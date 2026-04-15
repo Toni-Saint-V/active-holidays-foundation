@@ -16,14 +16,14 @@ export function AppShell() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">
-              Active Holidays
+              Платформа Active Holidays
             </p>
             <h1 className="mt-1 text-xl font-semibold text-textPrimary">
-              Foundation Scaffold
+              Архитектурный каркас
             </h1>
           </div>
           <div className="rounded-full border border-borderStrong bg-surface-3 px-3 py-1 text-sm text-textSecondary">
-            Phase 1
+            Фаза 2
           </div>
         </div>
       </header>

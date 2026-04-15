@@ -10,6 +10,6 @@ describe("AppShell", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Foundation Scaffold")).toBeInTheDocument();
+    expect(screen.getByText("Архитектурный каркас")).toBeInTheDocument();
   });
 });
