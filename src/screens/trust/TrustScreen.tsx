@@ -3,9 +3,9 @@ import { ScreenPlaceholder } from "@/screens/shared/ScreenPlaceholder";
 export function TrustScreen() {
   return (
     <ScreenPlaceholder
-      eyebrow="Trust"
-      title="Explainability и trust layer"
-      description="Trust screen готов как контейнер для evidence chain, replay и source explorer."
+      eyebrow="Доверие"
+      title="Объяснимость и слой доверия"
+      description="Экран доверия готов как контейнер для цепочки доказательств, воспроизведения и обозревателя источников."
     />
   );
 }

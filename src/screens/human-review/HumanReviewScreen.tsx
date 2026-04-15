@@ -3,9 +3,9 @@ import { ScreenPlaceholder } from "@/screens/shared/ScreenPlaceholder";
 export function HumanReviewScreen() {
   return (
     <ScreenPlaceholder
-      eyebrow="Human Review"
+      eyebrow="Ручная проверка"
       title="Эскалация на ручную проверку"
-      description="Сценарий HUMAN_REVIEW уже выделен как отдельный экран. Дальше сюда попадут ambiguity, conflicts и expert handoff."
+      description="Сценарий ручной проверки уже выделен как отдельный экран. Дальше сюда попадут неоднозначности, конфликты и передача эксперту."
     />
   );
 }

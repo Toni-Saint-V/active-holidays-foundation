@@ -3,9 +3,9 @@ import { ScreenPlaceholder } from "@/screens/shared/ScreenPlaceholder";
 export function LandingScreen() {
   return (
     <ScreenPlaceholder
-      eyebrow="Landing"
-      title="Премиальный вход в travel decision system"
-      description="Базовый экран готов. Следующим этапом сюда добавим zero-input intake, предварительный вердикт и быстрый старт сценария."
+      eyebrow="Старт"
+      title="Точка входа в систему решений для поездок"
+      description="Базовый экран готов. На следующем этапе здесь появятся старт анкеты, предварительный вердикт и быстрый запуск сценария."
     />
   );
 }

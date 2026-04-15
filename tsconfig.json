@@ -18,10 +18,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@server/*": ["server/*"]
+      "@shared/*": ["shared/*"]
     },
     "types": ["vitest/globals"]
   },
-  "include": ["src", "server", "vite.config.ts"],
+  "include": ["src", "server", "shared", "vite.config.ts"],
   "references": []
 }

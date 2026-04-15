@@ -3,9 +3,9 @@ import { ScreenPlaceholder } from "@/screens/shared/ScreenPlaceholder";
 export function ResultScreen() {
   return (
     <ScreenPlaceholder
-      eyebrow="Result"
+      eyebrow="Вердикт"
       title="Вердикт и маршрут"
-      description="Result route уже зарегистрирован. После доменной фазы сюда подключится deterministic payload, confidence и explainability."
+      description="Маршрут вердикта уже зарегистрирован. После доменной фазы сюда подключится детерминированный ответ, уровень уверенности и объяснимость."
     />
   );
 }

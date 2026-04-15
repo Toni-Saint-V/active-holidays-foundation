@@ -3,9 +3,9 @@ import { ScreenPlaceholder } from "@/screens/shared/ScreenPlaceholder";
 export function DocumentsScreen() {
   return (
     <ScreenPlaceholder
-      eyebrow="Documents"
+      eyebrow="Документы"
       title="Готовность документов"
-      description="Секция документов подготовлена как отдельный route boundary. Далее добавим readiness score и checklist."
+      description="Секция документов подготовлена как отдельная граница маршрута. Дальше добавим оценку готовности и чек-лист."
     />
   );
 }
