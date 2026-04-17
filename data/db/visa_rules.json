@@ -1,0 +1,90 @@
+[
+  {
+    "citizenship": "RU",
+    "destination": "IT",
+    "regime": "consular_visa",
+    "maxStayDays": 90,
+    "processingWeeks": 4,
+    "feeEur": 80,
+    "registrationRequired": false,
+    "sourceId": "src_italy_consulate_spb",
+    "note": "Шенгенская виза типа C, подача через VFS Italy."
+  },
+  {
+    "citizenship": "RU",
+    "destination": "RS",
+    "regime": "visa_free",
+    "maxStayDays": 30,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": false,
+    "sourceId": "src_russia_mfa_tr",
+    "note": "Сербия: безвизовый въезд до 30 дней."
+  },
+  {
+    "citizenship": "RU",
+    "destination": "AE",
+    "regime": "visa_on_arrival",
+    "maxStayDays": 90,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": false,
+    "sourceId": "src_russia_mfa_us",
+    "note": "ОАЭ: виза по прибытии на 90 дней."
+  },
+  {
+    "citizenship": "RU",
+    "destination": "GE",
+    "regime": "visa_free",
+    "maxStayDays": 365,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": false,
+    "sourceId": "src_russia_mfa_tr",
+    "note": "Грузия: безвизовый въезд до 365 дней."
+  },
+  {
+    "citizenship": "RU",
+    "destination": "AM",
+    "regime": "visa_free",
+    "maxStayDays": 180,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": false,
+    "sourceId": "src_russia_mfa_tr",
+    "note": "Армения: безвизовый въезд до 180 дней."
+  },
+  {
+    "citizenship": "TR",
+    "destination": "RU",
+    "regime": "visa_free",
+    "maxStayDays": 60,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": true,
+    "sourceId": "src_russia_mfa_tr",
+    "note": "Турция: безвизовый въезд в РФ, регистрация по прибытии в течение 7 дней."
+  },
+  {
+    "citizenship": "US",
+    "destination": "RU",
+    "regime": "consular_visa",
+    "maxStayDays": 30,
+    "processingWeeks": 8,
+    "feeEur": 160,
+    "registrationRequired": true,
+    "sourceId": "src_russia_mfa_us",
+    "note": "США: визовая подача в консульстве с учётом санкционного контекста."
+  },
+  {
+    "citizenship": "RU",
+    "destination": "RU",
+    "regime": "visa_free",
+    "maxStayDays": 365,
+    "processingWeeks": 0,
+    "feeEur": 0,
+    "registrationRequired": false,
+    "sourceId": "src_russia_mfa_tr",
+    "note": "Внутренняя поездка по России не требует визы."
+  }
+]

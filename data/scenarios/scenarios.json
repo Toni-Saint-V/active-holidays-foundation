@@ -1,0 +1,52 @@
+[
+  {
+    "caseId": "s1-rf-italy",
+    "productType": "travel",
+    "title": "S1 · Петербург → Италия",
+    "subtitle": "Туризм, 8 недель, нет страховки",
+    "expectedVerdict": "GO_WITH_CONDITIONS",
+    "expectedActionType": "book_appointment",
+    "expectedPrimaryPath": "italy_c_tourism",
+    "note": "Шенген C через VFS Italy — нужно добрать страховку и несколько документов."
+  },
+  {
+    "caseId": "s2-tr-spb",
+    "productType": "travel",
+    "title": "S2 · Анкара → Санкт-Петербург",
+    "subtitle": "Туризм, безвиз, регистрация за 7 дней",
+    "expectedVerdict": "GO",
+    "expectedActionType": "start_application",
+    "expectedPrimaryPath": "turkey_visa_free_spb",
+    "note": "Турция → РФ: безвизовый режим, регистрация по прибытии."
+  },
+  {
+    "caseId": "s3-us-spb-business",
+    "productType": "travel",
+    "title": "S3 · Нью-Йорк → Санкт-Петербург",
+    "subtitle": "Бизнес, санкции, платежи",
+    "expectedVerdict": "HUMAN_REVIEW",
+    "expectedActionType": "send_for_review",
+    "expectedPrimaryPath": null,
+    "note": "Санкционный контекст и платёжные ограничения — передаём менеджеру."
+  },
+  {
+    "caseId": "s4-rf-residency-dnv",
+    "productType": "residency_es",
+    "title": "S4 · Петербург → ВНЖ Испании",
+    "subtitle": "DNV, удалённый доход 3200€, B1",
+    "expectedVerdict": "GO_WITH_CONDITIONS",
+    "expectedActionType": "collect_financial_docs",
+    "expectedPrimaryPath": "dnv_espana",
+    "note": "Digital Nomad Visa: доход выше порога, осталось добрать финансовые документы и апостиль."
+  },
+  {
+    "caseId": "s5-rf-italy-insurance",
+    "productType": "insurance_adult",
+    "title": "S5 · Страховка в Италию",
+    "subtitle": "42 года, хроники, 10 дней",
+    "expectedVerdict": "GO_WITH_CONDITIONS",
+    "expectedActionType": "request_medical_questionnaire",
+    "expectedPrimaryPath": "alfa_plus",
+    "note": "Хроники требуют полиса с расширенным покрытием; базовые скрыты фильтром."
+  }
+]

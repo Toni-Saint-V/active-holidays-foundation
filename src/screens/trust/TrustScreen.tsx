@@ -1,146 +1,147 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useTravelFlowStore } from "@/state/travelFlowStore";
-import { getActiveTravelSession } from "@/state/travelFlowSelectors";
-
-const trustStatusLabels = {
-  ready: "Сигналы согласованы",
-  attention_needed: "Нужна дополнительная проверка",
-  blocked: "Сигналы пока неустойчивы"
-} as const;
-
-const checkStatusLabels = {
-  clear: "Чисто",
-  review: "Проверить",
-  blocked: "Блокер"
-} as const;
-
-const checkToneClasses = {
-  clear: "border-success/40 bg-successBg",
-  review: "border-warning/40 bg-warningBg",
-  blocked: "border-danger/40 bg-dangerBg"
-} as const;
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useCaseStore } from "@/state/caseStore";
+import { Badge, Button, Card } from "@/ui/primitives";
+import { ConfidenceGauge } from "@/ui/ConfidenceGauge";
+import { NodeGraph } from "@/ui/NodeGraph";
+import { SourceBadge } from "@/ui/SourceBadge";
+import { VolatilityRadar } from "@/ui/VolatilityRadar";
+import { FractalConfidence } from "@/ui/FractalConfidence";
+import { EmptyState } from "@/ui/EmptyState";
+import { staggerChild, staggerParent } from "@/animations/variants";
+import { useScreenView } from "@/instrumentation/screenView";
+import { formatPercent } from "@/lib/format";
 
 export function TrustScreen() {
-  const sessions = useTravelFlowStore((state) => state.sessions);
-  const activeSessionId = useTravelFlowStore((state) => state.activeSessionId);
-  const status = useTravelFlowStore((state) => state.status);
-  const errorMessage = useTravelFlowStore((state) => state.errorMessage);
-  const hydrateWorkspace = useTravelFlowStore((state) => state.hydrateWorkspace);
-  const activeSession = getActiveTravelSession(sessions, activeSessionId);
+  useScreenView("trust");
+  const [searchParams] = useSearchParams();
+  const caseIdFromUrl = searchParams.get("case");
+  const {
+    activeCase,
+    activeCaseId,
+    activeResult,
+    scenarios,
+    bootstrap,
+    loadCase,
+    status,
+    errorMessage
+  } = useCaseStore();
+  const [selectedFactor, setSelectedFactor] = useState<string | null>(null);
 
   useEffect(() => {
-    void hydrateWorkspace();
-  }, [hydrateWorkspace]);
+    if (scenarios.length === 0) void bootstrap();
+  }, [bootstrap, scenarios.length]);
 
-  if (status === "loading") {
-    return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-sm text-textSecondary">Загружаем проверку доверия...</p>
-      </section>
-    );
-  }
+  useEffect(() => {
+    const target = caseIdFromUrl ?? activeCaseId ?? scenarios[0]?.caseId ?? "s1-rf-italy";
+    if (target && target !== activeCaseId) {
+      void loadCase(target);
+    }
+  }, [caseIdFromUrl, activeCaseId, scenarios, loadCase]);
 
   if (status === "error") {
     return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-sm text-textPrimary">
-          {errorMessage ?? "Не удалось загрузить данные проверки доверия."}
-        </p>
-      </section>
+      <EmptyState
+        title="Не удалось построить доверие"
+        description={errorMessage ?? "Попробуйте обновить страницу."}
+        action={
+          <Button variant="secondary" onClick={() => loadCase("s1-rf-italy")}>
+            Загрузить S1
+          </Button>
+        }
+      />
     );
   }
 
-  if (!activeSession) {
+  if (!activeResult || !activeCase) {
     return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">Доверие</p>
-        <h2 className="mt-3 text-3xl font-semibold text-textPrimary">
-          Пока нет данных для объяснения решения
-        </h2>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
-          Раздел доверия появится после отправки анкеты, когда система соберёт
-          активную сессию решения.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            to="/intake"
-            className="rounded-xl bg-accent px-4 py-3 text-sm font-medium text-black transition hover:bg-accentHover"
-          >
-            Перейти к анкете
-          </Link>
-          <Link
-            to="/result"
-            className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
-          >
-            Открыть вердикт
-          </Link>
-        </div>
-      </section>
+      <Card>
+        <p className="animate-pulse text-sm text-textSecondary">Считаем доверие…</p>
+      </Card>
     );
   }
+
+  const { confidenceBreakdown, sources, volatilityScore, confidence } = activeResult.trust;
 
   return (
-    <div className="grid gap-4">
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">Доверие</p>
-        <h2 className="mt-3 text-3xl font-semibold text-textPrimary">
-          {trustStatusLabels[activeSession.result.trust.readiness]}
-        </h2>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
-          {activeSession.result.trust.summary}
-        </p>
-      </section>
+    <motion.div
+      variants={staggerParent}
+      initial="initial"
+      animate="animate"
+      className="grid gap-4"
+    >
+      <motion.section variants={staggerChild}>
+        <Card className="grid gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">Доверие</p>
+              <h2 className="text-2xl font-semibold text-textPrimary">
+                Почему движку можно верить
+              </h2>
+            </div>
+            <Badge tone={confidence >= 0.8 ? "positive" : confidence >= 0.5 ? "warning" : "negative"}>
+              {formatPercent(confidence)}
+            </Badge>
+          </div>
+          <ConfidenceGauge
+            breakdown={confidenceBreakdown}
+            selectedFactorId={selectedFactor}
+            onFactorClick={(factorId) =>
+              setSelectedFactor((current) => (current === factorId ? null : factorId))
+            }
+          />
+        </Card>
+      </motion.section>
 
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <h3 className="text-lg font-semibold text-textPrimary">Проверки доверия</h3>
-        <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
-          {activeSession.result.trust.checks.map((check) => (
-            <li
-              key={check.id}
-              className={[
-                "rounded-xl border px-4 py-3",
-                checkToneClasses[check.status]
-              ].join(" ")}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-medium text-textPrimary">{check.label}</p>
-                <span className="text-xs text-textPrimary">
-                  {checkStatusLabels[check.status]}
-                </span>
-              </div>
-              <p className="mt-2">{check.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <motion.section variants={staggerChild}>
+        <Card className="grid gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-textMuted">Цепочка объяснения</p>
+            <p className="text-sm text-textPrimary">Сигналы → правила → выводы</p>
+          </div>
+          <NodeGraph ruleResults={activeResult.ruleResults} />
+        </Card>
+      </motion.section>
 
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <h3 className="text-lg font-semibold text-textPrimary">Объясняющие блоки</h3>
-        <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
-          {activeSession.result.trust.explanations.map((item) => (
-            <li key={item.id} className="rounded-xl bg-surface-2 px-4 py-3">
-              <p className="font-medium text-textPrimary">{item.title}</p>
-              <p className="mt-2">{item.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <motion.section variants={staggerChild}>
+        <VolatilityRadar sources={sources.map((source) => ({
+          ...source,
+          summary: "",
+          url: source.url
+        }))} />
+      </motion.section>
 
-      <div className="flex flex-wrap gap-3">
-        <Link
-          to="/result"
-          className="rounded-xl bg-accent px-4 py-3 text-sm font-medium text-black transition hover:bg-accentHover"
-        >
-          Вернуться к вердикту
-        </Link>
-        <Link
-          to="/documents"
-          className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
-        >
-          Открыть документы
-        </Link>
-      </div>
-    </div>
+      <motion.section variants={staggerChild}>
+        <FractalConfidence breakdown={confidenceBreakdown} />
+      </motion.section>
+
+      <motion.section variants={staggerChild}>
+        <Card className="grid gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-textPrimary">Источники</p>
+            <span className="text-xs text-textSecondary">
+              Средняя волатильность {formatPercent(volatilityScore, 0)}
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {sources.map((source) => (
+              <SourceBadge
+                key={source.id}
+                source={{
+                  ...source,
+                  summary:
+                    source.tier === "official"
+                      ? "Официальный источник — учитываем с минимальной волатильностью."
+                      : source.tier === "operator"
+                        ? "Оператор: актуальные слоты и цены."
+                        : "Краудсорс: учитываем как вторичный сигнал."
+                }}
+              />
+            ))}
+          </div>
+        </Card>
+      </motion.section>
+    </motion.div>
   );
 }
