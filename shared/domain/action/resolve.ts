@@ -8,6 +8,7 @@ import type {
   Verdict
 } from "@shared/contracts";
 import { isInsuranceOffer, isResidencyOffer, isTravelOffer } from "@shared/contracts";
+import { filterRelevantRuleResults } from "../rules/relevance";
 import { getSignalValue } from "../signals";
 
 type ResolveActionInput = {
@@ -17,11 +18,15 @@ type ResolveActionInput = {
   criticalRisk: CriticalRisk;
   ruleResults: RuleResult[];
   signals: CaseSignals;
+  pathId?: string | null;
 };
 
 function travelAction(input: ResolveActionInput): NextAction {
-  const { verdict, primary, criticalRisk, ruleResults } = input;
-  const firedRules = ruleResults.filter((result) => result.fired);
+  const { verdict, primary, criticalRisk, ruleResults, pathId } = input;
+  const firedRules = filterRelevantRuleResults(
+    ruleResults.filter((result) => result.fired),
+    pathId
+  );
   const humanReviewTriggerIds = firedRules
     .filter((result) => result.output.type === "human_review_trigger")
     .map((result) => result.ruleId);

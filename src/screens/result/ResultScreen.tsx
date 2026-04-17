@@ -39,6 +39,12 @@ type ResultScreenProps = {
   screenName?: string;
 };
 
+const defaultCaseByProduct: Record<ProductType, string> = {
+  travel: "s1-rf-italy",
+  residency_es: "s4-rf-residency-dnv",
+  insurance_adult: "s5-rf-italy-insurance"
+};
+
 function whatIfConfigFor(productType: ProductType) {
   switch (productType) {
     case "travel":
@@ -104,26 +110,35 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
   }, [bootstrap, scenarios.length]);
 
   const defaultCaseId = useMemo(() => {
-    if (productType) {
-      const match = scenarios.find((item) => item.productType === productType);
-      if (match) return match.caseId;
+    if (!productType) {
+      return scenarios[0]?.caseId ?? defaultCaseByProduct.travel;
     }
-    return scenarios[0]?.caseId ?? "s1-rf-italy";
+    const match = scenarios.find((item) => item.productType === productType);
+    return match?.caseId ?? defaultCaseByProduct[productType];
   }, [productType, scenarios]);
 
+  const activeCaseProductType = activeCase?.productType ?? activeResult?.productType;
+  const activeCaseMatchesProduct = !productType || activeCaseProductType === productType;
+
   useEffect(() => {
-    const target = caseIdFromUrl ?? activeCaseId ?? defaultCaseId;
+    const target =
+      caseIdFromUrl ?? (activeCaseMatchesProduct ? activeCaseId : null) ?? defaultCaseId;
     if (target && target !== activeCaseId) {
       void loadCase(target);
     }
-  }, [caseIdFromUrl, activeCaseId, defaultCaseId, loadCase]);
+  }, [caseIdFromUrl, activeCaseId, activeCaseMatchesProduct, defaultCaseId, loadCase]);
 
   const primaryOffer = activeResult?.primaryPath ?? null;
   const alternativeOffers = activeResult?.alternativePaths ?? [];
   const verdict = activeResult?.verdict ?? null;
   const tone = verdict ? verdictTone[verdict] : null;
+  const isHumanReview = verdict === "HUMAN_REVIEW";
   const activeProductType: ProductType | null =
     activeResult?.productType ?? activeCase?.productType ?? null;
+  const humanReviewTriggers =
+    activeResult?.ruleResults.filter(
+      (rule) => rule.fired && rule.output.type === "human_review_trigger"
+    ) ?? [];
 
   const whatIfConfig = activeProductType ? whatIfConfigFor(activeProductType) : null;
   const baseWhatIfValue = useMemo(() => {
@@ -231,13 +246,19 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                   {activeCase.id} · {formatDate(activeResult.computedAt)}
                 </span>
               </div>
-              <Link
-                to={`/trust?case=${encodeURIComponent(activeCase.id)}`}
-                className="inline-flex items-center gap-2 text-xs text-accent"
-              >
-                <Sparkles className="h-3 w-3" />
-                Разобрать уверенность
-              </Link>
+              {isHumanReview ? (
+                <span className="max-w-xs text-right text-xs text-textSecondary">
+                  Маршрут, уверенность и риски подтвердит оператор после ручной проверки.
+                </span>
+              ) : (
+                <Link
+                  to={`/trust?case=${encodeURIComponent(activeCase.id)}`}
+                  className="inline-flex items-center gap-2 text-xs text-accent"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Разобрать уверенность
+                </Link>
+              )}
             </div>
             <div>
               <h2 className="text-3xl font-semibold text-textPrimary sm:text-4xl">
@@ -260,25 +281,50 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.div>
       </motion.section>
 
-      <motion.section variants={staggerChild}>
-        <Card>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-textPrimary">Уверенность движка</p>
-            <span className="text-[11px] uppercase tracking-wide text-textMuted">
-              применены пределы:{" "}
-              {activeResult.trust.confidenceBreakdown.capsApplied.length
-                ? activeResult.trust.confidenceBreakdown.capsApplied.join(", ")
-                : "нет"}
-            </span>
-          </div>
-          <ConfidenceGauge
-            breakdown={activeResult.trust.confidenceBreakdown}
-            accentColor={tone.accent}
-          />
-        </Card>
-      </motion.section>
+      {isHumanReview ? (
+        <motion.section variants={staggerChild}>
+          <Card className="grid gap-3">
+            <p className="text-sm font-medium text-textPrimary">Ручная проверка в работе</p>
+            <p className="text-sm text-textSecondary">
+              Автомат остановился на передаче кейса оператору: пока человек не подтвердит
+              решение, мы не показываем основной маршрут, оценку уверенности и карту рисков.
+            </p>
+            {humanReviewTriggers.length > 0 && (
+              <div className="grid gap-2">
+                {humanReviewTriggers.map((rule) => (
+                  <div
+                    key={rule.ruleId}
+                    className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3"
+                  >
+                    <p className="text-sm font-medium text-textPrimary">{rule.ruleId}</p>
+                    <p className="mt-1 text-xs text-textSecondary">{rule.explanation}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </motion.section>
+      ) : (
+        <motion.section variants={staggerChild}>
+          <Card>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-textPrimary">Уверенность движка</p>
+              <span className="text-[11px] uppercase tracking-wide text-textMuted">
+                применены пределы:{" "}
+                {activeResult.trust.confidenceBreakdown.capsApplied.length
+                  ? activeResult.trust.confidenceBreakdown.capsApplied.join(", ")
+                  : "нет"}
+              </span>
+            </div>
+            <ConfidenceGauge
+              breakdown={activeResult.trust.confidenceBreakdown}
+              accentColor={tone.accent}
+            />
+          </Card>
+        </motion.section>
+      )}
 
-      {activeResult.criticalRisk && (
+      {!isHumanReview && activeResult.criticalRisk && (
         <motion.section variants={staggerChild}>
           <Card padding="none" className="overflow-hidden">
             <div className="p-5">
@@ -291,7 +337,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       )}
 
-      {activeResult.risks.length > 0 && (
+      {!isHumanReview && activeResult.risks.length > 0 && (
         <motion.section variants={staggerChild}>
           <Card className="grid gap-3">
             <p className="text-sm font-medium text-textPrimary">Риски в работе</p>
@@ -304,7 +350,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       )}
 
-      {primaryOffer ? (
+      {!isHumanReview && primaryOffer ? (
         <motion.section variants={staggerChild} className="grid gap-3">
           <p className="text-sm font-medium text-textPrimary">
             {isTravelOffer(primaryOffer)
@@ -315,16 +361,16 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
           </p>
           <OfferCard offer={primaryOffer} selected showBoosts />
         </motion.section>
-      ) : (
+      ) : !isHumanReview ? (
         <motion.section variants={staggerChild}>
           <EmptyState
             title="Сейчас подходящего варианта нет"
             description="Либо сработал блокер, либо правило ушло в ручную проверку. Смотрите риски и объяснение решения ниже."
           />
         </motion.section>
-      )}
+      ) : null}
 
-      {alternativeOffers.length > 0 && (
+      {!isHumanReview && alternativeOffers.length > 0 && (
         <motion.section variants={staggerChild}>
           <Card className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -497,9 +543,10 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
           <p className="text-sm font-medium text-textPrimary">Общий снимок решения</p>
           <p className="text-xs text-textSecondary">
             Версия контракта: {activeResult.version}. Продукт:{" "}
-            {activeResult.productType}. Вычислено за{" "}
-            {activeResult.auditTrail.totalMs.toFixed(1)} мс · уверенность{" "}
-            {formatPercent(activeResult.trust.confidence)}.
+            {activeResult.productType}.{" "}
+            {isHumanReview
+              ? "Финальный маршрут, уровень уверенности и карту рисков подтвердит оператор."
+              : `Вычислено за ${activeResult.auditTrail.totalMs.toFixed(1)} мс · уверенность ${formatPercent(activeResult.trust.confidence)}.`}
           </p>
           {activeResult.assumptions.length > 0 && (
             <ul className="mt-1 grid gap-1 text-xs text-textMuted">

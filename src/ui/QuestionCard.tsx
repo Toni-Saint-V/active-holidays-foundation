@@ -54,7 +54,11 @@ export function QuestionCard({ question, onAnswer, children }: Props) {
         {question.kind === "boolean" && (
           <SegmentedControl
             value="none"
-            onChange={(value) => onAnswer(value === "yes")}
+            onChange={(value) => {
+              // "Не знаю" leaves the signal unresolved; only explicit yes/no should persist.
+              if (value === "none") return;
+              onAnswer(value === "yes");
+            }}
             options={[
               { value: "yes", label: "Да" },
               { value: "no", label: "Нет" },

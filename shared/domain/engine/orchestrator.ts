@@ -333,6 +333,7 @@ export function runDecision(
     preferences: input.case.preferences
   });
   const { primary, alternatives } = splitOffers(rankedOffers);
+  const focusPathId = primary?.id ?? rankedOffers[0]?.id ?? null;
   finishRank(
     primary
       ? `Основное предложение: ${primary.id}, альтернатив: ${alternatives.length}.`
@@ -343,7 +344,7 @@ export function runDecision(
     "computeRisks",
     "Собираем риски из сработавших правил."
   );
-  const risks = deriveRisks(ruleResults);
+  const risks = deriveRisks(ruleResults, focusPathId);
   const criticalRisk = pickCriticalRisk(risks);
   finishRisks(
     `Рисков: ${risks.length}${criticalRisk ? `, критический: ${criticalRisk.id}` : ""}.`
@@ -353,16 +354,17 @@ export function runDecision(
     "computeConfidence",
     "Считаем уверенность и применяем жёсткие пределы."
   );
-  const conflicts = detectConflicts(ruleResults);
+  const conflicts = detectConflicts(ruleResults, focusPathId);
   const freshSources = refreshSourcesWithVolatility(input.catalogs.sources, nowFn());
   const confidence = computeConfidenceBreakdown({
     signals: validSignals,
     ruleResults,
     sources: freshSources,
     conflicts,
-    productType
+    productType,
+    pathId: focusPathId
   });
-  const ambiguity = computeAmbiguity(ruleResults, conflicts);
+  const ambiguity = computeAmbiguity(ruleResults, conflicts, focusPathId);
   finishConfidence(
     `Уверенность: ${confidence.value}, конфликтов: ${conflicts.count}, пределов применено: ${confidence.capsApplied.length}.`
   );
@@ -378,7 +380,8 @@ export function runDecision(
     rankedOffers,
     confidence,
     ambiguity,
-    conflictCount: conflicts.count
+    conflictCount: conflicts.count,
+    pathId: focusPathId
   });
   finishVerdict(`Вердикт: ${verdict}.`);
 
@@ -392,7 +395,8 @@ export function runDecision(
     primary,
     criticalRisk,
     ruleResults,
-    signals: validSignals
+    signals: validSignals,
+    pathId: focusPathId
   });
   finishAction(`Действие: ${nextAction.type} (${nextAction.priority}).`);
 

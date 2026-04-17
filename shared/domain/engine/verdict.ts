@@ -7,6 +7,7 @@ import type {
   Verdict
 } from "@shared/contracts";
 import { mandatorySignalIds, hasSignal } from "../signals";
+import { filterRelevantRuleResults } from "../rules/relevance";
 
 type ComputeVerdictInput = {
   productType: ProductType;
@@ -16,6 +17,7 @@ type ComputeVerdictInput = {
   confidence: ConfidenceBreakdown;
   ambiguity: number;
   conflictCount: number;
+  pathId?: string | null;
 };
 
 export function computeVerdict(input: ComputeVerdictInput): Verdict {
@@ -26,14 +28,20 @@ export function computeVerdict(input: ComputeVerdictInput): Verdict {
     rankedOffers,
     confidence,
     ambiguity,
-    conflictCount
+    conflictCount,
+    pathId
   } = input;
   const firedRules = ruleResults.filter((result) => result.fired);
-  const hasHumanReview = firedRules.some(
+  const relevantFiredRules = filterRelevantRuleResults(firedRules, pathId);
+  const hasHumanReview = relevantFiredRules.some(
     (rule) => rule.output.type === "human_review_trigger"
   );
-  const hasBlocker = firedRules.some((rule) => rule.output.type === "blocker");
-  const hasWarning = firedRules.some((rule) => rule.output.type === "warning");
+  const hasBlocker = relevantFiredRules.some(
+    (rule) => rule.output.type === "blocker"
+  );
+  const hasWarning = relevantFiredRules.some(
+    (rule) => rule.output.type === "warning"
+  );
   const mandatory = mandatorySignalIds(productType);
   const mandatoryPresent = mandatory.every((id) => hasSignal(signals, id));
   const primary = rankedOffers.find((offer) => offer.eligible) ?? null;

@@ -6,6 +6,7 @@ import type {
   PathPreference,
   Verdict
 } from "@shared/contracts";
+import { signalIdSchema } from "@shared/contracts";
 import type { Catalogs } from "./catalogs";
 
 export class CaseStore {
@@ -58,11 +59,22 @@ export class CaseStore {
       (item) => item.signalId !== override.signalId
     );
     overrides.push(override);
-    const signals = existing.signals.map((signal) =>
-      signal.id === override.signalId
-        ? { ...signal, value: override.value, source: "override" as const, capturedAt: override.appliedAt }
-        : signal
-    );
+    const parsedSignalId = signalIdSchema.safeParse(override.signalId);
+    const signals = existing.signals.slice();
+    if (parsedSignalId.success) {
+      const nextSignal = {
+        id: parsedSignalId.data,
+        value: override.value,
+        source: "override" as const,
+        capturedAt: override.appliedAt
+      };
+      const existingIndex = signals.findIndex(
+        (signal) => signal.id === parsedSignalId.data
+      );
+      if (existingIndex === -1) signals.push(nextSignal);
+      else signals[existingIndex] = nextSignal;
+      signals.sort((a, b) => a.id.localeCompare(b.id));
+    }
     const next: Case = {
       ...existing,
       signals,

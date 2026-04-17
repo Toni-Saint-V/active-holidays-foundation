@@ -7,6 +7,7 @@ import type {
   Source
 } from "@shared/contracts";
 import { mandatorySignalIds, hasSignal } from "../signals";
+import { filterRelevantRuleResults, ruleResultAffectsPath } from "../rules/relevance";
 import { aggregateVolatility } from "../volatility";
 
 type ConflictReport = {
@@ -14,10 +15,13 @@ type ConflictReport = {
   pairs: Array<{ pathId: string; boostRule: string; penaltyRule: string }>;
 };
 
-export function detectConflicts(ruleResults: RuleResult[]): ConflictReport {
+export function detectConflicts(
+  ruleResults: RuleResult[],
+  pathId?: string | null
+): ConflictReport {
   const byPath: Record<string, { boosts: string[]; penalties: string[] }> = {};
   for (const result of ruleResults) {
-    if (!result.fired) continue;
+    if (!result.fired || !ruleResultAffectsPath(result, pathId)) continue;
     const pathIds = result.output.pathIds ?? [];
     for (const pathId of pathIds) {
       if (!byPath[pathId]) byPath[pathId] = { boosts: [], penalties: [] };
@@ -39,13 +43,18 @@ export function detectConflicts(ruleResults: RuleResult[]): ConflictReport {
 
 export function computeAmbiguity(
   ruleResults: RuleResult[],
-  conflicts: ConflictReport
+  conflicts: ConflictReport,
+  pathId?: string | null
 ): number {
-  const firedCount = ruleResults.filter((result) => result.fired).length;
+  const relevantFiredRules = filterRelevantRuleResults(
+    ruleResults.filter((result) => result.fired),
+    pathId
+  );
+  const firedCount = relevantFiredRules.length;
   if (firedCount === 0) return 0;
   const conflictShare = Math.min(1, conflicts.count / Math.max(1, firedCount));
-  const warnings = ruleResults.filter(
-    (result) => result.fired && result.output.type === "warning"
+  const warnings = relevantFiredRules.filter(
+    (result) => result.output.type === "warning"
   ).length;
   const warningShare = Math.min(1, warnings / Math.max(1, firedCount));
   return Math.round((conflictShare * 0.7 + warningShare * 0.3) * 100) / 100;
@@ -57,18 +66,20 @@ type ComputeConfidenceInput = {
   sources: Source[];
   conflicts: ConflictReport;
   productType: ProductType;
+  pathId?: string | null;
 };
 
 export function computeConfidenceBreakdown(
   input: ComputeConfidenceInput
 ): ConfidenceBreakdown {
-  const { signals, ruleResults, sources, conflicts, productType } = input;
+  const { signals, ruleResults, sources, conflicts, productType, pathId } = input;
 
   const mandatory = mandatorySignalIds(productType);
   const mandatoryPresent = mandatory.filter((id) => hasSignal(signals, id)).length;
   const completeness = mandatory.length === 0 ? 1 : mandatoryPresent / mandatory.length;
 
   const firedRules = ruleResults.filter((result) => result.fired);
+  const relevantFiredRules = filterRelevantRuleResults(firedRules, pathId);
   const rulesCovered = firedRules.length;
   const rulesRatio = ruleResults.length === 0 ? 0 : rulesCovered / ruleResults.length;
 
@@ -76,10 +87,12 @@ export function computeConfidenceBreakdown(
   const conflictPenalty = Math.min(0.35, conflicts.count * 0.12);
   const warningPenalty = Math.min(
     0.2,
-    firedRules.filter((rule) => rule.output.type === "warning").length * 0.04
+    relevantFiredRules.filter((rule) => rule.output.type === "warning").length * 0.04
   );
-  const blockerPresent = firedRules.some((rule) => rule.output.type === "blocker");
-  const humanReviewPresent = firedRules.some(
+  const blockerPresent = relevantFiredRules.some(
+    (rule) => rule.output.type === "blocker"
+  );
+  const humanReviewPresent = relevantFiredRules.some(
     (rule) => rule.output.type === "human_review_trigger"
   );
 
@@ -142,7 +155,7 @@ export function computeConfidenceBreakdown(
       detail:
         warningPenalty === 0
           ? "Активных предупреждений нет."
-          : `Предупреждений: ${firedRules.filter((rule) => rule.output.type === "warning").length}.`,
+          : `Предупреждений: ${relevantFiredRules.filter((rule) => rule.output.type === "warning").length}.`,
       value: -Math.min(1, warningPenalty * 3),
       weight: 0.1,
       children: []

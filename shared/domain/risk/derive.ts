@@ -1,4 +1,5 @@
 import type { CriticalRisk, Risk, RiskSeverity, RuleResult } from "@shared/contracts";
+import { ruleResultAffectsPath } from "../rules/relevance";
 
 const severityOrder: Record<RiskSeverity, number> = {
   critical: 4,
@@ -20,10 +21,13 @@ function severityToPulse(severity: RiskSeverity): number {
   }
 }
 
-export function deriveRisks(ruleResults: RuleResult[]): Risk[] {
+export function deriveRisks(
+  ruleResults: RuleResult[],
+  pathId?: string | null
+): Risk[] {
   const risks: Risk[] = [];
   for (const result of ruleResults) {
-    if (!result.fired) continue;
+    if (!result.fired || !ruleResultAffectsPath(result, pathId)) continue;
     let severity: RiskSeverity | null = null;
     if (result.output.type === "blocker") severity = result.output.severity ?? "critical";
     else if (result.output.type === "human_review_trigger") severity = "critical";
