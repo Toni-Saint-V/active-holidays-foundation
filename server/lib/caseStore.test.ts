@@ -66,4 +66,20 @@ describe("CaseStore.overrideSignal", () => {
       capturedAt: override.appliedAt
     });
   });
+
+  it("rejects overrides with a value type that does not match the signal", () => {
+    const store = new CaseStore(buildCatalogs(buildCase()));
+    const override: CaseOverride = {
+      signalId: "timeline_weeks",
+      value: "six",
+      reason: "Некорректное значение.",
+      appliedAt: "2026-04-17T10:00:00.000Z"
+    };
+
+    const updated = store.overrideSignal("case_1", override, new Date(override.appliedAt));
+
+    expect(updated).toBeNull();
+    expect(hasSignal(store.get("case_1")?.signals ?? [], "timeline_weeks")).toBe(false);
+    expect(store.get("case_1")?.overrides).toEqual([]);
+  });
 });

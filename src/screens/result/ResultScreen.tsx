@@ -116,17 +116,24 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     const match = scenarios.find((item) => item.productType === productType);
     return match?.caseId ?? defaultCaseByProduct[productType];
   }, [productType, scenarios]);
+  const requestedCaseId = useMemo(() => {
+    if (!caseIdFromUrl) return null;
+    if (!productType) return caseIdFromUrl;
+    const scenario = scenarios.find((item) => item.caseId === caseIdFromUrl);
+    if (!scenario || scenario.productType !== productType) return null;
+    return scenario.caseId;
+  }, [caseIdFromUrl, productType, scenarios]);
 
   const activeCaseProductType = activeCase?.productType ?? activeResult?.productType;
   const activeCaseMatchesProduct = !productType || activeCaseProductType === productType;
 
   useEffect(() => {
     const target =
-      caseIdFromUrl ?? (activeCaseMatchesProduct ? activeCaseId : null) ?? defaultCaseId;
+      requestedCaseId ?? (activeCaseMatchesProduct ? activeCaseId : null) ?? defaultCaseId;
     if (target && target !== activeCaseId) {
       void loadCase(target);
     }
-  }, [caseIdFromUrl, activeCaseId, activeCaseMatchesProduct, defaultCaseId, loadCase]);
+  }, [requestedCaseId, activeCaseId, activeCaseMatchesProduct, defaultCaseId, loadCase]);
 
   const primaryOffer = activeResult?.primaryPath ?? null;
   const alternativeOffers = activeResult?.alternativePaths ?? [];
@@ -407,68 +414,70 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       )}
 
-      <motion.section variants={staggerChild}>
-        <Card className="grid gap-3">
-          <p className="text-sm font-medium text-textPrimary">Почему такое решение</p>
-          <div className="grid gap-2">
-            {activeResult.whyBullets.map((bullet) => (
-              <ExpandableRow
-                key={bullet.id}
-                id={bullet.id}
-                title={bullet.text}
-                subtitle={`Правило ${bullet.ruleId} · сигналы: ${bullet.signalIds.join(", ")}`}
-                right={
-                  <Badge
-                    tone={
-                      bullet.tone === "positive"
-                        ? "positive"
-                        : bullet.tone === "negative"
-                          ? "negative"
-                          : bullet.tone === "review"
-                            ? "review"
-                            : bullet.tone === "warning"
-                              ? "warning"
-                              : "neutral"
-                    }
-                  >
-                    {bullet.ruleId}
-                  </Badge>
-                }
-                screen={screenName}
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-textMuted">Влияющие сигналы</p>
-                    <div className="mt-2 grid gap-1">
-                      {activeResult.decisionSignals
-                        .filter((signal) => bullet.signalIds.includes(signal.id))
-                        .map((signal) => (
-                          <SignalRow key={signal.id} signal={signal} />
-                        ))}
+      {!isHumanReview && (
+        <motion.section variants={staggerChild}>
+          <Card className="grid gap-3">
+            <p className="text-sm font-medium text-textPrimary">Почему такое решение</p>
+            <div className="grid gap-2">
+              {activeResult.whyBullets.map((bullet) => (
+                <ExpandableRow
+                  key={bullet.id}
+                  id={bullet.id}
+                  title={bullet.text}
+                  subtitle={`Правило ${bullet.ruleId} · сигналы: ${bullet.signalIds.join(", ")}`}
+                  right={
+                    <Badge
+                      tone={
+                        bullet.tone === "positive"
+                          ? "positive"
+                          : bullet.tone === "negative"
+                            ? "negative"
+                            : bullet.tone === "review"
+                              ? "review"
+                              : bullet.tone === "warning"
+                                ? "warning"
+                                : "neutral"
+                      }
+                    >
+                      {bullet.ruleId}
+                    </Badge>
+                  }
+                  screen={screenName}
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-textMuted">Влияющие сигналы</p>
+                      <div className="mt-2 grid gap-1">
+                        {activeResult.decisionSignals
+                          .filter((signal) => bullet.signalIds.includes(signal.id))
+                          .map((signal) => (
+                            <SignalRow key={signal.id} signal={signal} />
+                          ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-textMuted">Действие правила</p>
+                      <ul className="mt-2 grid gap-1 text-xs text-textSecondary">
+                        {activeResult.ruleResults
+                          .filter((rule) => rule.ruleId === bullet.ruleId)
+                          .map((rule) => (
+                            <li key={rule.ruleId} className="rounded-lg bg-surface-2 px-3 py-2">
+                              <p className="text-textPrimary">{rule.explanation}</p>
+                              <p className="mt-1 text-textMuted">
+                                Тип: {rule.output.type}
+                                {rule.output.severity ? `, уровень ${rule.output.severity}` : ""}
+                              </p>
+                            </li>
+                          ))}
+                      </ul>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-textMuted">Действие правила</p>
-                    <ul className="mt-2 grid gap-1 text-xs text-textSecondary">
-                      {activeResult.ruleResults
-                        .filter((rule) => rule.ruleId === bullet.ruleId)
-                        .map((rule) => (
-                          <li key={rule.ruleId} className="rounded-lg bg-surface-2 px-3 py-2">
-                            <p className="text-textPrimary">{rule.explanation}</p>
-                            <p className="mt-1 text-textMuted">
-                              Тип: {rule.output.type}
-                              {rule.output.severity ? `, уровень ${rule.output.severity}` : ""}
-                            </p>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                </div>
-              </ExpandableRow>
-            ))}
-          </div>
-        </Card>
-      </motion.section>
+                </ExpandableRow>
+              ))}
+            </div>
+          </Card>
+        </motion.section>
+      )}
 
       {whatIfConfig && (
         <motion.section variants={staggerChild}>
@@ -484,36 +493,38 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       )}
 
-      <motion.section variants={staggerChild}>
-        <Card className="grid gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium text-textPrimary">Реплей шагов движка</p>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                void loadAudit(activeCase.id);
-                track({ type: "replay_opened", caseId: activeCase.id });
-              }}
-              leadingIcon={<Sparkles className="h-3 w-3" />}
-            >
-              Загрузить аудит
-            </Button>
-          </div>
-          <AnimatePresence>
-            {audit && (
-              <motion.div
-                key="replay"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+      {!isHumanReview && (
+        <motion.section variants={staggerChild}>
+          <Card className="grid gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-medium text-textPrimary">Реплей шагов движка</p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void loadAudit(activeCase.id);
+                  track({ type: "replay_opened", caseId: activeCase.id });
+                }}
+                leadingIcon={<Sparkles className="h-3 w-3" />}
               >
-                <ReplayTimeline trail={audit.trail} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Card>
-      </motion.section>
+                Загрузить аудит
+              </Button>
+            </div>
+            <AnimatePresence>
+              {audit && (
+                <motion.div
+                  key="replay"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <ReplayTimeline trail={audit.trail} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Card>
+        </motion.section>
+      )}
 
       <motion.section variants={staggerChild}>
         <ForkDivider onFork={handleFork} disabled={status === "loading"} />

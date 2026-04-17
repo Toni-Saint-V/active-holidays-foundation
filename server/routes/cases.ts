@@ -137,7 +137,13 @@ export function casesRouter(): Router {
       requireCase(id);
       const override = req.body as z.infer<typeof caseOverrideSchema>;
       const updated = store.overrideSignal(id, override);
-      if (!updated) throw new HttpError(500, "Не удалось применить override.");
+      if (!updated) {
+        throw new HttpError(
+          400,
+          "Override не прошёл проверку сигнала: проверьте тип и допустимое значение.",
+          "invalid_override_signal"
+        );
+      }
       const result = computeResult(updated);
       store.snapshotDecision(
         updated.id,

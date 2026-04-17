@@ -6,7 +6,7 @@ import type {
   SignalDefinition,
   SignalId
 } from "@shared/contracts";
-import { signalsRegistry, hasSignal } from "../signals";
+import { hasResolvedSignal, signalsRegistry, hasSignal } from "../signals";
 import { allTravelRuleDefinitions, residencyRules, insuranceRules } from "../rules";
 
 function rulesForProduct(productType: ProductType) {
@@ -79,7 +79,7 @@ export function buildIntakeQueue(
   const remaining = ranked.filter((question) => !question.answered);
   const mandatoryTotal = ranked.filter((item) => item.mandatory).length;
   const mandatoryDone = ranked.filter(
-    (question) => question.answered && question.mandatory
+    (question) => question.mandatory && hasResolvedSignal(signals, question.id)
   ).length;
   const progress =
     mandatoryTotal === 0 ? 1 : Math.min(1, mandatoryDone / mandatoryTotal);

@@ -121,8 +121,11 @@ function travelAction(input: ResolveActionInput): NextAction {
 }
 
 function residencyAction(input: ResolveActionInput): NextAction {
-  const { verdict, primary, ruleResults, signals } = input;
-  const firedRules = ruleResults.filter((result) => result.fired);
+  const { verdict, primary, ruleResults, signals, pathId } = input;
+  const firedRules = filterRelevantRuleResults(
+    ruleResults.filter((result) => result.fired),
+    pathId
+  );
   const humanReviewIds = firedRules
     .filter((result) => result.output.type === "human_review_trigger")
     .map((result) => result.ruleId);
@@ -219,8 +222,11 @@ function residencyAction(input: ResolveActionInput): NextAction {
 }
 
 function insuranceAction(input: ResolveActionInput): NextAction {
-  const { verdict, primary, ruleResults, signals } = input;
-  const firedRules = ruleResults.filter((result) => result.fired);
+  const { verdict, primary, ruleResults, signals, pathId } = input;
+  const firedRules = filterRelevantRuleResults(
+    ruleResults.filter((result) => result.fired),
+    pathId
+  );
   const hasChronic = getSignalValue<boolean>(signals, "has_chronic_conditions") ?? false;
   const humanReviewIds = firedRules
     .filter((result) => result.output.type === "human_review_trigger")

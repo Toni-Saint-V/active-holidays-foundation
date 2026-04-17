@@ -79,9 +79,11 @@ export function computeConfidenceBreakdown(
   const completeness = mandatory.length === 0 ? 1 : mandatoryPresent / mandatory.length;
 
   const firedRules = ruleResults.filter((result) => result.fired);
+  const relevantRuleResults = filterRelevantRuleResults(ruleResults, pathId);
   const relevantFiredRules = filterRelevantRuleResults(firedRules, pathId);
-  const rulesCovered = firedRules.length;
-  const rulesRatio = ruleResults.length === 0 ? 0 : rulesCovered / ruleResults.length;
+  const rulesCovered = relevantFiredRules.length;
+  const rulesRatio =
+    relevantRuleResults.length === 0 ? null : rulesCovered / relevantRuleResults.length;
 
   const freshness = 1 - aggregateVolatility(sources);
   const conflictPenalty = Math.min(0.35, conflicts.count * 0.12);
@@ -114,8 +116,11 @@ export function computeConfidenceBreakdown(
     {
       id: "rule_coverage",
       label: "Срабатывания правил",
-      detail: `Сработало ${rulesCovered} из ${ruleResults.length} правил.`,
-      value: rulesRatio * 2 - 1,
+      detail:
+        relevantRuleResults.length === 0
+          ? "Для основного маршрута нет отдельных релевантных правил."
+          : `Сработало ${rulesCovered} из ${relevantRuleResults.length} релевантных правил.`,
+      value: rulesRatio === null ? 0 : rulesRatio * 2 - 1,
       weight: 0.2,
       children: []
     },

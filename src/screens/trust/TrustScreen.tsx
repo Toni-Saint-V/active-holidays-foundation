@@ -62,6 +62,15 @@ export function TrustScreen() {
     );
   }
 
+  if (activeResult.verdict === "HUMAN_REVIEW") {
+    return (
+      <EmptyState
+        title="Доверие уточнит оператор"
+        description="Для этого кейса мы не показываем детальную оценку уверенности до завершения ручной проверки."
+      />
+    );
+  }
+
   const { confidenceBreakdown, sources, volatilityScore, confidence } = activeResult.trust;
 
   return (

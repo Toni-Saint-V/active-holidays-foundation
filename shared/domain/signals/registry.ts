@@ -1,9 +1,10 @@
-import type {
-  CaseSignals,
-  ProductType,
-  SignalDefinition,
-  SignalId,
-  SignalsRegistry
+import {
+  signalValueSchema,
+  type CaseSignals,
+  type ProductType,
+  type SignalDefinition,
+  type SignalId,
+  type SignalsRegistry
 } from "@shared/contracts";
 
 export const signalsRegistry: SignalsRegistry = [
@@ -406,6 +407,12 @@ export function getSignalValue<T>(
 
 export function hasSignal(signals: CaseSignals, id: SignalId): boolean {
   return signals.some((signal) => signal.id === id);
+}
+
+export function hasResolvedSignal(signals: CaseSignals, id: SignalId): boolean {
+  const record = signals.find((signal) => signal.id === id);
+  if (!record) return false;
+  return signalValueSchema.safeParse({ id: record.id, value: record.value }).success;
 }
 
 export function mandatorySignalIds(productType: ProductType = "travel"): SignalId[] {

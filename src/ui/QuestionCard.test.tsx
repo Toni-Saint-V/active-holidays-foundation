@@ -16,7 +16,7 @@ vi.mock("framer-motion", () => ({
 }));
 
 describe("QuestionCard", () => {
-  it("keeps an unresolved boolean answer pending", async () => {
+  it("persists an explicit unresolved boolean answer as null", async () => {
     const user = userEvent.setup();
     const onAnswer = vi.fn();
 
@@ -39,6 +39,6 @@ describe("QuestionCard", () => {
 
     await user.click(screen.getByRole("tab", { name: "Не знаю" }));
 
-    expect(onAnswer).not.toHaveBeenCalled();
+    expect(onAnswer).toHaveBeenCalledWith(null);
   });
 });

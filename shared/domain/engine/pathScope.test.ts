@@ -10,7 +10,9 @@ import {
   computeConfidenceBreakdown,
   detectConflicts
 } from "../confidence";
+import { previewVerdict } from "../ai/livePreview";
 import { resolveAction } from "../action";
+import { generateWhy } from "./why";
 import { computeVerdict } from "./verdict";
 import { deriveRisks, pickCriticalRisk } from "../risk";
 
@@ -136,5 +138,53 @@ describe("path-scoped travel rules", () => {
     expect(risks).toEqual([]);
     expect(nextAction.type).toBe("start_application");
     expect(nextAction.triggeredBy).toEqual(["primary_path"]);
+    expect(
+      confidence.factors.find((factor) => factor.id === "rule_coverage")?.value
+    ).toBe(0);
+    expect(generateWhy(alternativePathRuleResults, primary.id)).toEqual([]);
+  });
+
+  it("keeps intake preview clear when only an alternative path is blocked", () => {
+    const preview = previewVerdict(
+      {
+        case: {
+          id: "case_preview",
+          title: "Preview",
+          productType: "travel",
+          createdAt: NOW,
+          updatedAt: NOW,
+          signals,
+          overrides: [],
+          preferences: [],
+          forkedFrom: null
+        },
+        catalogs: {
+          paths: [buildTravelOffer("primary_path", true), buildTravelOffer("alt_path", false)],
+          visaRules: [
+            {
+              citizenship: "RU",
+              destination: "IT",
+              regime: "visa_free",
+              maxStayDays: 90,
+              processingWeeks: 0,
+              feeEur: 0,
+              registrationRequired: false,
+              sourceId: "consulate",
+              note: "Тестовое правило."
+            }
+          ],
+          restrictions: [],
+          sources,
+          residencyPrograms: [],
+          insuranceProducts: []
+        }
+      },
+      {
+        now: () => new Date(NOW)
+      }
+    );
+
+    expect(preview.hasBlockingRule).toBe(false);
+    expect(preview.hasHumanReviewTrigger).toBe(false);
   });
 });

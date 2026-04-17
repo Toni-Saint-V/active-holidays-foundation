@@ -6,7 +6,7 @@ import { Chip } from "./primitives";
 import { SegmentedControl } from "./SegmentedControl";
 import { formatPercent } from "@/lib/format";
 
-type Answer = string | number | boolean;
+type Answer = string | number | boolean | null;
 
 type Props = {
   question: IntakeQuestion;
@@ -55,8 +55,10 @@ export function QuestionCard({ question, onAnswer, children }: Props) {
           <SegmentedControl
             value="none"
             onChange={(value) => {
-              // "Не знаю" leaves the signal unresolved; only explicit yes/no should persist.
-              if (value === "none") return;
+              if (value === "none") {
+                onAnswer(null);
+                return;
+              }
               onAnswer(value === "yes");
             }}
             options={[

@@ -1,4 +1,5 @@
 import type { RuleResult, WhyBullet } from "@shared/contracts";
+import { filterRelevantRuleResults } from "../rules/relevance";
 
 function toneFor(result: RuleResult): WhyBullet["tone"] {
   switch (result.output.type) {
@@ -19,9 +20,11 @@ function toneFor(result: RuleResult): WhyBullet["tone"] {
   }
 }
 
-export function generateWhy(ruleResults: RuleResult[]): WhyBullet[] {
-  return ruleResults
-    .filter((result) => result.fired)
+export function generateWhy(ruleResults: RuleResult[], pathId?: string | null): WhyBullet[] {
+  return filterRelevantRuleResults(
+    ruleResults.filter((result) => result.fired),
+    pathId
+  )
     .slice()
     .sort((a, b) => b.priority - a.priority || a.ruleId.localeCompare(b.ruleId))
     .map((result) => ({

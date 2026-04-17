@@ -43,8 +43,10 @@ export function HumanReviewScreen() {
   }, [caseIdFromUrl, activeCaseId, scenarios, loadCase]);
 
   useEffect(() => {
-    if (activeCase) void loadAudit(activeCase.id);
-  }, [activeCase, loadAudit]);
+    if (activeCase && activeResult?.verdict !== "HUMAN_REVIEW") {
+      void loadAudit(activeCase.id);
+    }
+  }, [activeCase, activeResult?.verdict, loadAudit]);
 
   if (status === "error") {
     return (
@@ -110,7 +112,7 @@ export function HumanReviewScreen() {
               leadingIcon={<Briefcase className="h-4 w-4" />}
               onClick={() => navigate(`/result?case=${encodeURIComponent(activeCase.id)}`)}
             >
-              Открыть вердикт полностью
+              Открыть кейс
             </Button>
           </div>
         </Card>
@@ -169,7 +171,7 @@ export function HumanReviewScreen() {
         </motion.section>
       )}
 
-      {audit && (
+      {audit && activeResult.verdict !== "HUMAN_REVIEW" && (
         <motion.section variants={staggerChild}>
           <Card>
             <p className="mb-3 text-sm font-medium text-textPrimary">Аудит решения</p>

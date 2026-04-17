@@ -58,7 +58,7 @@ export function IntakeScreen() {
     return activeResult.decisionSignals.filter((signal) => signal.present).slice(0, 6);
   }, [activeResult]);
 
-  async function handleAnswer(value: string | number | boolean) {
+  async function handleAnswer(value: string | number | boolean | null) {
     if (!activeCase || !currentQuestion) return;
     track({
       type: "intake_answered",

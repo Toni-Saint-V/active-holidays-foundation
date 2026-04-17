@@ -14,7 +14,7 @@
     "productType": "travel",
     "title": "S2 · Анкара → Санкт-Петербург",
     "subtitle": "Туризм, безвиз, регистрация за 7 дней",
-    "expectedVerdict": "GO",
+    "expectedVerdict": "GO_WITH_CONDITIONS",
     "expectedActionType": "start_application",
     "expectedPrimaryPath": "turkey_visa_free_spb",
     "note": "Турция → РФ: безвизовый режим, регистрация по прибытии."
@@ -34,7 +34,7 @@
     "productType": "residency_es",
     "title": "S4 · Петербург → ВНЖ Испании",
     "subtitle": "DNV, удалённый доход 3200€, B1",
-    "expectedVerdict": "GO_WITH_CONDITIONS",
+    "expectedVerdict": "GO",
     "expectedActionType": "collect_financial_docs",
     "expectedPrimaryPath": "dnv_espana",
     "note": "Digital Nomad Visa: доход выше порога, осталось добрать финансовые документы и апостиль."

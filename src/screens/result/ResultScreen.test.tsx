@@ -160,8 +160,8 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
   } as any;
 }
 
-function renderScreen(screenNode: ReactNode) {
-  return render(<MemoryRouter>{screenNode}</MemoryRouter>);
+function renderScreen(screenNode: ReactNode, initialEntries = ["/"]) {
+  return render(<MemoryRouter initialEntries={initialEntries}>{screenNode}</MemoryRouter>);
 }
 
 describe("ResultScreen", () => {
@@ -193,6 +193,60 @@ describe("ResultScreen", () => {
     );
 
     renderScreen(<ResultScreen productType="insurance_adult" />);
+
+    await waitFor(() => {
+      expect(loadCase).toHaveBeenCalledWith("s5-rf-italy-insurance");
+    });
+  });
+
+  it("ignores a foreign case query param on product-specific routes", async () => {
+    const loadCase = vi.fn().mockResolvedValue(undefined);
+    const baseStore = createStore();
+
+    useCaseStoreMock.mockReturnValue(
+      createStore({
+        activeCaseId: "s1-rf-italy",
+        activeCase: {
+          id: "s1-rf-italy",
+          title: "S1 · Петербург → Италия",
+          productType: "travel",
+          signals: [],
+          createdAt: "2026-04-17T10:00:00.000Z",
+          updatedAt: "2026-04-17T10:00:00.000Z"
+        },
+        activeResult: {
+          ...(baseStore.activeResult ?? {}),
+          productType: "travel"
+        },
+        scenarios: [
+          {
+            caseId: "s1-rf-italy",
+            productType: "travel",
+            title: "Travel",
+            subtitle: "",
+            expectedVerdict: "GO",
+            expectedActionType: "start_application",
+            expectedPrimaryPath: "italy_c_tourism",
+            note: ""
+          },
+          {
+            caseId: "s5-rf-italy-insurance",
+            productType: "insurance_adult",
+            title: "Insurance",
+            subtitle: "",
+            expectedVerdict: "GO",
+            expectedActionType: "start_application",
+            expectedPrimaryPath: "ins_basic",
+            note: ""
+          }
+        ],
+        loadCase
+      })
+    );
+
+    renderScreen(<ResultScreen productType="insurance_adult" />, [
+      "/insurance-adult?case=s1-rf-italy"
+    ]);
 
     await waitFor(() => {
       expect(loadCase).toHaveBeenCalledWith("s5-rf-italy-insurance");
@@ -268,6 +322,8 @@ describe("ResultScreen", () => {
     expect(screen.queryByText("Уверенность движка")).not.toBeInTheDocument();
     expect(screen.queryByText("Риски в работе")).not.toBeInTheDocument();
     expect(screen.queryByText("Основной маршрут")).not.toBeInTheDocument();
+    expect(screen.queryByText("Почему такое решение")).not.toBeInTheDocument();
+    expect(screen.queryByText("Реплей шагов движка")).not.toBeInTheDocument();
     expect(screen.queryByTestId("confidence-gauge")).not.toBeInTheDocument();
     expect(screen.queryByTestId("offer-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("risk-pulse")).not.toBeInTheDocument();

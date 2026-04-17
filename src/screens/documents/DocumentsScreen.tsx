@@ -58,6 +58,20 @@ export function DocumentsScreen() {
     );
   }
 
+  if (activeResult.verdict === "HUMAN_REVIEW") {
+    return (
+      <EmptyState
+        title="Документный трек откроет оператор"
+        description="Пока кейс на ручной проверке, мы не показываем пакет документов и шаги подачи."
+        action={
+          <Button variant="secondary" onClick={() => navigate("/human-review")}>
+            Вернуться к ручной проверке
+          </Button>
+        }
+      />
+    );
+  }
+
   const readiness = activeResult.documents;
 
   async function markReady() {

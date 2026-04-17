@@ -401,7 +401,7 @@ export function runDecision(
   finishAction(`Действие: ${nextAction.type} (${nextAction.priority}).`);
 
   const finishWhy = audit.start("generateWhy", "Собираем объяснительные буллеты.");
-  const whyBullets = generateWhy(ruleResults);
+  const whyBullets = generateWhy(ruleResults, focusPathId);
   finishWhy(`Буллетов: ${whyBullets.length}.`);
 
   const firedSignalIds = new Set<string>(
@@ -427,6 +427,7 @@ export function runDecision(
     caseId: input.case.id,
     preview: !!options.preview
   });
+  const isHumanReview = verdict === "HUMAN_REVIEW";
 
   const payload: ResultPayload = {
     version: "rdc.v1",
@@ -434,20 +435,26 @@ export function runDecision(
     caseId: input.case.id,
     computedAt: nowFn().toISOString(),
     verdict,
-    primaryPath: primary,
-    alternativePaths: alternatives,
-    criticalRisk,
-    risks,
+    primaryPath: isHumanReview ? null : primary,
+    alternativePaths: isHumanReview ? [] : alternatives,
+    criticalRisk: isHumanReview ? null : criticalRisk,
+    risks: isHumanReview ? [] : risks,
     nextAction,
     decisionSignals,
-    whyBullets,
+    whyBullets: isHumanReview ? [] : whyBullets,
     ruleResults,
-    documents,
+    documents: isHumanReview
+      ? { score: 0, readyCount: 0, requiredCount: 0, items: [] }
+      : documents,
     trust: {
-      confidence: confidence.value,
-      confidenceBreakdown: confidence,
-      volatilityScore,
-      sources: freshSources.map((source) => ({
+      confidence: isHumanReview ? 0 : confidence.value,
+      confidenceBreakdown: isHumanReview
+        ? { value: 0, base: confidence.base, capsApplied: ["human_review"], factors: [] }
+        : confidence,
+      volatilityScore: isHumanReview ? 0 : volatilityScore,
+      sources: isHumanReview
+        ? []
+        : freshSources.map((source) => ({
         id: source.id,
         label: source.label,
         url: source.url,
