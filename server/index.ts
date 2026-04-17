@@ -7,7 +7,7 @@ const port = Number(process.env.PORT ?? 3001);
 const healthResponse: HealthResponse = {
   status: "ok",
   service: "active-holidays-foundation",
-  phase: "phase-2"
+  phase: "phase-3"
 };
 
 app.use(cors());

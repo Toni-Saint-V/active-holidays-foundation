@@ -1,7 +1,12 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import type { TravelDecisionReasonCode, TravelDecisionSession } from "@shared/contracts";
+import type {
+  TravelDecisionReasonCode,
+  TravelDecisionSession,
+  TravelDecisionSurface
+} from "@shared/contracts";
 import { useTravelFlowStore } from "@/state/travelFlowStore";
+import { getActiveTravelSession } from "@/state/travelFlowSelectors";
 
 const outcomeLabels = {
   ready_to_plan: "Можно переходить дальше",
@@ -13,6 +18,12 @@ const readinessLabels = {
   ready: "Документная база готова",
   attention_needed: "Нужна проверка документов",
   blocked: "Есть блокер по документам"
+} as const;
+
+const trustReadinessLabels = {
+  ready: "Объяснимость устойчива",
+  attention_needed: "Нужна проверка доверия",
+  blocked: "Решение пока неустойчиво"
 } as const;
 
 const reasonLabels: Record<TravelDecisionReasonCode, string> = {
@@ -41,6 +52,31 @@ const intakeLabels = {
   }
 } as const;
 
+const surfacePaths: Record<TravelDecisionSurface, string> = {
+  intake: "/intake",
+  result: "/result",
+  documents: "/documents",
+  trust: "/trust"
+};
+
+const insightToneClasses = {
+  blocker: "border-danger/40 bg-dangerBg",
+  warning: "border-warning/40 bg-warningBg",
+  info: "border-borderStrong bg-surface-2"
+} as const;
+
+const stepStatusLabels = {
+  pending: "В работе",
+  done: "Готово"
+} as const;
+
+function formatSessionTimestamp(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function ResultEmptyState() {
   return (
     <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
@@ -49,8 +85,8 @@ function ResultEmptyState() {
         Пока нет сохранённого результата
       </h2>
       <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
-        Сначала отправьте анкету. После этого последняя детерминированная сессия
-        будет доступна на этом экране даже после перезагрузки.
+        Сначала отправьте анкету. После этого активная сессия и короткая история
+        решений будут доступны на этом экране даже после перезагрузки.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link
@@ -64,7 +100,17 @@ function ResultEmptyState() {
   );
 }
 
-function ResultDetails({ session }: { session: TravelDecisionSession }) {
+function ResultDetails({
+  session,
+  sessions,
+  activeSessionId,
+  onSelectSession
+}: {
+  session: TravelDecisionSession;
+  sessions: TravelDecisionSession[];
+  activeSessionId: string | null;
+  onSelectSession: (sessionId: string) => void;
+}) {
   return (
     <div className="grid gap-4">
       <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
@@ -74,7 +120,10 @@ function ResultDetails({ session }: { session: TravelDecisionSession }) {
             {outcomeLabels[session.result.outcome]}
           </h2>
           <span className="rounded-full border border-borderStrong bg-surface-2 px-3 py-1 text-sm text-textPrimary">
-            {readinessLabels[session.result.documentReadiness]}
+            {readinessLabels[session.result.documents.readiness]}
+          </span>
+          <span className="rounded-full border border-borderStrong bg-surface-2 px-3 py-1 text-sm text-textPrimary">
+            {trustReadinessLabels[session.result.trust.readiness]}
           </span>
         </div>
         <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
@@ -82,6 +131,9 @@ function ResultDetails({ session }: { session: TravelDecisionSession }) {
         </p>
         <p className="mt-4 text-sm text-textSecondary">
           Следующий фокус: {session.result.nextStepLabel}
+        </p>
+        <p className="mt-2 text-xs text-textMuted">
+          Активная сессия создана: {formatSessionTimestamp(session.createdAt)}
         </p>
       </section>
 
@@ -101,24 +153,77 @@ function ResultDetails({ session }: { session: TravelDecisionSession }) {
       </section>
 
       <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <h3 className="text-lg font-semibold text-textPrimary">Следующие шаги</h3>
+        <h3 className="text-lg font-semibold text-textPrimary">Объяснение решения</h3>
         <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
-          {session.result.checklist.map((item) => (
+          {session.result.trust.explanations.map((item) => (
             <li
               key={item.id}
-              className="flex items-start gap-3 rounded-xl bg-surface-2 px-4 py-3"
+              className={[
+                "rounded-xl border px-4 py-3",
+                insightToneClasses[item.severity]
+              ].join(" ")}
             >
-              <span
-                className={
-                  item.done
-                    ? "mt-1 inline-block h-2.5 w-2.5 rounded-full bg-success"
-                    : "mt-1 inline-block h-2.5 w-2.5 rounded-full bg-warning"
-                }
-              />
-              <span>{item.label}</span>
+              <p className="font-medium text-textPrimary">{item.title}</p>
+              <p className="mt-2">{item.detail}</p>
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
+        <h3 className="text-lg font-semibold text-textPrimary">Следующие шаги</h3>
+        <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
+          {session.result.nextSteps.map((step) => (
+            <li
+              key={step.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 py-3"
+            >
+              <div>
+                <p className="font-medium text-textPrimary">{step.label}</p>
+                <p className="mt-1 text-xs text-textSecondary">
+                  Статус: {stepStatusLabels[step.status]}
+                </p>
+              </div>
+              <Link
+                to={surfacePaths[step.target]}
+                className="rounded-lg border border-borderStrong px-3 py-2 text-xs text-textPrimary transition hover:bg-surface-3"
+              >
+                Открыть раздел
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <Link
+          to="/documents"
+          className="rounded-[20px] border border-border bg-surface p-6 shadow-soft transition hover:bg-surface-2"
+        >
+          <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">
+            Документы
+          </p>
+          <h3 className="mt-3 text-lg font-semibold text-textPrimary">
+            {readinessLabels[session.result.documents.readiness]}
+          </h3>
+          <p className="mt-3 text-sm leading-6 text-textSecondary">
+            {session.result.documents.summary}
+          </p>
+        </Link>
+        <Link
+          to="/trust"
+          className="rounded-[20px] border border-border bg-surface p-6 shadow-soft transition hover:bg-surface-2"
+        >
+          <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">
+            Доверие
+          </p>
+          <h3 className="mt-3 text-lg font-semibold text-textPrimary">
+            {trustReadinessLabels[session.result.trust.readiness]}
+          </h3>
+          <p className="mt-3 text-sm leading-6 text-textSecondary">
+            {session.result.trust.summary}
+          </p>
+        </Link>
       </section>
 
       <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
@@ -150,27 +255,62 @@ function ResultDetails({ session }: { session: TravelDecisionSession }) {
           </div>
         </dl>
       </section>
+
+      {sessions.length > 1 && (
+        <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
+          <h3 className="text-lg font-semibold text-textPrimary">Недавние сессии</h3>
+          <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
+            {sessions.map((historySession) => (
+              <li
+                key={historySession.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 py-3"
+              >
+                <div className="max-w-[32rem]">
+                  <p className="font-medium text-textPrimary">
+                    {outcomeLabels[historySession.result.outcome]}
+                  </p>
+                  <p className="mt-1">{historySession.result.summary}</p>
+                  <p className="mt-1 text-xs text-textMuted">
+                    {formatSessionTimestamp(historySession.createdAt)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectSession(historySession.id)}
+                  disabled={historySession.id === activeSessionId}
+                  className="rounded-lg border border-borderStrong px-3 py-2 text-xs text-textPrimary transition hover:bg-surface-3 disabled:cursor-default disabled:opacity-60"
+                >
+                  {historySession.id === activeSessionId
+                    ? "Активная сессия"
+                    : "Сделать активной"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
 
 export function ResultScreen() {
-  const latestSession = useTravelFlowStore((state) => state.latestSession);
+  const sessions = useTravelFlowStore((state) => state.sessions);
+  const activeSessionId = useTravelFlowStore((state) => state.activeSessionId);
   const status = useTravelFlowStore((state) => state.status);
   const errorMessage = useTravelFlowStore((state) => state.errorMessage);
-  const hydrateLatestSession = useTravelFlowStore(
-    (state) => state.hydrateLatestSession
-  );
-  const clearSession = useTravelFlowStore((state) => state.clearSession);
+  const hydrateWorkspace = useTravelFlowStore((state) => state.hydrateWorkspace);
+  const setActiveSession = useTravelFlowStore((state) => state.setActiveSession);
+  const clearWorkspace = useTravelFlowStore((state) => state.clearWorkspace);
+  const activeSession = getActiveTravelSession(sessions, activeSessionId);
 
   useEffect(() => {
-    void hydrateLatestSession();
-  }, [hydrateLatestSession]);
+    void hydrateWorkspace();
+  }, [hydrateWorkspace]);
 
   if (status === "loading") {
     return (
       <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-sm text-textSecondary">Загружаем последнюю сохранённую сессию...</p>
+        <p className="text-sm text-textSecondary">Загружаем сохранённые сессии...</p>
       </section>
     );
   }
@@ -185,13 +325,20 @@ export function ResultScreen() {
     );
   }
 
-  if (!latestSession) {
+  if (!activeSession) {
     return <ResultEmptyState />;
   }
 
   return (
     <div className="grid gap-4">
-      <ResultDetails session={latestSession} />
+      <ResultDetails
+        session={activeSession}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={(sessionId) => {
+          void setActiveSession(sessionId);
+        }}
+      />
       <div className="flex flex-wrap gap-3">
         <Link
           to="/intake"
@@ -202,11 +349,11 @@ export function ResultScreen() {
         <button
           type="button"
           onClick={() => {
-            void clearSession();
+            void clearWorkspace();
           }}
           className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
         >
-          Очистить текущую сессию
+          Очистить все сессии
         </button>
       </div>
     </div>

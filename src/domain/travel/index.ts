@@ -1,2 +1,2 @@
 export { buildTravelDecisionResult, buildTravelDecisionSession } from "./decision";
-export type { TravelDecisionRepository } from "./repository";
+export type { TravelDecisionRepository, TravelDecisionWorkspace } from "./repository";

@@ -5,30 +5,34 @@ import { localTravelDecisionRepository } from "@/data/travel/localTravelDecision
 type TravelFlowStatus = "idle" | "loading" | "submitting" | "ready" | "error";
 
 type TravelFlowState = {
-  latestSession: TravelDecisionSession | null;
+  activeSessionId: string | null;
+  sessions: TravelDecisionSession[];
   status: TravelFlowStatus;
   errorMessage: string | null;
-  hydrateLatestSession: () => Promise<void>;
+  hydrateWorkspace: () => Promise<void>;
   submitIntake: (input: TravelIntakeSubmission) => Promise<TravelDecisionSession>;
-  clearSession: () => Promise<void>;
+  setActiveSession: (sessionId: string) => Promise<void>;
+  clearWorkspace: () => Promise<void>;
 };
 
 export const useTravelFlowStore = create<TravelFlowState>((set) => ({
-  latestSession: null,
+  activeSessionId: null,
+  sessions: [],
   status: "idle",
   errorMessage: null,
-  async hydrateLatestSession() {
+  async hydrateWorkspace() {
     set((state) => ({
-      status: state.latestSession ? state.status : "loading",
+      status: state.sessions.length > 0 ? state.status : "loading",
       errorMessage: null
     }));
 
     try {
-      const latestSession = await localTravelDecisionRepository.getLatestSession();
+      const workspace = await localTravelDecisionRepository.loadWorkspace();
 
       set({
-        latestSession,
-        status: latestSession ? "ready" : "idle",
+        activeSessionId: workspace.activeSessionId,
+        sessions: workspace.sessions,
+        status: workspace.sessions.length > 0 ? "ready" : "idle",
         errorMessage: null
       });
     } catch (error) {
@@ -45,15 +49,19 @@ export const useTravelFlowStore = create<TravelFlowState>((set) => ({
     set({ status: "submitting", errorMessage: null });
 
     try {
-      const latestSession = await localTravelDecisionRepository.submitIntake(input);
+      const workspace = await localTravelDecisionRepository.submitIntake(input);
+      const activeSession =
+        workspace.sessions.find((session) => session.id === workspace.activeSessionId) ??
+        workspace.sessions[0];
 
       set({
-        latestSession,
+        activeSessionId: workspace.activeSessionId,
+        sessions: workspace.sessions,
         status: "ready",
         errorMessage: null
       });
 
-      return latestSession;
+      return activeSession;
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -68,10 +76,30 @@ export const useTravelFlowStore = create<TravelFlowState>((set) => ({
       throw error;
     }
   },
-  async clearSession() {
-    await localTravelDecisionRepository.clearLatestSession();
+  async setActiveSession(sessionId) {
+    try {
+      const workspace = await localTravelDecisionRepository.setActiveSession(sessionId);
+      set({
+        activeSessionId: workspace.activeSessionId,
+        sessions: workspace.sessions,
+        status: workspace.sessions.length > 0 ? "ready" : "idle",
+        errorMessage: null
+      });
+    } catch (error) {
+      set({
+        status: "error",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Не удалось переключить активную сессию."
+      });
+    }
+  },
+  async clearWorkspace() {
+    const workspace = await localTravelDecisionRepository.clearWorkspace();
     set({
-      latestSession: null,
+      activeSessionId: workspace.activeSessionId,
+      sessions: workspace.sessions,
       status: "idle",
       errorMessage: null
     });

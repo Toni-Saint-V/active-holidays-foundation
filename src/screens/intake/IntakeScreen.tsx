@@ -93,7 +93,7 @@ export function IntakeScreen() {
       </h2>
       <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
         Черновик формы живёт локально в компоненте. После отправки данные попадают в
-        типизированный репозиторий и сохраняются как последняя сессия для экрана результата.
+        типизированный репозиторий и сохраняются как активная сессия с короткой историей.
       </p>
 
       <form className="mt-6 grid gap-5" onSubmit={handleSubmit}>
@@ -182,7 +182,7 @@ export function IntakeScreen() {
             to="/result"
             className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
           >
-            Открыть последний результат
+            Открыть активный результат
           </Link>
         </div>
       </form>
