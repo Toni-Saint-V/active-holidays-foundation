@@ -23,7 +23,7 @@ export function AppShell() {
             </h1>
           </div>
           <div className="rounded-full border border-borderStrong bg-surface-3 px-3 py-1 text-sm text-textSecondary">
-            Фаза 2
+            Фаза 3
           </div>
         </div>
       </header>

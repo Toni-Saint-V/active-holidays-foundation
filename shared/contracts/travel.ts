@@ -45,22 +45,82 @@ export const travelDecisionReasonCodeSchema = z.enum([
   "urgent_timeline"
 ]);
 
-export const travelDecisionChecklistItemSchema = z.object({
+export const travelDecisionSeveritySchema = z.enum(["blocker", "warning", "info"]);
+
+export const travelDecisionSurfaceSchema = z.enum([
+  "intake",
+  "result",
+  "documents",
+  "trust"
+]);
+
+export const travelDecisionNextStepStatusSchema = z.enum(["pending", "done"]);
+
+export const travelDecisionInsightSchema = z.object({
   id: z.string().min(1),
-  label: z.string().min(1),
-  done: z.boolean()
+  title: z.string().min(1),
+  detail: z.string().min(1),
+  severity: travelDecisionSeveritySchema
 });
 
+export const travelDecisionNextStepSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  status: travelDecisionNextStepStatusSchema,
+  target: travelDecisionSurfaceSchema
+});
+
+export const travelDocumentItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  status: travelDocumentReadinessSchema,
+  detail: z.string().min(1)
+});
+
+export const travelTrustCheckStatusSchema = z.enum(["clear", "review", "blocked"]);
+
+export const travelTrustCheckSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  status: travelTrustCheckStatusSchema,
+  detail: z.string().min(1)
+});
+
+export const travelTrustReadinessSchema = z.enum([
+  "ready",
+  "attention_needed",
+  "blocked"
+]);
+
+export const travelDocumentsSectionSchema = z.object({
+  readiness: travelDocumentReadinessSchema,
+  summary: z.string().min(1),
+  items: z.array(travelDocumentItemSchema).min(1)
+});
+
+export const travelTrustSectionSchema = z.object({
+  readiness: travelTrustReadinessSchema,
+  summary: z.string().min(1),
+  checks: z.array(travelTrustCheckSchema).min(1),
+  explanations: z.array(travelDecisionInsightSchema).min(1)
+});
+
+// `documents.readiness` and `trust.readiness` are the source of truth.
+// Top-level readiness fields mirror them for summary/list consumers.
 export const travelDecisionResultSchema = z.object({
   outcome: travelDecisionOutcomeSchema,
   documentReadiness: travelDocumentReadinessSchema,
+  trustReadiness: travelTrustReadinessSchema,
   summary: z.string().min(1),
   nextStepLabel: z.string().min(1),
   reasonCodes: z.array(travelDecisionReasonCodeSchema),
-  checklist: z.array(travelDecisionChecklistItemSchema)
+  nextSteps: z.array(travelDecisionNextStepSchema).min(1),
+  documents: travelDocumentsSectionSchema,
+  trust: travelTrustSectionSchema
 });
 
 export const travelDecisionSessionSchema = z.object({
+  id: z.string().min(1),
   intake: travelIntakeSubmissionSchema,
   result: travelDecisionResultSchema,
   createdAt: z.string().datetime()
@@ -72,5 +132,18 @@ export type DestinationReadiness = z.infer<typeof destinationReadinessSchema>;
 export type TravelIntakeSubmission = z.infer<typeof travelIntakeSubmissionSchema>;
 export type TravelDecisionOutcome = z.infer<typeof travelDecisionOutcomeSchema>;
 export type TravelDecisionReasonCode = z.infer<typeof travelDecisionReasonCodeSchema>;
+export type TravelDecisionSeverity = z.infer<typeof travelDecisionSeveritySchema>;
+export type TravelDecisionSurface = z.infer<typeof travelDecisionSurfaceSchema>;
+export type TravelDecisionNextStepStatus = z.infer<
+  typeof travelDecisionNextStepStatusSchema
+>;
+export type TravelDecisionInsight = z.infer<typeof travelDecisionInsightSchema>;
+export type TravelDecisionNextStep = z.infer<typeof travelDecisionNextStepSchema>;
+export type TravelDocumentItem = z.infer<typeof travelDocumentItemSchema>;
+export type TravelTrustCheckStatus = z.infer<typeof travelTrustCheckStatusSchema>;
+export type TravelTrustCheck = z.infer<typeof travelTrustCheckSchema>;
+export type TravelTrustReadiness = z.infer<typeof travelTrustReadinessSchema>;
+export type TravelDocumentsSection = z.infer<typeof travelDocumentsSectionSchema>;
+export type TravelTrustSection = z.infer<typeof travelTrustSectionSchema>;
 export type TravelDecisionResult = z.infer<typeof travelDecisionResultSchema>;
 export type TravelDecisionSession = z.infer<typeof travelDecisionSessionSchema>;
