@@ -25,22 +25,25 @@ export const actionPrioritySchema = z.enum([
 ]);
 export type ActionPriority = z.infer<typeof actionPrioritySchema>;
 
+export const actionTargetScreenSchema = z.enum([
+  "intake",
+  "result",
+  "documents",
+  "trust",
+  "human-review",
+  "notifications",
+  "profile",
+  "residency-es",
+  "insurance-adult"
+]);
+export type ActionTargetScreen = z.infer<typeof actionTargetScreenSchema>;
+
 export const nextActionSchema = z.object({
   type: actionTypeSchema,
   priority: actionPrioritySchema,
   label: z.string().min(1),
   detail: z.string().min(1),
-  targetScreen: z.enum([
-    "intake",
-    "result",
-    "documents",
-    "trust",
-    "human-review",
-    "notifications",
-    "profile",
-    "residency-es",
-    "insurance-adult"
-  ]),
+  targetScreen: actionTargetScreenSchema,
   triggeredBy: z.array(z.string().min(1))
 });
 export type NextAction = z.infer<typeof nextActionSchema>;

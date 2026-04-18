@@ -148,7 +148,8 @@ describe("CaseStore ledger", () => {
       confidence: 0.66,
       summary: "preloaded full record",
       kind: "recompute",
-      changedSignalIds: []
+      changedSignalIds: [],
+      changedPreferenceIds: []
     };
     const store = new CaseStore({ ...catalogs, decisionsLog: [record] });
 
@@ -197,7 +198,8 @@ describe("CaseStore ledger", () => {
       confidence: 0.5,
       summary: "synthetic",
       kind: "recompute",
-      changedSignalIds: []
+      changedSignalIds: [],
+      changedPreferenceIds: []
     };
     store.insertRecordForTest(synthetic);
     expect(store.getRecord("dec_synthetic_1")).not.toBeNull();
@@ -226,7 +228,8 @@ describe("CaseStore ledger", () => {
       confidence: 0.7,
       summary: "preloaded",
       kind: "recompute",
-      changedSignalIds: []
+      changedSignalIds: [],
+      changedPreferenceIds: []
     };
     const store = new CaseStore({ ...catalogs, decisionsLog: [preloaded] });
 

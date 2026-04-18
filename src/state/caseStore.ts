@@ -11,7 +11,8 @@ import type {
   AuditTrail,
   CaseSignals,
   CaseOverride,
-  SignalId
+  SignalId,
+  ScenarioLabPayload
 } from "@shared/contracts";
 import { apiClient, type ScenarioCard } from "@/lib/apiClient";
 
@@ -28,6 +29,7 @@ type CaseStoreState = {
   activeCaseId: string | null;
   activeCase: Case | null;
   activeResult: ResultPayload | null;
+  activeScenarioLab: ScenarioLabPayload | null;
   cases: Case[];
   scenarios: ScenarioCard[];
   paths: Offer[];
@@ -36,6 +38,8 @@ type CaseStoreState = {
   audit: AuditSnapshot | null;
   sources: Source[];
   decisions: DecisionLogEntry[];
+  scenarioLabStatus: Status;
+  scenarioLabError: string | null;
   bootstrap: () => Promise<void>;
   loadCase: (id: string) => Promise<void>;
   patchSignal: (id: string, signalId: SignalId, value: unknown) => Promise<void>;
@@ -52,12 +56,34 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function scenarioLabRequest(id: string, fallbackMessage: string) {
+  return apiClient
+    .decisionScenarioLab(id)
+    .then((lab) => ({ ok: true as const, lab }))
+    .catch((error) => ({
+      ok: false as const,
+      errorMessage: error instanceof Error ? error.message : fallbackMessage
+    }));
+}
+
+function preservedScenarioLab(
+  current: ScenarioLabPayload | null,
+  caseId: string,
+  next:
+    | { ok: true; lab: ScenarioLabPayload }
+    | { ok: false; errorMessage: string }
+) {
+  if (next.ok) return next.lab;
+  return current?.caseId === caseId ? current : null;
+}
+
 export const useCaseStore = create<CaseStoreState>((set, get) => ({
   status: "idle",
   errorMessage: null,
   activeCaseId: null,
   activeCase: null,
   activeResult: null,
+  activeScenarioLab: null,
   cases: [],
   scenarios: [],
   paths: [],
@@ -66,6 +92,8 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
   audit: null,
   sources: [],
   decisions: [],
+  scenarioLabStatus: "idle",
+  scenarioLabError: null,
 
   async bootstrap() {
     set({ status: "loading", errorMessage: null });
@@ -86,23 +114,34 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
   },
 
   async loadCase(id) {
-    set({ status: "loading", errorMessage: null });
+    const currentLab = get().activeScenarioLab;
+    set({
+      status: "loading",
+      errorMessage: null,
+      scenarioLabStatus: "loading",
+      scenarioLabError: null,
+      activeScenarioLab: currentLab?.caseId === id ? currentLab : null
+    });
     try {
-      const [caseData, result, paths, intakeQueue, preview] = await Promise.all([
+      const [caseData, result, paths, intakeQueue, preview, scenarioLabResult] = await Promise.all([
         apiClient.getCase(id),
         apiClient.getResult(id),
         apiClient.paths(id),
         apiClient.nextQuestion(id),
-        apiClient.preview(id)
+        apiClient.preview(id),
+        scenarioLabRequest(id, "Не удалось собрать сценарную лабораторию.")
       ]);
       set({
         activeCaseId: id,
         activeCase: caseData,
         activeResult: result,
+        activeScenarioLab: preservedScenarioLab(currentLab, id, scenarioLabResult),
         paths,
         intakeQueue,
         intakePreview: preview,
-        status: "ready"
+        status: "ready",
+        scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
       });
     } catch (error) {
       set({
@@ -121,18 +160,24 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
 
   async patchSignals(id, signals) {
     try {
+      const currentLab = get().activeScenarioLab;
+      set({ scenarioLabStatus: "loading", scenarioLabError: null });
       const response = await apiClient.patchSignals(id, signals);
-      const [paths, intakeQueue, preview] = await Promise.all([
+      const [paths, intakeQueue, preview, scenarioLabResult] = await Promise.all([
         apiClient.paths(id),
         apiClient.nextQuestion(id),
-        apiClient.preview(id)
+        apiClient.preview(id),
+        scenarioLabRequest(id, "Не удалось обновить сценарную лабораторию.")
       ]);
       set({
         activeCase: response.case,
         activeResult: response.result,
+        activeScenarioLab: preservedScenarioLab(currentLab, id, scenarioLabResult),
         paths,
         intakeQueue,
-        intakePreview: preview
+        intakePreview: preview,
+        scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
       });
     } catch (error) {
       set({
@@ -145,12 +190,20 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
 
   async setPreferences(id, preferences) {
     try {
+      const currentLab = get().activeScenarioLab;
+      set({ scenarioLabStatus: "loading", scenarioLabError: null });
       const response = await apiClient.recompute(id, preferences);
-      const paths = await apiClient.paths(id);
+      const [paths, scenarioLabResult] = await Promise.all([
+        apiClient.paths(id),
+        scenarioLabRequest(id, "Не удалось обновить сценарную лабораторию.")
+      ]);
       set({
         activeCase: response.case,
         activeResult: response.result,
-        paths
+        activeScenarioLab: preservedScenarioLab(currentLab, id, scenarioLabResult),
+        paths,
+        scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
       });
     } catch (error) {
       set({
@@ -163,16 +216,22 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
 
   async overrideSignal(id, override) {
     try {
+      const currentLab = get().activeScenarioLab;
+      set({ scenarioLabStatus: "loading", scenarioLabError: null });
       const response = await apiClient.overrideSignal(id, override);
-      const [paths, intakeQueue] = await Promise.all([
+      const [paths, intakeQueue, scenarioLabResult] = await Promise.all([
         apiClient.paths(id),
-        apiClient.nextQuestion(id)
+        apiClient.nextQuestion(id),
+        scenarioLabRequest(id, "Не удалось обновить сценарную лабораторию.")
       ]);
       set({
         activeCase: response.case,
         activeResult: response.result,
+        activeScenarioLab: preservedScenarioLab(currentLab, id, scenarioLabResult),
         paths,
-        intakeQueue
+        intakeQueue,
+        scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
       });
     } catch (error) {
       set({
@@ -185,8 +244,20 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
 
   async recompute(id) {
     try {
+      const currentLab = get().activeScenarioLab;
+      set({ scenarioLabStatus: "loading", scenarioLabError: null });
       const response = await apiClient.recompute(id);
-      set({ activeCase: response.case, activeResult: response.result });
+      const scenarioLabResult = await scenarioLabRequest(
+        id,
+        "Не удалось обновить сценарную лабораторию."
+      );
+      set({
+        activeCase: response.case,
+        activeResult: response.result,
+        activeScenarioLab: preservedScenarioLab(currentLab, id, scenarioLabResult),
+        scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
+      });
     } catch (error) {
       set({
         status: "error",

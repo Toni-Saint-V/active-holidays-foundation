@@ -4,12 +4,19 @@ import {
   caseOverrideSchema,
   caseSignalsSchema,
   pathPreferencesSchema,
+  scenarioLabCompareRequestSchema,
   type Case,
   type CaseSignals,
   type DecisionKind
 } from "@shared/contracts";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
+import { buildDecisionScenarioLab } from "../lib/decisionScenarioLab";
+import {
+  buildScenarioCompareResponse,
+  buildScenarioFamily,
+  ensureSameScenarioFamily
+} from "../lib/scenarioLab";
 import { HttpError } from "../middleware/errorHandler";
 import { validateBody, validateParams } from "../middleware/validate";
 import {
@@ -54,7 +61,10 @@ function recordDecision(
   caseData: Case,
   summary: string,
   kind: DecisionKind,
-  changedSignalIds: string[]
+  delta: {
+    changedSignalIds: string[];
+    changedPreferenceIds?: string[];
+  }
 ) {
   const catalogs = orchestratorCatalogs();
   const result = runDecision({ case: caseData, catalogs });
@@ -64,7 +74,8 @@ function recordDecision(
     result,
     summary,
     kind,
-    changedSignalIds
+    changedSignalIds: delta.changedSignalIds,
+    changedPreferenceIds: delta.changedPreferenceIds
   });
   return { result, record };
 }
@@ -112,7 +123,7 @@ export function casesRouter(): Router {
         updated,
         `Пересчёт после изменения ${signals.length} сигналов.`,
         "recompute",
-        signals.map((signal) => signal.id)
+        { changedSignalIds: signals.map((signal) => signal.id) }
       );
       res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
@@ -140,7 +151,10 @@ export function casesRouter(): Router {
         updated,
         preferences ? "Пересчёт с новыми предпочтениями по маршрутам." : "Пересчёт без изменений.",
         "recompute",
-        []
+        {
+          changedSignalIds: [],
+          changedPreferenceIds: preferences?.map((item) => item.id) ?? []
+        }
       );
       res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
@@ -167,7 +181,7 @@ export function casesRouter(): Router {
         updated,
         `Override сигнала ${override.signalId}: ${override.reason}.`,
         "override",
-        [override.signalId]
+        { changedSignalIds: [override.signalId] }
       );
       res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
@@ -187,6 +201,97 @@ export function casesRouter(): Router {
     const result = computeResult(caseData);
     res.json(result.documents);
   });
+
+  router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
+    const caseData = requireCase(getId(req));
+    const result = computeResult(caseData);
+    res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(), result));
+  });
+
+  router.get("/:id/scenarios", validateParams(caseIdParams), (req, res) => {
+    const id = getId(req);
+    requireCase(id);
+    const family = buildScenarioFamily(getCaseStore(), id, computeResult);
+    res.json(family);
+  });
+
+  router.post(
+    "/:id/scenarios/compare",
+    validateParams(caseIdParams),
+    validateBody(scenarioLabCompareRequestSchema),
+    (req, res) => {
+      const id = getId(req);
+      const store = getCaseStore();
+      const baselineCase = requireCase(id);
+      const {
+        compareToCaseId,
+        title,
+        signals,
+        preferences
+      } = req.body as z.infer<typeof scenarioLabCompareRequestSchema>;
+
+      if (compareToCaseId) {
+        const candidateCase = requireCase(compareToCaseId);
+        if (!ensureSameScenarioFamily(store, baselineCase.id, candidateCase.id)) {
+          throw new HttpError(
+            400,
+            "Сравнивать можно только сценарии из одной fork-цепочки.",
+            "scenario_family_mismatch"
+          );
+        }
+        res.json(
+          buildScenarioCompareResponse({
+            store,
+            baselineCase,
+            candidateCase,
+            computeResult
+          })
+        );
+        return;
+      }
+
+      const forked = store.fork(id, { title });
+      if (!forked) {
+        throw new HttpError(500, "Не удалось создать сценарный fork.");
+      }
+
+      let candidateCase = forked;
+      if (signals.length > 0) {
+        const patched = store.patchSignals(candidateCase.id, signals);
+        if (!patched) {
+          throw new HttpError(500, "Не удалось применить сигналы к сценарному fork.");
+        }
+        candidateCase = patched;
+      }
+      if (preferences) {
+        const updatedPreferences = store.setPreferences(candidateCase.id, preferences);
+        if (!updatedPreferences) {
+          throw new HttpError(500, "Не удалось применить предпочтения к сценарному fork.");
+        }
+        candidateCase = updatedPreferences;
+      }
+
+      const { record } = recordDecision(
+        candidateCase,
+        `Сценарное сравнение для кейса ${id}.`,
+        "fork",
+        {
+          changedSignalIds: signals.map((signal) => signal.id),
+          changedPreferenceIds: preferences?.map((item) => item.id) ?? []
+        }
+      );
+
+      res.json(
+        buildScenarioCompareResponse({
+          store,
+          baselineCase,
+          candidateCase,
+          candidateDecisionRecordId: record.decisionId,
+          computeResult
+        })
+      );
+    }
+  );
 
   router.get("/:id/drift", validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
@@ -245,7 +350,7 @@ export function casesRouter(): Router {
         forked,
         `Форк кейса ${id}.`,
         "fork",
-        []
+        { changedSignalIds: [] }
       );
       res.json({ case: forked, result, decisionRecordId: record.decisionId });
     }

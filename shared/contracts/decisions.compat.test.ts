@@ -39,7 +39,8 @@ const RECORD: DecisionRecord = {
   confidence: 0.79,
   summary: "recompute",
   kind: "recompute",
-  changedSignalIds: []
+  changedSignalIds: [],
+  changedPreferenceIds: []
 };
 
 describe("decisionLedgerEntrySchema", () => {

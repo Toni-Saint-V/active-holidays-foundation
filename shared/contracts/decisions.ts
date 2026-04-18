@@ -53,7 +53,8 @@ export const decisionRecordSchema = z.object({
   confidence: z.number().min(0).max(1),
   summary: z.string().min(1),
   kind: decisionKindSchema,
-  changedSignalIds: z.array(z.string()).default([])
+  changedSignalIds: z.array(z.string()).default([]),
+  changedPreferenceIds: z.array(z.string()).default([])
 });
 export type DecisionRecord = z.infer<typeof decisionRecordSchema>;
 

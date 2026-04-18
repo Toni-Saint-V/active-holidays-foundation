@@ -1,14 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, GitBranch, Sparkles } from "lucide-react";
 import {
   caseOverrideSchema,
-  isInsuranceOffer,
-  isResidencyOffer,
-  isTravelOffer,
-  type Offer,
-  type PathPreference,
   type ProductType
 } from "@shared/contracts";
 import { useCaseStore } from "@/state/caseStore";
@@ -17,11 +12,6 @@ import { ExpandableRow } from "@/ui/Accordion";
 import { ConfidenceGauge } from "@/ui/ConfidenceGauge";
 import { RiskPulse } from "@/ui/RiskPulse";
 import { OfferCard } from "@/ui/OfferCard";
-import {
-  SwipeDeck,
-  insuranceDismissReasons,
-  residencyDismissReasons
-} from "@/ui/SwipeDeck";
 import { TemporalWhatIf } from "@/ui/TemporalWhatIf";
 import { ReplayTimeline } from "@/ui/ReplayTimeline";
 import { ForkDivider } from "@/ui/ForkDivider";
@@ -33,51 +23,75 @@ import { useScreenView } from "@/instrumentation/screenView";
 import { track } from "@/instrumentation/events";
 import { useToast } from "@/ui/Toast";
 import { formatDate, formatPercent } from "@/lib/format";
+import {
+  defaultCaseByProduct,
+  findScenarioCaseId,
+  productTypeLabel
+} from "@/lib/caseDefaults";
+import { ResultCompareSurface } from "./ResultCompareSurface";
 
 type ResultScreenProps = {
   productType?: ProductType;
   screenName?: string;
 };
 
-const defaultCaseByProduct: Record<ProductType, string> = {
-  travel: "s1-rf-italy",
-  residency_es: "s4-rf-residency-dnv",
-  insurance_adult: "s5-rf-italy-insurance"
+const whatIfConfigByProduct: Record<
+  ProductType,
+  {
+    label: string;
+    signalId: "timeline_weeks" | "trip_duration_days" | "slot_available_weeks";
+    unit: (value: number) => string;
+    min: number;
+    max: number;
+    reason: (value: number) => string;
+  }
+> = {
+  travel: {
+    label: "Сдвинуть горизонт поездки",
+    signalId: "timeline_weeks",
+    unit: (value: number) => `${value} нед.`,
+    min: -12,
+    max: 12,
+    reason: (weeks: number) =>
+      `Сценарий «а что, если…»: горизонт изменён на ${weeks} недель.`
+  },
+  insurance_adult: {
+    label: "Сдвинуть длительность поездки",
+    signalId: "trip_duration_days",
+    unit: (value: number) => `${value} дн.`,
+    min: -14,
+    max: 21,
+    reason: (days: number) =>
+      `Сценарий «а что, если…»: длительность изменена на ${days} дней.`
+  },
+  residency_es: {
+    label: "Сдвинуть срок подачи",
+    signalId: "slot_available_weeks",
+    unit: (value: number) => `${value} нед.`,
+    min: -8,
+    max: 16,
+    reason: (weeks: number) =>
+      `Сценарий «а что, если…»: ближайшее окно подачи ${weeks} недель.`
+  }
+};
+
+const confidenceCapLabels: Record<string, string> = {
+  active_blocker: "активный блокер",
+  human_review_trigger: "нужна ручная проверка",
+  missing_mandatory_signal: "не хватает обязательных данных",
+  rule_conflict: "есть конфликт правил"
+};
+
+const bulletToneLabels: Record<string, string> = {
+  positive: "усиливает шанс",
+  warning: "нужна доработка",
+  negative: "мешает пройти",
+  review: "нужен человек",
+  neutral: "нейтрально"
 };
 
 function whatIfConfigFor(productType: ProductType) {
-  switch (productType) {
-    case "travel":
-      return {
-        label: "Сдвинуть горизонт поездки",
-        signalId: "timeline_weeks" as const,
-        unit: (value: number) => `${value} нед.`,
-        min: -12,
-        max: 12,
-        reason: (weeks: number) =>
-          `Сценарий «а что, если…»: горизонт изменён на ${weeks} недель.`
-      };
-    case "insurance_adult":
-      return {
-        label: "Сдвинуть длительность поездки",
-        signalId: "trip_duration_days" as const,
-        unit: (value: number) => `${value} дн.`,
-        min: -14,
-        max: 21,
-        reason: (days: number) =>
-          `Сценарий «а что, если…»: длительность изменена на ${days} дней.`
-      };
-    case "residency_es":
-      return {
-        label: "Сдвинуть срок подачи",
-        signalId: "slot_available_weeks" as const,
-        unit: (value: number) => `${value} нед.`,
-        min: -8,
-        max: 16,
-        reason: (weeks: number) =>
-          `Сценарий «а что, если…»: ближайшее окно подачи ${weeks} недель.`
-      };
-  }
+  return whatIfConfigByProduct[productType];
 }
 
 export function ResultScreen({ productType, screenName = "result" }: ResultScreenProps = {}) {
@@ -90,7 +104,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     activeCase,
     activeCaseId,
     activeResult,
-    paths,
+    activeScenarioLab,
     scenarios,
     audit,
     bootstrap,
@@ -98,12 +112,12 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     loadAudit,
     recompute,
     fork,
-    setPreferences,
     overrideSignal,
+    scenarioLabError,
+    scenarioLabStatus,
     status,
     errorMessage
   } = useCaseStore();
-  const [preferences, setPreferencesLocal] = useState<PathPreference[]>([]);
 
   useEffect(() => {
     if (scenarios.length === 0) void bootstrap();
@@ -113,8 +127,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     if (!productType) {
       return scenarios[0]?.caseId ?? defaultCaseByProduct.travel;
     }
-    const match = scenarios.find((item) => item.productType === productType);
-    return match?.caseId ?? defaultCaseByProduct[productType];
+    return findScenarioCaseId(scenarios, productType);
   }, [productType, scenarios]);
   const requestedCaseId = useMemo(() => {
     if (!caseIdFromUrl) return null;
@@ -136,7 +149,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
   }, [requestedCaseId, activeCaseId, activeCaseMatchesProduct, defaultCaseId, loadCase]);
 
   const primaryOffer = activeResult?.primaryPath ?? null;
-  const alternativeOffers = activeResult?.alternativePaths ?? [];
   const verdict = activeResult?.verdict ?? null;
   const tone = verdict ? verdictTone[verdict] : null;
   const isHumanReview = verdict === "HUMAN_REVIEW";
@@ -153,12 +165,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     const signal = activeCase.signals.find((item) => item.id === whatIfConfig.signalId);
     return typeof signal?.value === "number" ? signal.value : 0;
   }, [activeCase, whatIfConfig]);
-
-  const dismissReasons = useMemo(() => {
-    if (activeProductType === "insurance_adult") return insuranceDismissReasons;
-    if (activeProductType === "residency_es") return residencyDismissReasons;
-    return undefined;
-  }, [activeProductType]);
 
   async function handleTemporalApply(value: number) {
     if (!activeCase || !whatIfConfig) return;
@@ -186,13 +192,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
       toast.push("Создан форк — сравните решения рядом.", "success");
       navigate(`/result?case=${encodeURIComponent(forkedId)}`);
     }
-  }
-
-  async function handlePreferences(decisions: { pathId: string; weight: number; reason?: string }[]) {
-    if (!activeCase) return;
-    const parsed = decisions.map((item) => ({ id: item.pathId, weight: item.weight }));
-    setPreferencesLocal(parsed);
-    await setPreferences(activeCase.id, parsed);
   }
 
   function handleNextActionClick() {
@@ -248,9 +247,9 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                 >
                   {tone.label}
                 </Badge>
-                <Badge tone="neutral">{activeResult.productType}</Badge>
+                <Badge tone="neutral">{productTypeLabel(activeResult.productType)}</Badge>
                 <span className="text-[11px] uppercase tracking-wide text-textMuted">
-                  {activeCase.id} · {formatDate(activeResult.computedAt)}
+                  Обновлено {formatDate(activeResult.computedAt)}
                 </span>
               </div>
               {isHumanReview ? (
@@ -303,7 +302,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                     key={rule.ruleId}
                     className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3"
                   >
-                    <p className="text-sm font-medium text-textPrimary">{rule.ruleId}</p>
+                    <p className="text-sm font-medium text-textPrimary">Что требует проверки</p>
                     <p className="mt-1 text-xs text-textSecondary">{rule.explanation}</p>
                   </div>
                 ))}
@@ -319,7 +318,9 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
               <span className="text-[11px] uppercase tracking-wide text-textMuted">
                 применены пределы:{" "}
                 {activeResult.trust.confidenceBreakdown.capsApplied.length
-                  ? activeResult.trust.confidenceBreakdown.capsApplied.join(", ")
+                  ? activeResult.trust.confidenceBreakdown.capsApplied
+                      .map((item) => confidenceCapLabels[item] ?? item)
+                      .join(", ")
                   : "нет"}
               </span>
             </div>
@@ -357,14 +358,21 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       )}
 
+      <motion.section variants={staggerChild}>
+        <ResultCompareSurface
+          lab={activeScenarioLab}
+          loading={scenarioLabStatus === "loading"}
+          errorMessage={scenarioLabError}
+          onOpenTarget={(targetScreen) =>
+            navigate(`/${targetScreen}?case=${encodeURIComponent(activeCase.id)}`)
+          }
+        />
+      </motion.section>
+
       {!isHumanReview && primaryOffer ? (
         <motion.section variants={staggerChild} className="grid gap-3">
           <p className="text-sm font-medium text-textPrimary">
-            {isTravelOffer(primaryOffer)
-              ? "Основной маршрут"
-              : isResidencyOffer(primaryOffer)
-                ? "Основная программа"
-                : "Основной полис"}
+            Основной сценарий
           </p>
           <OfferCard offer={primaryOffer} selected showBoosts />
         </motion.section>
@@ -377,43 +385,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         </motion.section>
       ) : null}
 
-      {!isHumanReview && alternativeOffers.length > 0 && (
-        <motion.section variants={staggerChild}>
-          <Card className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-textPrimary">Свайп-сравнение альтернатив</p>
-                <p className="text-xs text-textSecondary">
-                  Свайп влево — отклонить, вправо — добавить в шорт-лист. Предпочтения уходят в ранжировщик.
-                </p>
-              </div>
-              <Badge tone="neutral">{alternativeOffers.length} вариантов</Badge>
-            </div>
-            <SwipeDeck
-              offers={alternativeOffers as Offer[]}
-              dismissReasons={dismissReasons}
-              onShortlist={(offerId) =>
-                toast.push(`Вариант ${offerId} в шорт-листе — ранжировщик учтёт.`, "success")
-              }
-              onDismiss={(offerId, reason) =>
-                toast.push(
-                  reason
-                    ? `Вариант ${offerId} отклонён: ${reason}.`
-                    : `Вариант ${offerId} отклонён — уронит вес в следующий пересчёт.`,
-                  "info"
-                )
-              }
-              onPreferencesChange={(decisions) => void handlePreferences(decisions)}
-            />
-            {preferences.length > 0 && (
-              <p className="text-xs text-textMuted">
-                Активные предпочтения: {preferences.map((p) => `${p.id} (${p.weight >= 0 ? "+" : ""}${p.weight.toFixed(2)})`).join(", ")}
-              </p>
-            )}
-          </Card>
-        </motion.section>
-      )}
-
       {!isHumanReview && (
         <motion.section variants={staggerChild}>
           <Card className="grid gap-3">
@@ -424,7 +395,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                   key={bullet.id}
                   id={bullet.id}
                   title={bullet.text}
-                  subtitle={`Правило ${bullet.ruleId} · сигналы: ${bullet.signalIds.join(", ")}`}
+                  subtitle="Что именно повлияло на решение"
                   right={
                     <Badge
                       tone={
@@ -436,10 +407,10 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                               ? "review"
                               : bullet.tone === "warning"
                                 ? "warning"
-                                : "neutral"
+                              : "neutral"
                       }
                     >
-                      {bullet.ruleId}
+                      {bulletToneLabels[bullet.tone] ?? "фактор"}
                     </Badge>
                   }
                   screen={screenName}
@@ -463,10 +434,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
                           .map((rule) => (
                             <li key={rule.ruleId} className="rounded-lg bg-surface-2 px-3 py-2">
                               <p className="text-textPrimary">{rule.explanation}</p>
-                              <p className="mt-1 text-textMuted">
-                                Тип: {rule.output.type}
-                                {rule.output.severity ? `, уровень ${rule.output.severity}` : ""}
-                              </p>
                             </li>
                           ))}
                       </ul>
@@ -553,8 +520,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         <Card className="grid gap-2">
           <p className="text-sm font-medium text-textPrimary">Общий снимок решения</p>
           <p className="text-xs text-textSecondary">
-            Версия контракта: {activeResult.version}. Продукт:{" "}
-            {activeResult.productType}.{" "}
+            Продукт: {productTypeLabel(activeResult.productType)}.{" "}
             {isHumanReview
               ? "Финальный маршрут, уровень уверенности и карту рисков подтвердит оператор."
               : `Вычислено за ${activeResult.auditTrail.totalMs.toFixed(1)} мс · уверенность ${formatPercent(activeResult.trust.confidence)}.`}

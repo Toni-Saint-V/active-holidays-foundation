@@ -14,6 +14,10 @@ import {
   caseOverrideSchema,
   caseSignalsSchema,
   pathPreferencesSchema,
+  scenarioLabFamilySchema,
+  scenarioLabCompareRequestSchema,
+  scenarioLabCompareResponseSchema,
+  scenarioLabPayloadSchema,
   offersSchema,
   productTypeSchema,
   verdictSchema,
@@ -29,6 +33,10 @@ import {
   type ProductType,
   type ResultPayload,
   type RuleMetadata,
+  type ScenarioLabCompareRequest,
+  type ScenarioLabCompareResponse,
+  type ScenarioLabFamily,
+  type ScenarioLabPayload,
   type Source
 } from "@shared/contracts";
 
@@ -182,6 +190,32 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify({ title })
     });
+  },
+  async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/scenarios`,
+      scenarioLabFamilySchema
+    );
+  },
+  async compareScenario(
+    id: string,
+    payload: ScenarioLabCompareRequest
+  ): Promise<ScenarioLabCompareResponse> {
+    const body = scenarioLabCompareRequestSchema.parse(payload);
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/scenarios/compare`,
+      scenarioLabCompareResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(body)
+      }
+    );
+  },
+  async decisionScenarioLab(id: string): Promise<ScenarioLabPayload> {
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/scenario-lab`,
+      scenarioLabPayloadSchema
+    );
   },
   async paths(caseId: string): Promise<Offer[]> {
     const response = await request(

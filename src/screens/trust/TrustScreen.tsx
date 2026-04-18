@@ -12,6 +12,7 @@ import { EmptyState } from "@/ui/EmptyState";
 import { staggerChild, staggerParent } from "@/animations/variants";
 import { useScreenView } from "@/instrumentation/screenView";
 import { formatPercent } from "@/lib/format";
+import { defaultCaseIdForProduct } from "@/lib/caseDefaults";
 
 export function TrustScreen() {
   useScreenView("trust");
@@ -34,11 +35,14 @@ export function TrustScreen() {
   }, [bootstrap, scenarios.length]);
 
   useEffect(() => {
-    const target = caseIdFromUrl ?? activeCaseId ?? scenarios[0]?.caseId ?? "s1-rf-italy";
+    const target =
+      caseIdFromUrl ??
+      activeCaseId ??
+      defaultCaseIdForProduct(activeCase?.productType ?? activeResult?.productType ?? "travel");
     if (target && target !== activeCaseId) {
       void loadCase(target);
     }
-  }, [caseIdFromUrl, activeCaseId, scenarios, loadCase]);
+  }, [caseIdFromUrl, activeCaseId, activeCase?.productType, activeResult?.productType, loadCase]);
 
   if (status === "error") {
     return (

@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode, SVGProps } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { ResultScreen } from "./ResultScreen";
@@ -63,12 +63,6 @@ vi.mock("@/ui/OfferCard", () => ({
   )
 }));
 
-vi.mock("@/ui/SwipeDeck", () => ({
-  SwipeDeck: () => <div data-testid="swipe-deck" />,
-  insuranceDismissReasons: [],
-  residencyDismissReasons: []
-}));
-
 vi.mock("@/ui/TemporalWhatIf", () => ({
   TemporalWhatIf: () => <div data-testid="what-if" />
 }));
@@ -100,6 +94,56 @@ vi.mock("@/ui/Toast", () => ({
 const useCaseStoreMock = vi.mocked(useCaseStore);
 
 function createStore(overrides: Partial<Record<string, unknown>> = {}) {
+  const activeResult = {
+    verdict: "GO",
+    productType: "travel",
+    computedAt: "2026-04-17T10:00:00.000Z",
+    nextAction: {
+      type: "start_application",
+      label: "Начать заявку",
+      detail: "Можно переходить к следующему шагу.",
+      targetScreen: "result"
+    },
+    trust: {
+      confidence: 0.74,
+      confidenceBreakdown: {
+        value: 0.74,
+        capsApplied: [],
+        factors: []
+      }
+    },
+    primaryPath: {
+      id: "italy_c_tourism",
+      productType: "travel",
+      title: "Шенген C"
+    },
+    alternativePaths: [],
+    criticalRisk: null,
+    risks: [],
+    whyBullets: [],
+    decisionSignals: [],
+    ruleResults: [],
+    assumptions: [],
+    version: "rdc.v1",
+    documents: {
+      score: 0.71,
+      readyCount: 5,
+      requiredCount: 7,
+      items: [
+        {
+          id: "insurance",
+          label: "Страховка на всю поездку",
+          status: "attention_needed",
+          detail: "Нужен полис с покрытием не ниже 30000€.",
+          pathId: "italy_c_tourism"
+        }
+      ]
+    },
+    auditTrail: {
+      totalMs: 14.2
+    }
+  };
+
   return {
     activeCase: {
       id: "s1-rf-italy",
@@ -109,39 +153,116 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
       updatedAt: "2026-04-17T10:00:00.000Z"
     },
     activeCaseId: "s1-rf-italy",
-    activeResult: {
-      verdict: "GO",
-      productType: "travel",
-      computedAt: "2026-04-17T10:00:00.000Z",
-      nextAction: {
-        type: "start_application",
-        label: "Начать заявку",
-        detail: "Можно переходить к следующему шагу.",
-        targetScreen: "result"
-      },
-      trust: {
-        confidence: 0.74,
-        confidenceBreakdown: {
-          value: 0.74,
-          capsApplied: [],
-          factors: []
+    activeResult,
+    activeScenarioLab: {
+      version: "scenario-lab.v1",
+      caseId: "s1-rf-italy",
+      generatedAt: "2026-04-17T10:00:00.000Z",
+      baseResult: activeResult,
+      issues: [
+        {
+          id: "issue:documents",
+          title: "Документы",
+          detail: "Не хватает 2 документов из 7 — доготовить перед подачей.",
+          severity: "medium",
+          kind: "warning",
+          ruleId: "R10",
+          signalIds: ["documents_ready_count", "documents_required_count"]
         }
-      },
-      primaryPath: {
-        id: "italy_c_tourism",
-        productType: "travel",
-        title: "Шенген C"
-      },
-      alternativePaths: [],
-      criticalRisk: null,
-      risks: [],
-      whyBullets: [],
-      decisionSignals: [],
-      ruleResults: [],
-      assumptions: [],
-      version: "rdc.v1",
-      auditTrail: {
-        totalMs: 14.2
+      ],
+      scenarios: [
+        {
+          id: "documents-ready",
+          type: "documents",
+          title: "Добрать обязательные документы",
+          summary: "Закрываем недостающий чеклист по текущему пути и смотрим, как меняется исход.",
+          recommended: true,
+          nextAction: {
+            type: "upload_missing_docs",
+            label: "Перейти к документам",
+            detail: "Сначала закройте недостающий чеклист.",
+            targetScreen: "documents"
+          },
+          comparison: {
+            verdictBefore: "GO",
+            verdictAfter: "GO",
+            confidenceBefore: 0.74,
+            confidenceAfter: 0.82,
+            primaryPathBefore: { id: "italy_c_tourism", label: "Шенген C" },
+            primaryPathAfter: { id: "italy_c_tourism", label: "Шенген C" },
+            resolvedRisks: ["Страховка на всю поездку"],
+            remainingRisks: [],
+            documents: {
+              readyCountBefore: 5,
+              readyCountAfter: 7,
+              requiredCount: 7,
+              itemsToCollect: []
+            },
+            whyChanged: ["Чеклист становится полным, поэтому решение становится устойчивее."]
+          },
+          plan: {
+            headline: "После этого сценария следующий шаг — перейти к документам.",
+            firstSteps: ["Подготовить страховку на всю поездку."],
+            criticalSteps: ["Не отправлять заявку с неполным пакетом."],
+            canWait: ["Дополнительные улучшения можно делать уже после полного чеклиста."],
+            humanReviewRequired: false,
+            humanReviewReason: null
+          }
+        },
+        {
+          id: "human-review",
+          type: "human_review",
+          title: "Передать кейс в ручную проверку",
+          summary: "Если автоматический пересчёт не даёт нормальный исход, не рисуем оптимизм и зовём человека.",
+          recommended: false,
+          nextAction: {
+            type: "send_for_review",
+            label: "Открыть ручную проверку",
+            detail: "Нужна ручная проверка.",
+            targetScreen: "human-review"
+          },
+          comparison: {
+            verdictBefore: "GO",
+            verdictAfter: "HUMAN_REVIEW",
+            confidenceBefore: 0.74,
+            confidenceAfter: 0.55,
+            primaryPathBefore: { id: "italy_c_tourism", label: "Шенген C" },
+            primaryPathAfter: { id: null, label: null },
+            resolvedRisks: [],
+            remainingRisks: ["Нужна ручная проверка"],
+            documents: {
+              readyCountBefore: 5,
+              readyCountAfter: 5,
+              requiredCount: 7,
+              itemsToCollect: [
+                {
+                  id: "insurance",
+                  label: "Страховка на всю поездку",
+                  status: "attention_needed",
+                  detail: "Нужен полис с покрытием не ниже 30000€.",
+                  pathId: "italy_c_tourism"
+                }
+              ]
+            },
+            whyChanged: ["Автоматического сценария недостаточно."]
+          },
+          plan: {
+            headline: "Автоматического улучшения недостаточно — нужен человек.",
+            firstSteps: ["Подготовить текущие материалы по кейсу."],
+            criticalSteps: ["Нужна ручная проверка."],
+            canWait: [],
+            humanReviewRequired: true,
+            humanReviewReason: "Нужна ручная проверка."
+          }
+        }
+      ],
+      recommendedScenarioId: "documents-ready",
+      noHelpfulScenarios: false,
+      humanReviewEscalation: {
+        required: false,
+        title: "Ручная проверка не нужна",
+        detail: "По текущему кейсу есть автоматический сценарий.",
+        triggeredBy: []
       }
     },
     paths: [],
@@ -154,6 +275,8 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
     fork: vi.fn().mockResolvedValue(null),
     setPreferences: vi.fn().mockResolvedValue(undefined),
     overrideSignal: vi.fn().mockResolvedValue(undefined),
+    scenarioLabStatus: "ready",
+    scenarioLabError: null,
     status: "ready",
     errorMessage: null,
     ...overrides
@@ -327,6 +450,57 @@ describe("ResultScreen", () => {
     expect(screen.queryByTestId("confidence-gauge")).not.toBeInTheDocument();
     expect(screen.queryByTestId("offer-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("risk-pulse")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("swipe-deck")).not.toBeInTheDocument();
+    expect(screen.getByText("Как улучшить шанс")).toBeInTheDocument();
+  });
+
+  it("renders decision scenario lab and updates the plan when another scenario is selected", async () => {
+    useCaseStoreMock.mockReturnValue(
+      createStore()
+    );
+
+    renderScreen(<ResultScreen />);
+
+    expect(screen.getByText("Как улучшить шанс")).toBeInTheDocument();
+    expect(screen.getByText("Что мешает сейчас")).toBeInTheDocument();
+    expect(screen.getByText("Документы")).toBeInTheDocument();
+    expect(screen.getByText("Добрать обязательные документы")).toBeInTheDocument();
+    expect(screen.getByText("Подготовить страховку на всю поездку.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Передать кейс в ручную проверку/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Автоматического улучшения недостаточно — нужен человек.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows honest dead-end state when no helpful scenarios are available", () => {
+    useCaseStoreMock.mockReturnValue(
+      createStore({
+        activeScenarioLab: {
+          ...createStore().activeScenarioLab,
+          scenarios: [
+            {
+              ...createStore().activeScenarioLab.scenarios[1],
+              recommended: true
+            }
+          ],
+          recommendedScenarioId: "human-review",
+          noHelpfulScenarios: true,
+          humanReviewEscalation: {
+            required: true,
+            title: "Нужна ручная проверка",
+            detail: "Если ни один сценарий не даёт нормальный исход, кейс нужно передать человеку.",
+            triggeredBy: ["no_helpful_scenarios"]
+          }
+        }
+      })
+    );
+
+    renderScreen(<ResultScreen />);
+
+    expect(screen.getByText("полезных сравнений нет")).toBeInTheDocument();
+    expect(
+      screen.getByText("Если ни один сценарий не даёт нормальный исход, кейс нужно передать человеку.")
+    ).toBeInTheDocument();
   });
 });

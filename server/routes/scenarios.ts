@@ -2,10 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { verdictSchema, actionTypeSchema } from "@shared/contracts";
+import { verdictSchema, actionTypeSchema, productTypeSchema } from "@shared/contracts";
 
 const scenarioSchema = z.object({
   caseId: z.string(),
+  productType: productTypeSchema,
   title: z.string(),
   subtitle: z.string(),
   expectedVerdict: verdictSchema,

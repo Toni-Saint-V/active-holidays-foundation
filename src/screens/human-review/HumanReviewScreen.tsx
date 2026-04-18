@@ -11,6 +11,7 @@ import { useScreenView } from "@/instrumentation/screenView";
 import { useToast } from "@/ui/Toast";
 import { staggerChild, staggerParent } from "@/animations/variants";
 import { formatDate } from "@/lib/format";
+import { findHumanReviewCaseId } from "@/lib/caseDefaults";
 
 export function HumanReviewScreen() {
   useScreenView("human-review");
@@ -36,7 +37,10 @@ export function HumanReviewScreen() {
   }, [bootstrap, scenarios.length]);
 
   useEffect(() => {
-    const target = caseIdFromUrl ?? activeCaseId ?? scenarios[0]?.caseId ?? "s3-us-spb-business";
+    const target =
+      caseIdFromUrl ??
+      activeCaseId ??
+      findHumanReviewCaseId(scenarios);
     if (target && target !== activeCaseId) {
       void loadCase(target);
     }
@@ -93,11 +97,11 @@ export function HumanReviewScreen() {
                   : "Для этого кейса ручная проверка не обязательна, но можно передать его менеджеру вручную."}
               </p>
             </div>
-            <Badge tone="review">вердикт {activeResult.verdict}</Badge>
+            <Badge tone="review">нужна ручная проверка</Badge>
           </div>
           <div className="mt-4 grid gap-2">
             <div className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-textSecondary">
-              Кейс: {activeCase.id} · обновлён {formatDate(activeCase.updatedAt)}
+              Последнее обновление: {formatDate(activeCase.updatedAt)}
             </div>
             <div className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-textSecondary">
               Следующее действие: {activeResult.nextAction.label}
@@ -130,9 +134,7 @@ export function HumanReviewScreen() {
                   key={rule.ruleId}
                   className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-3"
                 >
-                  <p className="text-sm font-medium text-sky-100">
-                    {rule.ruleId} · {rule.category}
-                  </p>
+                  <p className="text-sm font-medium text-sky-100">Причина проверки</p>
                   <p className="mt-1 text-xs text-sky-100/80">{rule.explanation}</p>
                 </div>
               ))}

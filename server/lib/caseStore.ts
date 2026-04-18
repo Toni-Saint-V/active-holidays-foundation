@@ -35,6 +35,7 @@ export type SnapshotDecisionRecordInput = {
   summary: string;
   kind: DecisionKind;
   changedSignalIds: string[];
+  changedPreferenceIds?: string[];
   now?: Date;
 };
 
@@ -57,7 +58,8 @@ function migrateLegacyEntry(entry: DecisionLogEntry): DecisionRecord {
     confidence: entry.confidence,
     summary: entry.summary,
     kind: entry.kind,
-    changedSignalIds: entry.changedSignalIds
+    changedSignalIds: entry.changedSignalIds,
+    changedPreferenceIds: []
   };
 }
 
@@ -240,7 +242,8 @@ export class CaseStore {
       confidence: Math.round(input.result.trust.confidence * 100) / 100,
       summary: input.summary,
       kind: input.kind,
-      changedSignalIds: input.changedSignalIds.slice()
+      changedSignalIds: input.changedSignalIds.slice(),
+      changedPreferenceIds: input.changedPreferenceIds?.slice() ?? []
     };
 
     this.appendRecord(record);
@@ -327,7 +330,8 @@ export class CaseStore {
       confidence: Math.round(confidence * 100) / 100,
       summary,
       kind,
-      changedSignalIds: changedSignalIds.slice()
+      changedSignalIds: changedSignalIds.slice(),
+      changedPreferenceIds: []
     };
     this.appendRecord(record);
     return decisionRecordToLogEntry(record);

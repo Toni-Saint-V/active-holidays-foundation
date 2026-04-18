@@ -27,19 +27,20 @@ export const decisionSignalSchema = z.object({
 });
 export type DecisionSignal = z.infer<typeof decisionSignalSchema>;
 
+export const documentsReadinessItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  status: z.enum(["ready", "attention_needed", "blocked"]),
+  detail: z.string().min(1),
+  pathId: z.string().min(1).nullable()
+});
+export type DocumentsReadinessItem = z.infer<typeof documentsReadinessItemSchema>;
+
 export const documentsReadinessSchema = z.object({
   score: z.number().min(0).max(1),
   readyCount: z.number().int().min(0),
   requiredCount: z.number().int().min(0),
-  items: z.array(
-    z.object({
-      id: z.string().min(1),
-      label: z.string().min(1),
-      status: z.enum(["ready", "attention_needed", "blocked"]),
-      detail: z.string().min(1),
-      pathId: z.string().min(1).nullable()
-    })
-  )
+  items: z.array(documentsReadinessItemSchema)
 });
 export type DocumentsReadiness = z.infer<typeof documentsReadinessSchema>;
 
