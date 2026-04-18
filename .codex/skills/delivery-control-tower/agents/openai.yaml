@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delivery Control Tower"
+  short_description: "Главный оркестратор skills для продукта, Notion, Lovable и repo"
+  default_prompt: "Используй $delivery-control-tower, чтобы управлять полным delivery-конвейером: audit, Notion sync, build briefs, Lovable prompts, AI/interactivity audit, UI polish, implementation review и phase-gate."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Interactive Screen Audit"
+  short_description: "Проверяет экран на AI-native ценность и интерактивы"
+  default_prompt: "Используй $ai-interactive-screen-audit, чтобы проверить экран на внедрение AI-native поведения, сильные интерактивы, trust moments и полезные product upgrades без визуального шума."

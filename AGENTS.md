@@ -8,6 +8,7 @@
 - UI must depend on stable domain contracts, not raw storage shapes.
 - All visible UI copy must be in Russian.
 - Prefer the strongest real implementation over broad fake completeness.
+- Repo-local custom Codex skills live in `.codex/skills` and should stay versioned with the repository when they affect this project's workflow.
 
 ## Phase 1 Boundary
 
