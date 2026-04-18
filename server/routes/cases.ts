@@ -5,13 +5,19 @@ import {
   caseSignalsSchema,
   pathPreferencesSchema,
   type Case,
-  type CaseSignals
+  type CaseSignals,
+  type DecisionKind
 } from "@shared/contracts";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { HttpError } from "../middleware/errorHandler";
 import { validateBody, validateParams } from "../middleware/validate";
-import { runDecision } from "@shared/domain";
+import {
+  driftDiff,
+  fingerprintResult,
+  runDecision,
+  type OrchestratorCatalogs
+} from "@shared/domain/engine";
 
 const caseIdParams = z.object({ id: z.string().min(1) });
 
@@ -28,7 +34,7 @@ function requireCase(id: string): Case {
   return existing;
 }
 
-function orchestratorCatalogs() {
+function orchestratorCatalogs(): OrchestratorCatalogs {
   const catalogs = getCatalogsOrThrow();
   return {
     paths: catalogs.paths,
@@ -42,6 +48,25 @@ function orchestratorCatalogs() {
 
 function computeResult(caseData: Case) {
   return runDecision({ case: caseData, catalogs: orchestratorCatalogs() });
+}
+
+function recordDecision(
+  caseData: Case,
+  summary: string,
+  kind: DecisionKind,
+  changedSignalIds: string[]
+) {
+  const catalogs = orchestratorCatalogs();
+  const result = runDecision({ case: caseData, catalogs });
+  const record = getCaseStore().snapshotDecisionRecord({
+    case: caseData,
+    catalogs,
+    result,
+    summary,
+    kind,
+    changedSignalIds
+  });
+  return { result, record };
 }
 
 export function casesRouter(): Router {
@@ -83,16 +108,13 @@ export function casesRouter(): Router {
       const signals = (req.body as { signals: CaseSignals }).signals;
       const updated = store.patchSignals(id, signals);
       if (!updated) throw new HttpError(500, "Не удалось обновить сигналы.");
-      const result = computeResult(updated);
-      store.snapshotDecision(
-        updated.id,
-        result.verdict,
-        result.trust.confidence,
+      const { result, record } = recordDecision(
+        updated,
         `Пересчёт после изменения ${signals.length} сигналов.`,
         "recompute",
         signals.map((signal) => signal.id)
       );
-      res.json({ case: updated, result });
+      res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
   );
 
@@ -114,16 +136,13 @@ export function casesRouter(): Router {
       const updated = preferences
         ? store.setPreferences(existing.id, preferences) ?? existing
         : existing;
-      const result = computeResult(updated);
-      store.snapshotDecision(
-        updated.id,
-        result.verdict,
-        result.trust.confidence,
+      const { result, record } = recordDecision(
+        updated,
         preferences ? "Пересчёт с новыми предпочтениями по маршрутам." : "Пересчёт без изменений.",
         "recompute",
         []
       );
-      res.json({ case: updated, result });
+      res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
   );
 
@@ -144,16 +163,13 @@ export function casesRouter(): Router {
           "invalid_override_signal"
         );
       }
-      const result = computeResult(updated);
-      store.snapshotDecision(
-        updated.id,
-        result.verdict,
-        result.trust.confidence,
+      const { result, record } = recordDecision(
+        updated,
         `Override сигнала ${override.signalId}: ${override.reason}.`,
         "override",
         [override.signalId]
       );
-      res.json({ case: updated, result });
+      res.json({ case: updated, result, decisionRecordId: record.decisionId });
     }
   );
 
@@ -172,6 +188,48 @@ export function casesRouter(): Router {
     res.json(result.documents);
   });
 
+  router.get("/:id/drift", validateParams(caseIdParams), (req, res) => {
+    const id = getId(req);
+    const currentCase = requireCase(id);
+    const latest = getCaseStore().latestRecordFor(id);
+    if (!latest) {
+      throw new HttpError(
+        409,
+        `Для кейса ${id} нет решений в журнале — запустите recompute, чтобы создать базу для drift-проверки.`,
+        "no_decision_record"
+      );
+    }
+    if (!latest.result) {
+      throw new HttpError(
+        409,
+        `Последнее решение для кейса ${id} — legacy-запись без полного результата. Запустите recompute, чтобы получить базу для drift-проверки.`,
+        "legacy_decision_record"
+      );
+    }
+    const replayResult = runDecision(
+      { case: currentCase, catalogs: orchestratorCatalogs() },
+      { now: () => new Date(latest.computedAt) }
+    );
+    const replayFingerprint = fingerprintResult(replayResult);
+    const diff = driftDiff(latest.result, replayResult);
+    // Compare the latest stored decision with the same case under the current
+    // catalogs, but keep the original decision time stable so computedAt does
+    // not create false-positive fingerprint drift on otherwise identical data.
+    // fingerprint mismatch must still count as drift even when driftDiff
+    // returns null, otherwise result-fields that driftDiff does not inspect
+    // (e.g. auditTrail shape, ruleResults, path title) could drift silently.
+    const drifted = diff !== null || replayFingerprint !== latest.resultFingerprint;
+    res.json({
+      decisionRecordId: latest.decisionId,
+      engineVersion: latest.engineVersion,
+      engineRevision: latest.engineRevision,
+      latestResultFingerprint: latest.resultFingerprint,
+      replayResultFingerprint: replayFingerprint,
+      drifted,
+      diff
+    });
+  });
+
   router.post(
     "/:id/fork",
     validateParams(caseIdParams),
@@ -183,16 +241,13 @@ export function casesRouter(): Router {
       const title = (req.body as { title?: string }).title;
       const forked = store.fork(id, { title });
       if (!forked) throw new HttpError(500, "Не удалось форкнуть кейс.");
-      const result = computeResult(forked);
-      store.snapshotDecision(
-        forked.id,
-        result.verdict,
-        result.trust.confidence,
+      const { result, record } = recordDecision(
+        forked,
         `Форк кейса ${id}.`,
         "fork",
         []
       );
-      res.json({ case: forked, result });
+      res.json({ case: forked, result, decisionRecordId: record.decisionId });
     }
   );
 

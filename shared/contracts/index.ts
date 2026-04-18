@@ -15,5 +15,6 @@ export * from "./audit";
 export * from "./case";
 export * from "./result";
 export * from "./intake";
+export * from "./engine";
 export * from "./decisions";
 export * from "./health";

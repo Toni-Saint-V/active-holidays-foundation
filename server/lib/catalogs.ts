@@ -1,7 +1,7 @@
 import {
   casesSchema,
   countryRestrictionsSchema,
-  decisionsLogSchema,
+  decisionLedgerSchema,
   insuranceProductsCatalogSchema,
   pathsCatalogSchema,
   residencyProgramsCatalogSchema,
@@ -9,7 +9,7 @@ import {
   visaRulesSchema,
   type Case,
   type CountryRestriction,
-  type DecisionLogEntry,
+  type DecisionLedgerEntry,
   type InsuranceProductDefinition,
   type PathDefinition,
   type ResidencyProgramDefinition,
@@ -24,7 +24,7 @@ export type Catalogs = {
   restrictions: CountryRestriction[];
   sources: Source[];
   cases: Case[];
-  decisionsLog: DecisionLogEntry[];
+  decisionsLog: DecisionLedgerEntry[];
   residencyPrograms: ResidencyProgramDefinition[];
   insuranceProducts: InsuranceProductDefinition[];
 };
@@ -48,7 +48,7 @@ export async function loadCatalogs(): Promise<Catalogs> {
     loadSeed("db/country_restrictions.json", countryRestrictionsSchema),
     loadSeed("db/sources.json", sourcesCatalogSchema),
     loadSeed("db/cases.json", casesSchema),
-    loadSeed("db/decisions_log.json", decisionsLogSchema),
+    loadSeed("db/decisions_log.json", decisionLedgerSchema),
     loadSeed("db/residency_programs.json", residencyProgramsCatalogSchema),
     loadSeed("db/insurance_products.json", insuranceProductsCatalogSchema)
   ]);
