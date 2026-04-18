@@ -1,0 +1,34 @@
+[
+  {
+    "citizenship": "US",
+    "destination": "RU",
+    "severity": "sanctions",
+    "label": "Санкционный контекст US↔RU",
+    "detail": "Бизнес-поездки граждан США требуют дополнительной проверки на санкционные списки и контрагентов.",
+    "sourceId": "src_sanctions_watch"
+  },
+  {
+    "citizenship": "US",
+    "destination": "RU",
+    "severity": "payment",
+    "label": "Ограничения платежей",
+    "detail": "Карты, выпущенные американскими банками, в России не принимаются — нужно готовить наличные или альтернативу.",
+    "sourceId": "src_russia_mfa_us"
+  },
+  {
+    "citizenship": "US",
+    "destination": "RU",
+    "severity": "advisory",
+    "label": "Государственный совет США",
+    "detail": "Госдеп США сохраняет предупреждение уровня 4 для поездок в Россию.",
+    "sourceId": "src_sanctions_watch"
+  },
+  {
+    "citizenship": "RU",
+    "destination": "IT",
+    "severity": "advisory",
+    "label": "Усиленная проверка туристических виз",
+    "detail": "Консульство усилило проверку целей поездки, сроки по-прежнему в рамках 4 недель.",
+    "sourceId": "src_italy_consulate_spb"
+  }
+]

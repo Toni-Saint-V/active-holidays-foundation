@@ -8,6 +8,9 @@ import { HumanReviewScreen } from "@/screens/human-review/HumanReviewScreen";
 import { TrustScreen } from "@/screens/trust/TrustScreen";
 import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
+import { NotFoundScreen } from "@/screens/not-found/NotFoundScreen";
+import { ResidencyScreen } from "@/screens/residency-es/ResidencyScreen";
+import { InsuranceScreen } from "@/screens/insurance-adult/InsuranceScreen";
 
 export function AppRouter() {
   return (
@@ -22,6 +25,9 @@ export function AppRouter() {
           <Route path="/trust" element={<TrustScreen />} />
           <Route path="/notifications" element={<NotificationsScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />
+          <Route path="/residency-es" element={<ResidencyScreen />} />
+          <Route path="/insurance-adult" element={<InsuranceScreen />} />
+          <Route path="*" element={<NotFoundScreen />} />
         </Route>
       </Routes>
     </BrowserRouter>

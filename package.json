@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:engine": "tsx scripts/verify-engine-drift.ts",
+    "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

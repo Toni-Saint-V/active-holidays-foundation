@@ -1,150 +1,165 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useTravelFlowStore } from "@/state/travelFlowStore";
-import { getActiveTravelSession } from "@/state/travelFlowSelectors";
-
-const itemStatusLabels = {
-  ready: "Готово",
-  attention_needed: "Нужно внимание",
-  blocked: "Есть блокер"
-} as const;
-
-const itemToneClasses = {
-  ready: "border-success/40 bg-successBg",
-  attention_needed: "border-warning/40 bg-warningBg",
-  blocked: "border-danger/40 bg-dangerBg"
-} as const;
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { FileText } from "lucide-react";
+import { useCaseStore } from "@/state/caseStore";
+import { Badge, Button, Card } from "@/ui/primitives";
+import { ReadinessCircle } from "@/ui/ReadinessCircle";
+import { DocumentCard } from "@/ui/DocumentCard";
+import { EmptyState } from "@/ui/EmptyState";
+import { staggerChild, staggerParent } from "@/animations/variants";
+import { useScreenView } from "@/instrumentation/screenView";
+import { useToast } from "@/ui/Toast";
+import { track } from "@/instrumentation/events";
 
 export function DocumentsScreen() {
-  const sessions = useTravelFlowStore((state) => state.sessions);
-  const activeSessionId = useTravelFlowStore((state) => state.activeSessionId);
-  const status = useTravelFlowStore((state) => state.status);
-  const errorMessage = useTravelFlowStore((state) => state.errorMessage);
-  const hydrateWorkspace = useTravelFlowStore((state) => state.hydrateWorkspace);
-  const activeSession = getActiveTravelSession(sessions, activeSessionId);
+  useScreenView("documents");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const caseIdFromUrl = searchParams.get("case");
+  const {
+    activeCase,
+    activeCaseId,
+    activeResult,
+    scenarios,
+    bootstrap,
+    loadCase,
+    patchSignal,
+    status,
+    errorMessage
+  } = useCaseStore();
 
   useEffect(() => {
-    void hydrateWorkspace();
-  }, [hydrateWorkspace]);
+    if (scenarios.length === 0) void bootstrap();
+  }, [bootstrap, scenarios.length]);
 
-  if (status === "loading") {
-    return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-sm text-textSecondary">Загружаем документный статус...</p>
-      </section>
-    );
-  }
+  useEffect(() => {
+    const target = caseIdFromUrl ?? activeCaseId ?? scenarios[0]?.caseId ?? "s1-rf-italy";
+    if (target && target !== activeCaseId) {
+      void loadCase(target);
+    }
+  }, [caseIdFromUrl, activeCaseId, scenarios, loadCase]);
 
   if (status === "error") {
     return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-sm text-textPrimary">
-          {errorMessage ?? "Не удалось загрузить документный статус."}
-        </p>
-      </section>
+      <EmptyState
+        title="Ошибка загрузки документов"
+        description={errorMessage ?? "Попробуйте обновить страницу."}
+      />
     );
   }
 
-  if (!activeSession) {
+  if (!activeCase || !activeResult) {
     return (
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">Документы</p>
-        <h2 className="mt-3 text-3xl font-semibold text-textPrimary">
-          Пока нет активной сессии
-        </h2>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
-          Сначала отправьте анкету, чтобы система построила документный статус и набор
-          следующих шагов.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            to="/intake"
-            className="rounded-xl bg-accent px-4 py-3 text-sm font-medium text-black transition hover:bg-accentHover"
-          >
-            Перейти к анкете
-          </Link>
-          <Link
-            to="/result"
-            className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
-          >
-            Открыть вердикт
-          </Link>
-        </div>
-      </section>
+      <Card>
+        <p className="animate-pulse text-sm text-textSecondary">Готовим документный трек…</p>
+      </Card>
     );
+  }
+
+  if (activeResult.verdict === "HUMAN_REVIEW") {
+    return (
+      <EmptyState
+        title="Документный трек откроет оператор"
+        description="Пока кейс на ручной проверке, мы не показываем пакет документов и шаги подачи."
+        action={
+          <Button variant="secondary" onClick={() => navigate("/human-review")}>
+            Вернуться к ручной проверке
+          </Button>
+        }
+      />
+    );
+  }
+
+  const readiness = activeResult.documents;
+
+  async function markReady() {
+    if (!activeCase) return;
+    const next = Math.min(readiness.readyCount + 1, readiness.requiredCount);
+    track({ type: "cta_clicked", cta: "documents_mark_ready" });
+    await patchSignal(activeCase.id, "documents_ready_count", next);
+    toast.push("Отметили документ как готовый — пересчитали движком.", "success");
   }
 
   return (
-    <div className="grid gap-4">
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <p className="text-xs uppercase tracking-[0.24em] text-textSecondary">Документы</p>
-        <h2 className="mt-3 text-3xl font-semibold text-textPrimary">
-          {itemStatusLabels[activeSession.result.documents.readiness]}
-        </h2>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-textSecondary">
-          {activeSession.result.documents.summary}
-        </p>
-      </section>
+    <motion.div
+      variants={staggerParent}
+      initial="initial"
+      animate="animate"
+      className="grid gap-4"
+    >
+      <motion.section variants={staggerChild}>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">Документы</p>
+              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">
+                Индекс готовности
+              </h2>
+              <p className="mt-2 text-sm text-textSecondary">
+                {readiness.score >= 0.99
+                  ? "Пакет собран — можно подавать."
+                  : readiness.score >= 0.5
+                    ? "Базовая часть готова, осталось добрать несколько документов."
+                    : "Рано подавать: нужно готовить ключевые документы."}
+              </p>
+            </div>
+            <Badge tone={readiness.score >= 0.8 ? "positive" : readiness.score >= 0.5 ? "warning" : "negative"}>
+              {Math.round(readiness.score * 100)}%
+            </Badge>
+          </div>
+          <div className="mt-4">
+            <ReadinessCircle readiness={readiness} />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button size="sm" onClick={markReady}>
+              <FileText className="h-3 w-3" /> Отметить документ как готовый
+            </Button>
+            <Link to={`/result?case=${encodeURIComponent(activeCase.id)}`}>
+              <Button variant="secondary" size="sm">
+                Вернуться к вердикту
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </motion.section>
 
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <h3 className="text-lg font-semibold text-textPrimary">Состав документной готовности</h3>
-        <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
-          {activeSession.result.documents.items.map((item) => (
-            <li
-              key={item.id}
-              className={[
-                "rounded-xl border px-4 py-3",
-                itemToneClasses[item.status]
-              ].join(" ")}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-medium text-textPrimary">{item.label}</p>
-                <span className="text-xs text-textPrimary">
-                  {itemStatusLabels[item.status]}
-                </span>
-              </div>
-              <p className="mt-2">{item.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <motion.section variants={staggerChild}>
+        <Card>
+          <p className="mb-3 text-sm font-medium text-textPrimary">
+            Требования основного маршрута
+          </p>
+          {readiness.items.length === 0 ? (
+            <p className="text-sm text-textSecondary">
+              Список появится, когда движок найдёт основной маршрут.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              {readiness.items.map((item) => (
+                <DocumentCard
+                  key={item.id}
+                  item={{ id: item.id, label: item.label, status: item.status, detail: item.detail }}
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+      </motion.section>
 
-      <section className="rounded-[20px] border border-border bg-surface p-6 shadow-soft">
-        <h3 className="text-lg font-semibold text-textPrimary">Что делать дальше</h3>
-        <ul className="mt-4 grid gap-3 text-sm text-textSecondary">
-          {activeSession.result.nextSteps
-            .filter((step) => step.target === "documents" || step.target === "intake")
-            .map((step) => (
-              <li
-                key={step.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 py-3"
-              >
-                <span>{step.label}</span>
-                <Link
-                  to={step.target === "documents" ? "/documents" : "/intake"}
-                  className="rounded-lg border border-borderStrong px-3 py-2 text-xs text-textPrimary transition hover:bg-surface-3"
-                >
-                  Открыть
-                </Link>
-              </li>
-            ))}
-        </ul>
-      </section>
-
-      <div className="flex flex-wrap gap-3">
-        <Link
-          to="/result"
-          className="rounded-xl bg-accent px-4 py-3 text-sm font-medium text-black transition hover:bg-accentHover"
-        >
-          Вернуться к вердикту
-        </Link>
-        <Link
-          to="/trust"
-          className="rounded-xl border border-borderStrong bg-surface-2 px-4 py-3 text-sm text-textPrimary transition hover:bg-surface-3"
-        >
-          Открыть раздел доверия
-        </Link>
-      </div>
-    </div>
+      <motion.section variants={staggerChild}>
+        <Card>
+          <p className="mb-2 text-sm font-medium text-textPrimary">
+            Следующий шаг от движка
+          </p>
+          <p className="text-sm text-textSecondary">{activeResult.nextAction.detail}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button onClick={() => navigate(`/${activeResult.nextAction.targetScreen}?case=${encodeURIComponent(activeCase.id)}`)}>
+              {activeResult.nextAction.label}
+            </Button>
+          </div>
+        </Card>
+      </motion.section>
+    </motion.div>
   );
 }
