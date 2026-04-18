@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notion Catalog Sync"
+  short_description: "Синхронизирует продуктовые каталоги из Notion в repo"
+  default_prompt: "Используй $notion-catalog-sync, чтобы обновить JSON-каталоги, контракты и проверки в репозитории на основе актуальных правил и продуктовых решений из Notion."

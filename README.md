@@ -42,6 +42,25 @@ This repository currently contains:
 - theme tokens and base Tailwind setup
 - strict TS/Vite/Vitest baseline
 
+## Repo-Local Codex Skills
+
+Custom skills created for this project are versioned in `.codex/skills/`.
+
+Current repo-local set:
+
+- `bank-grade-review`
+- `product-os-audit`
+- `build-brief-orchestrator`
+- `lovable-redline`
+- `notion-catalog-sync`
+- `phase-gate-sync`
+- `notion-ai-sync-director`
+- `lovable-step-prompts`
+- `ai-interactive-screen-audit`
+- `ui-motion-performance-polish`
+- `delivery-control-tower`
+- `market-reality-product-innovation`
+
 ## Architecture Guardrails
 
 - `src/` is browser-facing application code.

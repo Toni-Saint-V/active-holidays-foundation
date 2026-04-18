@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bank-Grade Review"
+  short_description: "Строгое ревью с фокусом на будущее и передачу в Codex CLI"
+  default_prompt: "Используй $bank-grade-review, чтобы провести строгое ревью этого кода, плана или диффа на корректность, поддерживаемость, расширяемость и forward risk, а после ревью сразу дай русский блок передачи для Codex CLI."
