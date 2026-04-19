@@ -1,4 +1,0 @@
-interface:
-  display_name: "UI Motion Performance Polish"
-  short_description: "Доводит экран до 10/10 по UI, motion и performance"
-  default_prompt: "Используй $ui-motion-performance-polish, чтобы довести экран или flow до 10/10 по визуальному качеству, анимации, отзывчивости, accessibility и производительности без ухудшения поддерживаемости."

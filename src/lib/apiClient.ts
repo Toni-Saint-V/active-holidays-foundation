@@ -14,6 +14,9 @@ import {
   caseOverrideSchema,
   caseSignalsSchema,
   pathPreferencesSchema,
+  recommendationDetailRequestSchema,
+  recommendationDetailSchema,
+  recommendationShortlistSchema,
   scenarioLabFamilySchema,
   scenarioLabCompareRequestSchema,
   scenarioLabCompareResponseSchema,
@@ -31,6 +34,8 @@ import {
   type Offer,
   type PathPreferences,
   type ProductType,
+  type RecommendationDetail,
+  type RecommendationShortlist,
   type ResultPayload,
   type RuleMetadata,
   type ScenarioLabCompareRequest,
@@ -156,6 +161,26 @@ export const apiClient = {
   },
   async getResult(id: string): Promise<ResultPayload> {
     return request(`/api/cases/${encodeURIComponent(id)}/result`, resultPayloadSchema);
+  },
+  async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/recommendations/shortlist`,
+      recommendationShortlistSchema
+    );
+  },
+  async recommendationDetail(
+    id: string,
+    offerId: string
+  ): Promise<RecommendationDetail> {
+    const body = recommendationDetailRequestSchema.parse({ offerId });
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/recommendations/detail`,
+      recommendationDetailSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(body)
+      }
+    );
   },
   async patchSignals(id: string, signals: CaseSignals) {
     return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {

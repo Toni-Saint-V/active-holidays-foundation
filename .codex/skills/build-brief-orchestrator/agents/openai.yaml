@@ -1,4 +1,0 @@
-interface:
-  display_name: "Build Brief Orchestrator"
-  short_description: "Собирает сильные briefs для Codex CLI и Lovable"
-  default_prompt: "Используй $build-brief-orchestrator, чтобы превратить продуктовую задачу в качественные Build Briefs и готовые handoff-промпты для Codex CLI, Lovable и review-gate."

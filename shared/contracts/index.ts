@@ -20,3 +20,4 @@ export * from "./engine";
 export * from "./decisions";
 export * from "./health";
 export * from "./scenarioLab";
+export * from "./recommendations";

@@ -54,7 +54,7 @@ async function start() {
   });
 }
 
-const isCli = process.argv[1]?.endsWith("server/index.ts") || process.env.NODE_ENV !== "test";
+const isCli = /server\/index\.(ts|js)$/.test(process.argv[1] ?? "");
 if (isCli) {
   start().catch((error) => {
     console.error("[active-holidays] failed to start:", error);

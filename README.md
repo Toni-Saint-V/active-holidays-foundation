@@ -44,22 +44,39 @@ This repository currently contains:
 
 ## Repo-Local Codex Skills
 
-Custom skills created for this project are versioned in `.codex/skills/`.
+Repo-local skill overrides are versioned in `.codex/skills/`.
 
-Current repo-local set:
+Current repo-local override set:
 
 - `bank-grade-review`
+
+The rest of the Active Holidays workflow relies on the shared global skills to
+avoid duplicate shadow copies. This matches the current Notion execution layer
+for the project, where the active stack includes:
+
 - `product-os-audit`
 - `build-brief-orchestrator`
 - `lovable-redline`
 - `notion-catalog-sync`
 - `phase-gate-sync`
+- `market-reality-product-innovation`
 - `notion-ai-sync-director`
 - `lovable-step-prompts`
 - `ai-interactive-screen-audit`
 - `ui-motion-performance-polish`
-- `delivery-control-tower`
-- `market-reality-product-innovation`
+
+## Repo-Local Codex Automations
+
+The automation suite for this repository lives in `.codex/automations/`.
+
+Key entrypoints:
+
+- `AUTOMATIONS_AUDIT.md`
+- `AUTOMATIONS_ROADMAP.md`
+- `AUTOMATIONS_OPERATING_MODEL.md`
+- `RUNBOOK.md`
+- `npm run automations:verify`
+- `npm run automations:sync -- --dry-run`
 
 ## Architecture Guardrails
 

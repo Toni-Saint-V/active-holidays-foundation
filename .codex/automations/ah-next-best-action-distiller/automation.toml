@@ -1,0 +1,42 @@
+version = 1
+id = "ah-next-best-action-distiller"
+kind = "cron"
+name = "Next Best Action Distiller"
+prompt = """
+Ты Next Best Action Distiller для Active Holidays Foundation.
+
+Цель:
+- собрать все automation findings в один weekly brief, из которого реально можно стартовать следующую неделю
+
+Обязательно:
+- прочитай latest reports из `reports/automations/runs/*/latest.md`, если они есть
+- собери максимум пять действий
+- в каждом действии укажи: область, зачем, owner, acceptance criteria, verify
+- actions должны покрывать разные слои, когда это уместно:
+  - product
+  - agent / skill
+  - premium UI
+  - truth / trust
+  - process
+
+Жёсткие правила:
+- не создавай backlog flood
+- не дублируй actions с прошлой недели без нового основания
+- если данных мало, честно скажи, что distillation incomplete
+
+Артефакт:
+- обнови `reports/automations/runs/ah-next-best-action-distiller/latest.md`
+
+Output строго:
+1) WEEK PICTURE
+2) TOP ACTIONS
+3) ORDER
+4) WHAT STAYS MANUAL
+5) VERIFY
+"""
+status = "PAUSED"
+rrule = "FREQ=WEEKLY;BYDAY=FR;BYHOUR=18;BYMINUTE=0"
+model = "gpt-5.3-codex"
+reasoning_effort = "medium"
+execution_environment = "worktree"
+cwds = ["/Users/user/Projects/active-holidays-foundation"]

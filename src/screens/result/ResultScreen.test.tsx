@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode, SVGProps } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { ResultScreen } from "./ResultScreen";
@@ -73,6 +73,10 @@ vi.mock("@/ui/ReplayTimeline", () => ({
 
 vi.mock("@/ui/ForkDivider", () => ({
   ForkDivider: () => <div data-testid="fork-divider" />
+}));
+
+vi.mock("./AiRecommendationPanel", () => ({
+  AiRecommendationPanel: () => <div data-testid="ai-recommendation-panel" />
 }));
 
 vi.mock("@/ui/SignalRow", () => ({
@@ -289,6 +293,7 @@ function renderScreen(screenNode: ReactNode, initialEntries = ["/"]) {
 
 describe("ResultScreen", () => {
   beforeEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 
@@ -442,15 +447,15 @@ describe("ResultScreen", () => {
     expect(
       screen.getByText("Маршрут, уверенность и риски подтвердит оператор после ручной проверки.")
     ).toBeInTheDocument();
-    expect(screen.queryByText("Уверенность движка")).not.toBeInTheDocument();
-    expect(screen.queryByText("Риски в работе")).not.toBeInTheDocument();
-    expect(screen.queryByText("Основной маршрут")).not.toBeInTheDocument();
-    expect(screen.queryByText("Почему такое решение")).not.toBeInTheDocument();
-    expect(screen.queryByText("Реплей шагов движка")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Уверенность движка")).toHaveLength(0);
+    expect(screen.queryAllByText("Риски в работе")).toHaveLength(0);
+    expect(screen.queryAllByText("Основной маршрут")).toHaveLength(0);
+    expect(screen.queryAllByText("Почему такое решение")).toHaveLength(0);
+    expect(screen.queryAllByText("Реплей шагов движка")).toHaveLength(0);
     expect(screen.queryByTestId("confidence-gauge")).not.toBeInTheDocument();
     expect(screen.queryByTestId("offer-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("risk-pulse")).not.toBeInTheDocument();
-    expect(screen.getByText("Как улучшить шанс")).toBeInTheDocument();
+    expect(screen.getAllByText("Как улучшить шанс").length).toBeGreaterThan(0);
   });
 
   it("renders decision scenario lab and updates the plan when another scenario is selected", async () => {
@@ -460,8 +465,8 @@ describe("ResultScreen", () => {
 
     renderScreen(<ResultScreen />);
 
-    expect(screen.getByText("Как улучшить шанс")).toBeInTheDocument();
-    expect(screen.getByText("Что мешает сейчас")).toBeInTheDocument();
+    expect(screen.getAllByText("Как улучшить шанс").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Что мешает сейчас").length).toBeGreaterThan(0);
     expect(screen.getByText("Документы")).toBeInTheDocument();
     expect(screen.getByText("Добрать обязательные документы")).toBeInTheDocument();
     expect(screen.getByText("Подготовить страховку на всю поездку.")).toBeInTheDocument();

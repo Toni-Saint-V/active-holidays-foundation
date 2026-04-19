@@ -10,6 +10,15 @@
 - Prefer the strongest real implementation over broad fake completeness.
 - Repo-local custom Codex skills live in `.codex/skills` and should stay versioned with the repository when they affect this project's workflow.
 
+## Automation Rules
+
+- Repo-local Codex automations live in `.codex/automations/`.
+- Keep repo-local skills only when they differ from the shared global version; byte-identical copies should be removed instead of shadowing them.
+- Automation definitions must stay runnable from `/Users/user/Projects/active-holidays-foundation`.
+- Run `npm run automations:verify` after editing automation prompts, schedules, or supporting docs.
+- Use `npm run automations:sync -- --dry-run` before copying repo-local automations into `$CODEX_HOME`.
+- Runtime outputs belong in `reports/automations/` and must not turn into committed noise.
+
 ## Phase 1 Boundary
 
 - Allowed: scaffold, routing, theme, tooling, client shell, server health route.

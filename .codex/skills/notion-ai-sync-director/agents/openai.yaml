@@ -1,4 +1,0 @@
-interface:
-  display_name: "Notion AI Sync Director"
-  short_description: "Готовит и контролирует основной sync-pass для Notion AI"
-  default_prompt: "Используй $notion-ai-sync-director, чтобы подготовить сильное задание для Notion AI на основной sync-pass по продукту, Roadmap и Build Briefs, а затем определить, что Codex должен дочистить вручную."

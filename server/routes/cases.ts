@@ -4,6 +4,7 @@ import {
   caseOverrideSchema,
   caseSignalsSchema,
   pathPreferencesSchema,
+  recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
   type Case,
   type CaseSignals,
@@ -12,6 +13,11 @@ import {
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { buildDecisionScenarioLab } from "../lib/decisionScenarioLab";
+import {
+  buildRecommendationDetail,
+  buildRecommendationShortlist,
+  RecommendationOfferNotFoundError
+} from "../lib/recommendations";
 import {
   buildScenarioCompareResponse,
   buildScenarioFamily,
@@ -107,6 +113,45 @@ export function casesRouter(): Router {
     const result = computeResult(caseData);
     res.json(result);
   });
+
+  router.get("/:id/recommendations/shortlist", validateParams(caseIdParams), async (req, res) => {
+    const caseData = requireCase(getId(req));
+    const result = computeResult(caseData);
+    const shortlist = await buildRecommendationShortlist(caseData, result);
+    if (!shortlist) {
+      throw new HttpError(
+        404,
+        `Для кейса ${caseData.id} нет кандидатных рекомендаций для короткого списка.`,
+        "recommendation_shortlist_unavailable"
+      );
+    }
+    res.json(shortlist);
+  });
+
+  router.post(
+    "/:id/recommendations/detail",
+    validateParams(caseIdParams),
+    validateBody(recommendationDetailRequestSchema),
+    async (req, res) => {
+      const caseData = requireCase(getId(req));
+      const result = computeResult(caseData);
+      const { offerId } = recommendationDetailRequestSchema.parse(req.body);
+
+      try {
+        const detail = await buildRecommendationDetail(caseData, result, offerId);
+        res.json(detail);
+      } catch (error) {
+        if (!(error instanceof RecommendationOfferNotFoundError)) {
+          throw error;
+        }
+        throw new HttpError(
+          404,
+          `Вариант ${offerId} отсутствует в текущем коротком списке рекомендаций.`,
+          "recommendation_offer_not_found"
+        );
+      }
+    }
+  );
 
   router.post(
     "/:id/signals",

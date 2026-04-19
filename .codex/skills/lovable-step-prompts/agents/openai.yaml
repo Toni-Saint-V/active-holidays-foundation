@@ -1,4 +1,0 @@
-interface:
-  display_name: "Lovable Step Prompts"
-  short_description: "Делает сильные Lovable-промпты на каждый шаг сборки"
-  default_prompt: "Используй $lovable-step-prompts, чтобы подготовить пошаговые prompts для Lovable по каждому экрану или этапу, с учетом screen contracts, states, product constraints и лучших практик Lovable."

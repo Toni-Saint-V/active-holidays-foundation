@@ -13,7 +13,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:engine": "tsx scripts/verify-engine-drift.ts",
-    "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update"
+    "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update",
+    "automations:sync": "node --experimental-strip-types scripts/codex/sync-automations.ts",
+    "automations:verify": "node --experimental-strip-types scripts/codex/verify-automations.ts",
+    "automations:check:truth": "node --experimental-strip-types scripts/automations/check-source-freshness.ts",
+    "automations:check:screens": "node --experimental-strip-types scripts/automations/check-screen-surface.ts",
+    "automations:check:skills": "node --experimental-strip-types scripts/automations/check-skill-duplication.ts",
+    "automations:check:context": "node --experimental-strip-types scripts/automations/check-context-surface.ts",
+    "automations:check:all": "npm run automations:verify && npm run automations:check:truth && npm run automations:check:screens && npm run automations:check:skills && npm run automations:check:context"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -24,12 +31,13 @@
     "express": "^5.1.0",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.542.0",
+    "openai": "^6.34.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1",
     "tailwind-merge": "^3.3.1",
-    "zustand": "^5.0.8",
-    "zod": "^4.1.11"
+    "zod": "^4.1.11",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",

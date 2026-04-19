@@ -1,4 +1,0 @@
-interface:
-  display_name: "Product OS Audit"
-  short_description: "Аудит и синхронизация продукта, Notion и repo"
-  default_prompt: "Используй $product-os-audit, чтобы сверить продуктовую рамку, Notion, Roadmap и реальное состояние репозитория, найти drift и предложить следующий сильный шаг."

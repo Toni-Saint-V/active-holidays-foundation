@@ -28,6 +28,7 @@ import {
   findScenarioCaseId,
   productTypeLabel
 } from "@/lib/caseDefaults";
+import { AiRecommendationPanel } from "./AiRecommendationPanel";
 import { ResultCompareSurface } from "./ResultCompareSurface";
 
 type ResultScreenProps = {
@@ -286,6 +287,19 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
           </Card>
         </motion.div>
       </motion.section>
+
+      {!isHumanReview && (
+        <motion.section variants={staggerChild}>
+          <AiRecommendationPanel
+            caseId={activeCase.id}
+            computedAt={activeResult.computedAt}
+            preferences={activeCase.preferences}
+            onOpenScenario={(scenarioCaseId) =>
+              navigate(`/result?case=${encodeURIComponent(scenarioCaseId)}`)
+            }
+          />
+        </motion.section>
+      )}
 
       {isHumanReview ? (
         <motion.section variants={staggerChild}>
