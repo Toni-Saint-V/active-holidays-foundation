@@ -176,3 +176,190 @@
 - major visual direction changes
 - commercial decisions and partnerships
 - external system write-back that changes planning truth
+
+## Notion Control Tower Layer
+
+### Canonical vs Operational
+
+Keep Notion split into two layers:
+
+- canonical pages:
+  - `P0 · Master Doc — Vision & Boundaries`
+  - `P0 · Definition of Final`
+  - `P1 · UX Architecture — Flow / State / Screens`
+  - `P2 · Screen Contracts for Lovable`
+- operational surfaces:
+  - `Execution`
+  - `Open Decisions`
+  - `Build Briefs`
+  - `Release Gate`
+  - `Automation Inbox`
+  - `Opportunities`
+  - `Review Findings & Learnings`
+
+Rule:
+
+- canonical pages should receive only `Suggested Update`, `Drift Note`, or `Decision Required` unless a human explicitly approves deeper edits
+- operational surfaces are the safe destination for automation-owned truth
+
+### Repo-Owned Schema Contract
+
+Until the repo stores live Notion ids, the primary mapping rule is the exact operational surface name. Notion AI and automation actors must not silently rename, split, or merge these surfaces.
+
+If the live workspace already contains an equivalent surface under a different name:
+
+- do not rename or merge it automatically
+- create a `Decision Required` or blocked sync packet
+- keep the repo contract unchanged until a human approves the migration
+
+Required operational surfaces and properties:
+
+| Surface | Required properties |
+| --- | --- |
+| `Execution` | `Record`, `Sync Key`, `Area`, `Status`, `Source`, `Confidence`, `Last Verified At`, `Action Needed`, `Evidence` |
+| `Open Decisions` | `Record`, `Sync Key`, `Layer`, `Decision Status`, `Recommendation`, `Why Now`, `Urgency`, `Owner`, `Source`, `Confidence`, `Last Verified At`, `Action Needed`, `Evidence` |
+| `Build Briefs` | `Record`, `Sync Key`, `Scope`, `Ready`, `Inputs Verified`, `Acceptance Criteria`, `Verify`, `Prompt Block`, `Source` |
+| `Release Gate` | `Record`, `Sync Key`, `Surface`, `Gate`, `Status`, `Blocking Reason`, `Source`, `Confidence`, `Last Verified At`, `Evidence` |
+| `Automation Inbox` | `Record`, `Sync Key`, `Packet Type`, `Severity`, `Status`, `Action Needed`, `Routed To`, `Source`, `Confidence`, `Last Verified At` |
+| `Opportunities` | `Record`, `Sync Key`, `Idea`, `Why Now`, `Impact`, `Complexity`, `Source`, `Confidence`, `Status` |
+| `Review Findings & Learnings` | `Record`, `Sync Key`, `Layer`, `Severity`, `Fix Path`, `Source`, `Confidence`, `Status`, `Evidence` |
+
+Allowed schema evolution:
+
+- additive property creation that preserves the required properties
+- views, filters, and relations that do not change the contract-owned names or required properties
+
+Disallowed without explicit human approval:
+
+- renaming any of the seven operational surfaces
+- removing or renaming required properties
+- splitting one contract surface into multiple databases
+- merging two contract surfaces into one database
+
+### Deterministic Write Contract
+
+Default mode:
+
+- all Notion-facing automation stays `report-first` until the live workspace is manually confirmed against the schema contract above
+
+Notion-facing packet envelope:
+
+- any report that is meant for future Notion sync must carry:
+  - `recordTitle`
+  - `syncKey`
+  - `notionSurface`
+  - `writeMode`
+  - `sourceReportId`
+  - `source`
+  - `confidence`
+  - `lastVerifiedAt`
+  - `actionNeeded`
+- target-specific lifecycle fields:
+  - `Open Decisions`: `decisionStatus`, `whyNow`, `urgency`, `owner`
+  - `Automation Inbox`: `status`
+- if a producer cannot emit this envelope, the packet is not eligible for live write-back and must stay report-only
+
+Deterministic `syncKey` formats:
+
+- `Execution`: `execution:<area-slug>:<step-slug>`
+- `Open Decisions`: `decision:<layer-slug>:<decision-slug>`
+- `Build Briefs`: `brief:<scope-slug>:<phase-slug>`
+- `Release Gate`: `gate:<surface-slug>:<gate-slug>`
+- `Automation Inbox`: `inbox:<packet-type-slug>:<subject-slug>`
+- `Opportunities`: `opportunity:<surface-slug>:<idea-slug>`
+- `Review Findings & Learnings`: `learning:<layer-slug>:<pattern-slug>`
+
+Lifecycle values:
+
+- `Open Decisions.Decision Status`: `open`, `in_review`, `decided`, `blocked`
+- `Automation Inbox.Status`: `open`, `in_review`, `blocked`, `resolved`
+
+Write modes by target:
+
+- `Execution`: `UPSERT_RECORD_BY_SYNC_KEY`
+- `Open Decisions`: `UPSERT_RECORD_BY_SYNC_KEY`
+- `Build Briefs`: `UPSERT_RECORD_BY_SYNC_KEY`
+- `Release Gate`: `UPSERT_RECORD_BY_SYNC_KEY`
+- `Automation Inbox`: `UPSERT_UNRESOLVED_BY_SYNC_KEY`
+- `Opportunities`: `UPSERT_RECORD_BY_SYNC_KEY`
+- `Review Findings & Learnings`: `UPSERT_RECORD_BY_SYNC_KEY`
+- canonical pages: `UPDATE_NOTE_BLOCK_BY_SYNC_KEY` only, with note kinds `Suggested Update`, `Drift Note`, or `Decision Required`
+
+Blocked conditions:
+
+- schema mismatch between repo contract and live Notion
+- missing required property or ambiguous surface mapping
+- no safe target block on a canonical page
+- no deterministic `syncKey` can be derived from the source packet
+
+### New Notion-Facing Automations
+
+## AH-11 · Open Decisions Curator
+
+- priority: `critical`
+- business goal: capture real repo-vs-Notion-vs-report contradictions as clean decision records.
+- trigger / schedule: Mon/Wed/Fri `10:00` Europe/Moscow.
+- inputs: latest automation reports, execution drift, release blockers, canonical docs.
+- tools / integrations: local reports, optional Notion read.
+- exact behavior: outputs at most three decisions with recommendation, urgency, target Notion surface, deterministic `syncKey`, and `UPSERT_RECORD_BY_SYNC_KEY` write intent.
+- artifacts produced: `reports/automations/runs/ah-open-decisions-curator/latest.md`.
+- success criteria: blocking ambiguity becomes explicit and actionable instead of living in chat history.
+
+## AH-12 · Release Gate Sync
+
+- priority: `critical`
+- business goal: keep release truth evidence-backed and visible inside the project operating layer.
+- trigger / schedule: Mon-Fri `13:30` Europe/Moscow.
+- inputs: build/typecheck/test/review/automation signals.
+- tools / integrations: local repo checks, optional Notion write target.
+- exact behavior: produces a gate snapshot split into `green`, `blocking`, and `manual verify needed`.
+- artifacts produced: `reports/automations/runs/ah-release-gate-sync/latest.md`.
+- success criteria: the project can answer “what is actually ready?” without guesswork.
+
+## AH-13 · Review Learning Distiller
+
+- priority: `high`
+- business goal: convert repeated findings into system improvements instead of isolated fixes.
+- trigger / schedule: Tue/Fri `16:00` Europe/Moscow.
+- inputs: review findings, automation reports, release-gate friction.
+- tools / integrations: local reports, optional Notion `Review Findings & Learnings`.
+- exact behavior: identifies recurring patterns and routes them to rules, checklists, skills, or tests.
+- artifacts produced: `reports/automations/runs/ah-review-learning-distiller/latest.md`.
+- success criteria: repeated bugs and review comments start shrinking over time.
+
+## AH-14 · Notion Sync Director
+
+- priority: `critical`
+- business goal: safely update Notion operational truth from evidence packets without damaging canonical docs.
+- trigger / schedule: Mon-Fri `19:00` Europe/Moscow.
+- inputs: latest reports across decisions, release truth, briefs, drift, opportunities, and learnings.
+- tools / integrations: Notion write path when available.
+- exact behavior: stays report-first by default, validates the live workspace against the repo-owned schema contract, then updates operational surfaces only through deterministic `syncKey` + `writeMode` rules and creates keyed notes for canonical pages when needed.
+- artifacts produced: `reports/automations/runs/ah-notion-sync-director/latest.md`.
+- success criteria: Notion stays current while every write remains attributable and reversible.
+
+### External Write Policy
+
+- external writes remain disabled by default for all automations except the explicitly enabled director pattern
+- if Notion is unavailable, the automation must emit a blocked packet instead of pretending the sync succeeded
+- no other automation should write directly to canonical pages
+- even `ah-notion-sync-director` must stay `report-first` until the schema contract is checked manually against the live workspace
+
+### Activation Order
+
+The Notion control tower assumes feeder and synthesis reports already exist.
+
+Prerequisites before enabling the Notion pack:
+
+1. `ah-product-os-radar`
+2. `ah-execution-brief-sync`
+3. `ah-design-drift-vs-contract`
+4. `ah-truth-freshness-watch`
+
+Then enable:
+
+1. `ah-open-decisions-curator`
+2. `ah-release-gate-sync`
+3. `ah-review-learning-distiller`
+4. `ah-notion-sync-director` in `report-first` mode
+5. live write-back only after schema-contract confirmation
