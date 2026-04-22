@@ -31,7 +31,7 @@ prompt = """
   - `Execution`, `Open Decisions`, `Build Briefs`, `Release Gate`, `Opportunities`, `Review Findings & Learnings`: `UPSERT_RECORD_BY_SYNC_KEY`
   - `Automation Inbox`: `UPSERT_UNRESOLVED_BY_SYNC_KEY`; новый record разрешён только если `syncKey` materially changed
   - canonical pages `P0`, `P1`, `P2`: `UPDATE_NOTE_BLOCK_BY_SYNC_KEY` в режимах `Suggested Update`, `Drift Note`, `Decision Required`
-- в каждом prepared update указывай `recordTitle`, `syncKey`, `sourceReportId`, `source`, `confidence`, `last verified at`, `action needed`, `writeMode`
+- в каждом prepared update указывай `recordTitle`, `syncKey`, `notionSurface`, `sourceReportId`, `source`, `confidence`, `lastVerifiedAt`, `actionNeeded`, `writeMode`
 
 Жёсткие правила:
 - не переписывай canonical text без явного diff

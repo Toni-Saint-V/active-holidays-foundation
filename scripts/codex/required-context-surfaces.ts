@@ -1,0 +1,35 @@
+export const REQUIRED_SKILL_SHARED_SURFACES = [
+  ".codex/skills/index.md",
+  ".codex/skills/bundles.md",
+  ".codex/skills/task-templates.md",
+  ".codex/skills/modes.md",
+  ".codex/skills/README.md",
+  "scripts/codex/skill-mode-registry.ts",
+  "scripts/codex/skills-autopilot.ts",
+  "scripts/codex/skill-mode-telemetry.ts",
+  "scripts/codex/detect-skill-mode.ts",
+  "scripts/codex/start-skill-mode.ts",
+  "scripts/codex/run-skill-autopilot.ts",
+  ".codex/skills/_shared/active-holidays/product-context.md",
+  ".codex/skills/_shared/active-holidays/architecture-map.md",
+  ".codex/skills/_shared/active-holidays/flow-map.md",
+  ".codex/skills/_shared/active-holidays/trust-and-ai-boundaries.md",
+  ".codex/skills/_shared/active-holidays/terminology.md",
+  ".codex/skills/_shared/active-holidays/review-checklists.md",
+  ".codex/skills/_shared/active-holidays/anti-patterns.md",
+  ".codex/skills/_shared/active-holidays/premium-ui-playbook.md",
+  ".codex/skills/_shared/active-holidays/plugin-surface.md"
+] as const;
+
+export const REQUIRED_CONTEXT_SURFACES = [
+  "AGENTS.md",
+  "README.md",
+  "AUTOMATIONS_AUDIT.md",
+  "AUTOMATIONS_ROADMAP.md",
+  "AUTOMATIONS_OPERATING_MODEL.md",
+  "RUNBOOK.md",
+  ".codex/automations/README.md",
+  ...REQUIRED_SKILL_SHARED_SURFACES,
+  "scripts/codex/evaluate-agent-system.ts",
+  "scripts/codex/fixtures/agent-system-fixtures.ts"
+] as const;

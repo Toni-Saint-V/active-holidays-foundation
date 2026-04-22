@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Readiness"
+  short_description: "Финальный repo gate перед готовностью"
+  default_prompt: "Use $release-readiness to check this Active Holidays change for the right repo gates, proof, gaps, and residual risk before calling it ready."

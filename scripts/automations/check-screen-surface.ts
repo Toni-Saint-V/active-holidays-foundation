@@ -30,7 +30,7 @@ async function main() {
         (match) => match[1] ?? ""
       )
     )
-  ).filter(Boolean);
+  ).filter((name) => Boolean(name) && name.endsWith("Screen"));
 
   const missingScreenView: string[] = [];
   const weakStateCoverage: string[] = [];

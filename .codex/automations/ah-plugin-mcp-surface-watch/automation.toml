@@ -11,13 +11,15 @@ prompt = """
 
 Обязательно:
 - используй `scripts/automations/check-context-surface.ts`
-- проверь `.codex/skills`, `.codex/automations`, repo docs, optional `.cursor/mcp.json`
+- проверь `.codex/skills`, `.codex/automations`, repo docs, optional `.cursor/mcp.json`, optional `.agents/plugins/marketplace.json`, optional `plugins/*/.codex-plugin/plugin.json`
 - смотри на practical impact: уменьшает ли изменение friction для product/design/agent workflows
+- зафиксируй, покрывают ли уже задачу существующие runtime plugins и skills до идеи локального plugin scaffold
 - если есть real low-risk improvement, подготовь patch plan or config note
 
 Жёсткие правила:
 - не выдумывай plugin formats
 - не создавай MCP config без реального назначения
+- не создавай repo-local plugin, если это можно закрыть skills/docs/automation слоем
 - не дублируй один и тот же context в трёх местах
 
 Артефакт:

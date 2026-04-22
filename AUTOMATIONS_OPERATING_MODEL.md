@@ -312,7 +312,7 @@ Blocked conditions:
 - trigger / schedule: Mon-Fri `13:30` Europe/Moscow.
 - inputs: build/typecheck/test/review/automation signals.
 - tools / integrations: local repo checks, optional Notion write target.
-- exact behavior: produces a gate snapshot split into `green`, `blocking`, and `manual verify needed`.
+- exact behavior: produces a gate snapshot split into `green`, `blocking`, and `manual verify needed`, plus deterministic `Release Gate` packets with `syncKey`, `notionSurface`, `writeMode`, and evidence fields when the report is safe for downstream sync.
 - artifacts produced: `reports/automations/runs/ah-release-gate-sync/latest.md`.
 - success criteria: the project can answer “what is actually ready?” without guesswork.
 
@@ -323,7 +323,7 @@ Blocked conditions:
 - trigger / schedule: Tue/Fri `16:00` Europe/Moscow.
 - inputs: review findings, automation reports, release-gate friction.
 - tools / integrations: local reports, optional Notion `Review Findings & Learnings`.
-- exact behavior: identifies recurring patterns and routes them to rules, checklists, skills, or tests.
+- exact behavior: identifies recurring patterns and routes them to rules, checklists, skills, or tests, while emitting deterministic learning packets or explicit reroutes to `Open Decisions` when the pattern is really a pending decision.
 - artifacts produced: `reports/automations/runs/ah-review-learning-distiller/latest.md`.
 - success criteria: repeated bugs and review comments start shrinking over time.
 
@@ -334,7 +334,7 @@ Blocked conditions:
 - trigger / schedule: Mon-Fri `19:00` Europe/Moscow.
 - inputs: latest reports across decisions, release truth, briefs, drift, opportunities, and learnings.
 - tools / integrations: Notion write path when available.
-- exact behavior: stays report-first by default, validates the live workspace against the repo-owned schema contract, then updates operational surfaces only through deterministic `syncKey` + `writeMode` rules and creates keyed notes for canonical pages when needed.
+- exact behavior: stays report-first by default, validates the live workspace against the repo-owned schema contract, then updates operational surfaces only through deterministic packet envelopes with `recordTitle`, `syncKey`, `notionSurface`, `writeMode`, `sourceReportId`, `source`, `confidence`, `lastVerifiedAt`, and `actionNeeded`, and creates keyed notes for canonical pages when needed.
 - artifacts produced: `reports/automations/runs/ah-notion-sync-director/latest.md`.
 - success criteria: Notion stays current while every write remains attributable and reversible.
 

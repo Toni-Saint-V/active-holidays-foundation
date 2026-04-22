@@ -33,6 +33,7 @@ Safety contract:
 - `ah-notion-sync-director` stays `report-first` until the repo-owned Notion schema contract is manually confirmed against the live workspace
 - exact operational surface names are contract-owned until repo stores live Notion ids
 - Notion-facing packets should carry deterministic `syncKey` and explicit `writeMode` when they are meant for future sync
+- Notion-facing feeder and synthesis reports should emit the full packet envelope: `recordTitle`, `syncKey`, `notionSurface`, `writeMode`, `sourceReportId`, `source`, `confidence`, `lastVerifiedAt`, `actionNeeded`
 
 Why this split exists:
 

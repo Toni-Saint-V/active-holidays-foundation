@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Boundary And Trust"
+  short_description: "Детерминированная trust boundary для AI explanations без ownership drift"
+  default_prompt: "Use $ai-boundary-and-trust to verify AI recommendation ownership, deterministic trust boundaries, and regression-safe behavior before shipping."

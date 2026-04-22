@@ -18,6 +18,7 @@
 - `Execution`
   - `recordTitle`: `Notion control tower next step`
   - `syncKey`: `execution:result-flow:notion-control-tower-next-step`
+  - `notionSurface`: `Execution`
   - `writeMode`: `UPSERT_RECORD_BY_SYNC_KEY`
   - `sourceReportId`: `ah-execution-brief-sync:latest`
   - `source`: `ah-execution-brief-sync:latest`
@@ -27,6 +28,7 @@
 - `Open Decisions`
   - `recordTitle`: `RDC companion reference-only`
   - `syncKey`: `decision:scope:rdc-companion-reference-only`
+  - `notionSurface`: `Open Decisions`
   - `writeMode`: `UPSERT_RECORD_BY_SYNC_KEY`
   - `sourceReportId`: `ah-open-decisions-curator:latest`
   - `source`: `ah-open-decisions-curator:latest`
@@ -36,6 +38,7 @@
 - `Release Gate`
   - `recordTitle`: `Notion write-back gate`
   - `syncKey`: `gate:notion-control-tower:writeback-enabled`
+  - `notionSurface`: `Release Gate`
   - `writeMode`: `UPSERT_RECORD_BY_SYNC_KEY`
   - `sourceReportId`: `ah-release-gate-sync:latest`
   - `source`: `ah-release-gate-sync:latest`
@@ -57,5 +60,5 @@
 
 ## VERIFY
 
-- Every planned record includes `recordTitle`, `syncKey`, `sourceReportId`, `writeMode`, `source`, and `confidence`.
+- Every planned record includes `recordTitle`, `syncKey`, `notionSurface`, `sourceReportId`, `writeMode`, `source`, and `confidence`.
 - Canonical pages were not silently overwritten.

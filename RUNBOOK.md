@@ -6,6 +6,7 @@
 - deterministic helper scripts for:
   - truth / freshness
   - screen surface
+  - flow instrumentation
   - skill dedupe
   - context surface
 - install/sync and verification scripts: `scripts/codex/`
@@ -84,6 +85,12 @@ npm run automations:check:truth
 npm run automations:check:screens
 ```
 
+### Flow instrumentation
+
+```bash
+npm run automations:check:flow
+```
+
 ### Repo-local skill duplication
 
 ```bash
@@ -110,6 +117,7 @@ npm run automations:check:context
 ```bash
 npm run automations:verify
 npm run automations:check:all
+npm run skills:verify
 ```
 
 ## Safe Defaults

@@ -15,6 +15,40 @@ function extractQuoted(text: string, key: string): string | null {
   return match?.[1] ?? null;
 }
 
+function requiresReportFirstSafety(id: string, text: string): boolean {
+  if (requiresNotionPacketEnvelope(id)) return true;
+  return /write-back|write back|live write/i.test(text);
+}
+
+function requiresNotionPacketEnvelope(id: string): boolean {
+  return [
+    "ah-open-decisions-curator",
+    "ah-release-gate-sync",
+    "ah-review-learning-distiller",
+    "ah-notion-sync-director"
+  ].includes(id);
+}
+
+function missingPacketMarkers(text: string): string[] {
+  const markers = [
+    "recordTitle",
+    "syncKey",
+    "notionSurface",
+    "writeMode",
+    "sourceReportId",
+    "source",
+    "confidence",
+    "lastVerifiedAt",
+    "actionNeeded"
+  ];
+
+  return markers.filter((marker) => !text.includes(marker));
+}
+
+function hasWriteModeIntent(text: string): boolean {
+  return /UPSERT_[A-Z_]+|UPDATE_NOTE_BLOCK_BY_SYNC_KEY/.test(text);
+}
+
 async function listAutomationDirs(root: string): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const matches: string[] = [];
@@ -82,6 +116,31 @@ async function main() {
     if (id) seenIds.add(id);
     if (!text.includes("/Users/user/Projects/active-holidays-foundation")) {
       failures.push(`${dir}: cwd does not point to active-holidays-foundation`);
+    }
+    if (status && status !== "PAUSED") {
+      failures.push(`${dir}: repo-local automations must stay PAUSED by default`);
+    }
+    if (id && requiresReportFirstSafety(id, text) && !/report-first/i.test(text)) {
+      failures.push(`${dir}: direct write-capable automation must declare report-first safety`);
+    }
+    if (id && requiresNotionPacketEnvelope(id)) {
+      const missingMarkers = missingPacketMarkers(text);
+      if (missingMarkers.length > 0) {
+        failures.push(
+          `${dir}: Notion-facing automation is missing packet markers ${missingMarkers.join(", ")}`
+        );
+      }
+    }
+    if (
+      id &&
+      hasWriteModeIntent(text) &&
+      /notion/i.test(text) &&
+      !requiresNotionPacketEnvelope(id) &&
+      !/report-first/i.test(text)
+    ) {
+      failures.push(
+        `${dir}: automation declares Notion write intent without explicit report-first safety`
+      );
     }
   }
 

@@ -14,13 +14,20 @@
     "test:watch": "vitest",
     "verify:engine": "tsx scripts/verify-engine-drift.ts",
     "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update",
+    "skills:verify": "node --experimental-strip-types scripts/codex/verify-skills.ts",
+    "skills:evaluate-agents": "node --experimental-strip-types scripts/codex/evaluate-agent-system.ts",
+    "skills:detect-mode": "node --experimental-strip-types scripts/codex/detect-skill-mode.ts",
+    "skills:start": "node --experimental-strip-types scripts/codex/start-skill-mode.ts",
+    "skills:autopilot": "node --experimental-strip-types scripts/codex/run-skill-autopilot.ts",
+    "skills:telemetry:report": "node --experimental-strip-types scripts/codex/skill-mode-telemetry.ts --report",
     "automations:sync": "node --experimental-strip-types scripts/codex/sync-automations.ts",
     "automations:verify": "node --experimental-strip-types scripts/codex/verify-automations.ts",
     "automations:check:truth": "node --experimental-strip-types scripts/automations/check-source-freshness.ts",
     "automations:check:screens": "node --experimental-strip-types scripts/automations/check-screen-surface.ts",
+    "automations:check:flow": "node --experimental-strip-types scripts/automations/check-flow-instrumentation.ts",
     "automations:check:skills": "node --experimental-strip-types scripts/automations/check-skill-duplication.ts",
     "automations:check:context": "node --experimental-strip-types scripts/automations/check-context-surface.ts",
-    "automations:check:all": "npm run automations:verify && npm run automations:check:truth && npm run automations:check:screens && npm run automations:check:skills && npm run automations:check:context"
+    "automations:check:all": "npm run automations:verify && npm run automations:check:truth && npm run automations:check:screens && npm run automations:check:flow && npm run automations:check:skills && npm run automations:check:context"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

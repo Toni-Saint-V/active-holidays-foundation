@@ -1,0 +1,4 @@
+interface:
+  display_name: "Multi-Lens Review"
+  short_description: "Финальный multi-lens review перед сдачей"
+  default_prompt: "Use $multi-lens-review to run the final ship gate on this Active Holidays change and return findings, proof, gaps, and a ship or block verdict."

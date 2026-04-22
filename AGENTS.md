@@ -10,6 +10,36 @@
 - Prefer the strongest real implementation over broad fake completeness.
 - Repo-local custom Codex skills live in `.codex/skills` and should stay versioned with the repository when they affect this project's workflow.
 
+## Project Ownership Rules
+
+- Keep the whole Active Holidays project in view, not just the current file or isolated task.
+- Do not behave like a narrow ticket executor when project continuity matters.
+- Proactively define or surface the next strongest concrete task when it helps move the project forward.
+- Keep delivery aligned with the current project phase, real constraints, and source-of-truth artifacts.
+- When useful, prepare handoff-ready next-step blocks for Lovable, Cursor, Codex, or GitHub instead of making the user restate the work.
+
+## Notion Discipline Rules
+
+- When Notion is part of the workflow and access exists, treat it as a living source of truth, not passive reference material.
+- Reconcile repo reality with Notion before making major planning, scope, or status claims.
+- Keep task framing, progress, and execution state aligned between the implementation and Notion.
+- After meaningful progress, scope change, or decision change, update the relevant Notion artifact or prepare the exact update block immediately.
+- Do not let Notion drift away from the actual project state.
+
+## Protocol Rules
+
+- Ordinary discussion and clarification may use normal natural language.
+- Structured formatting is mandatory only for execution-related outputs:
+  - specs
+  - implementation plans
+  - task handoff blocks
+  - status/progress blocks when they affect execution
+  - checklists, risks, and acceptance criteria
+- Do not force structured JSON for casual conversation unless the user explicitly asks for it.
+- For any UI task, first show a PNG preview and wait for explicit user approval before changing UI code.
+- Live browser screenshots are implementation proof only; they do not replace pre-implementation PNG approval.
+- If a task mixes UI and non-UI work, non-UI execution may proceed, but the UI slice stays blocked until approval.
+
 ## Automation Rules
 
 - Repo-local Codex automations live in `.codex/automations/`.
@@ -18,6 +48,23 @@
 - Run `npm run automations:verify` after editing automation prompts, schedules, or supporting docs.
 - Use `npm run automations:sync -- --dry-run` before copying repo-local automations into `$CODEX_HOME`.
 - Runtime outputs belong in `reports/automations/` and must not turn into committed noise.
+
+## Plugin / MCP Surface Rules
+
+- Prefer existing runtime plugins and shared skills before adding any repo-local plugin scaffold.
+- Do not invent plugin manifests, marketplace entries, or MCP config shapes.
+- Repo-local plugin work must stay anchored to real files: `plugins/*/.codex-plugin/plugin.json`, optional `.agents/plugins/marketplace.json`, and optional `.cursor/mcp.json`.
+- If a repo-local plugin is added, it must solve a repeated repo-local workflow that skills, docs, or automations could not already cover cleanly.
+
+## Skill Routing Rules
+
+- Resolve exactly one primary operating mode before loading bundles or templates.
+- Use `.codex/skills/modes.md`, `npm run skills:detect-mode`, or `npm run skills:start` to classify the task.
+- Bundle choice and template choice must follow that same primary mode.
+- Treat extra mode candidates as context only, not as permission to combine multiple primary modes.
+- `skill-system-governance` is the primary mode for repo-local Codex surface work such as `.codex/skills/*`, `.codex/automations/*`, routing docs, `README.md`, `AGENTS.md`, and validator guidance.
+- `skill-system-governance` is not a new abstraction layer; it is the maintenance mode for the existing router and operating docs.
+- Move to `plugin-surface` only when plugin or MCP files are the dominant changed surface.
 
 ## Phase 1 Boundary
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Russian Trust-Safe Copy"
+  short_description: "Краткий русский copy без фальшивой уверенности"
+  default_prompt: "Use $russian-trust-safe-copy to rewrite this Active Holidays copy into concise Russian wording with clear next action and no fake certainty."

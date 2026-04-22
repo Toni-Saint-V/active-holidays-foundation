@@ -22,10 +22,18 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run build` — client build
 - `npm run test` — unit tests
 - `npm run typecheck` — TypeScript check
+- `npm run verify:engine` — deterministic scenario drift gate
+- `npm run skills:verify` — repo-local Codex skill system check
+- `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
+- `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
+- `npm run skills:telemetry:report` — summarize recorded skill-mode telemetry
 
 ## Environment
 
 - Copy `.env.example` when you need to override the API port locally.
+- Human review state is persisted locally in `output/server-state/human-reviews.json`.
+- Override the file path with `ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE` when you need isolated runtime storage.
+- Protect internal human-review transitions with `ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN` and send it through the `x-active-holidays-internal-token` header from trusted server-side callers only.
 
 ## Current Scope
 
@@ -35,6 +43,7 @@ This repository currently contains:
 - route registration for all primary screens
 - first deterministic intake -> result flow
 - structured result with trust/documents sections
+- persisted human-review lifecycle with restart-safe local server storage
 - bootable Express API with `/api/health`
 - shared contract baseline in `shared/contracts`
 - typed local repository for a small decision session history
@@ -42,28 +51,84 @@ This repository currently contains:
 - theme tokens and base Tailwind setup
 - strict TS/Vite/Vitest baseline
 
-## Repo-Local Codex Skills
+## Repo-Local Codex Skill System
 
-Repo-local skill overrides are versioned in `.codex/skills/`.
+Repo-local skills now form a thin operating layer around this repo instead of a single override.
 
-Current repo-local override set:
+Entry points:
 
-- `bank-grade-review`
+- `.codex/skills/index.md`
+- `.codex/skills/bundles.md`
+- `.codex/skills/task-templates.md`
+- `.codex/skills/modes.md`
+- `.codex/skills/_shared/active-holidays/`
+- `.codex/skills/README.md`
 
-The rest of the Active Holidays workflow relies on the shared global skills to
-avoid duplicate shadow copies. This matches the current Notion execution layer
-for the project, where the active stack includes:
+Key repo-local bundles:
 
-- `product-os-audit`
-- `build-brief-orchestrator`
-- `lovable-redline`
-- `notion-catalog-sync`
-- `phase-gate-sync`
-- `market-reality-product-innovation`
-- `notion-ai-sync-director`
-- `lovable-step-prompts`
-- `ai-interactive-screen-audit`
-- `ui-motion-performance-polish`
+- domain AI/trust/result-flow skills
+- engineering guardrails and hygiene skills
+- `plugin-surface-governance` for plugin and MCP boundary work
+- `frontend-premium-ui` as the repo-local premium UI executor
+- `multi-lens-review` as the mandatory final self-check
+- `release-readiness` as the final repo gate
+- primary-mode routing via `.codex/skills/modes.md`
+- bundle selection via `Core` / `Optional` / `Finish`
+- task templates for AI boundary, schema, result flow, premium UI, fallback, regression, plugin or MCP governance, and final review work
+
+Routing model:
+
+- auto-detect with `npm run skills:detect-mode`, `npm run skills:start`, or `npm run skills:autopilot`
+- accept exactly one primary mode per task
+- use that mode to choose one bundle and one template
+- add secondary skills only inside that chosen mode
+- treat `skill-system-governance` as the primary mode for repo-local docs, router, skills, automations, and operating-surface maintenance
+- treat `plugin-surface` as separate only when plugin or MCP files are the dominant surface
+
+Global curated skills stay in `~/.codex/skills` and are used as companions rather than duplicated shadows.
+
+Repo-local plugin and MCP surface is governance-first:
+
+- prefer runtime plugins or existing skills before adding local plugin scaffolds
+- use `.codex/skills/_shared/active-holidays/plugin-surface.md` for the decision boundary
+- treat local plugin manifests and marketplace state as optional but real repo surface once introduced
+
+Mode auto-detection is available via:
+
+- `npm run skills:detect-mode -- --prompt "<request>"`
+- `npm run skills:detect-mode -- --files "<csv paths>"`
+- `npm run skills:evaluate-agents`
+
+Executable mode runner:
+
+- `npm run skills:start -- --prompt "<request>"`
+- `npm run skills:start -- --files "<csv paths>"`
+
+Autopilot runner:
+
+- `npm run skills:autopilot -- --prompt "<request>"`
+- `npm run skills:autopilot -- --files "<csv paths>"`
+- add `--telemetry` or `--telemetry-file reports/skills/custom.jsonl` when you want runtime telemetry written to disk
+
+## Skill Autopilot
+
+`skills:autopilot` is the fastest safe entrypoint when you want the system to do more than pick a mode.
+
+It returns:
+
+- primary mode, bundle, and template
+- routing confidence with score and gap to the next candidate
+- execution lane such as `manual-routing`, `blocked-png`, `review-lane`, `fast-lane`, or `standard-lane`
+- adaptive `recommendedAgentPack` for the current task surface
+- canonical `multiAgentPack` for the selected mode
+- `executionPlan`, verify commands, and first steps
+- optional telemetry summary plus a richer `telemetryReport`
+
+Telemetry usage:
+
+- set `SKILL_MODE_TELEMETRY=1` to record detect/start/autopilot runs
+- optionally set `SKILL_MODE_TELEMETRY_FILE` to override the default log path
+- run `npm run skills:telemetry:report` to inspect the current telemetry summary
 
 ## Repo-Local Codex Automations
 
@@ -85,12 +150,10 @@ Key entrypoints:
 - `shared/contracts/` is the stable cross-layer surface for small typed DTOs and schemas.
 - Component-local state owns the intake draft until submit.
 - Zustand owns only the active submitted workspace and hydration status.
-- Deterministic flow logic lives in `src/domain/`, storage details stay in `src/data/`.
 - `result`, `documents`, and `trust` consume derived session state rather than raw persistence data.
 
-Next phases will add:
+## Verification Baseline
 
-- local JSON DB
-- deterministic decision engine
-- typed API routes
-- interactive product flows
+- run `npm run typecheck`, `npm run test`, and `npm run build` before closing substantial work
+- run `npm run verify:engine` for engine/rule/result-contract changes
+- run `npm run skills:verify` plus the existing Codex checks after changing `.codex/skills`

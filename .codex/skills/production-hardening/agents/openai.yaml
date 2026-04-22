@@ -1,0 +1,4 @@
+interface:
+  display_name: "Production Hardening"
+  short_description: "Fallback, edge-state и regression-ready hardening для production"
+  default_prompt: "Use $production-hardening to verify fallback behavior, retries, stale-safe state, and regression-ready production hardening for this Active Holidays change."

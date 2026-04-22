@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA Self Review"
+  short_description: "Второй QA-проход перед финальной сдачей"
+  default_prompt: "Use $qa-self-review to run a second-pass QA review on this Active Holidays change and surface weak states, regressions, and verification gaps."

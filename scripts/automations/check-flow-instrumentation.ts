@@ -38,7 +38,9 @@ async function main() {
     const relative = path.relative(repoRoot, filePath);
     const hasScreenViewImport = source.includes('from "@/instrumentation/screenView"');
     const hasScreenViewCall = source.includes("useScreenView(");
-    if (!hasScreenViewImport || !hasScreenViewCall) {
+    const delegatesScreenView =
+      source.includes("<ResultScreen") && source.includes("screenName=");
+    if (!(delegatesScreenView || (hasScreenViewImport && hasScreenViewCall))) {
       screenCoverageMissing.push(relative);
     }
 
