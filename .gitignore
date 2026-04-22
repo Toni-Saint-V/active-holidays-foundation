@@ -9,3 +9,4 @@ npm-debug.log*
 *.tsbuildinfo
 reports/automations/runs
 reports/automations/state
+output/server-state
