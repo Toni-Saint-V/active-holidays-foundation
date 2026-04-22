@@ -3,6 +3,10 @@ import cors from "cors";
 import { healthResponseSchema, type HealthResponse } from "@shared/contracts";
 import { loadCatalogs } from "./lib/catalogs";
 import { initializeCaseStore } from "./lib/caseStore";
+import {
+  loadPersistedHumanReviews,
+  savePersistedHumanReviews
+} from "./lib/humanReviewPersistence";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { casesRouter } from "./routes/cases";
@@ -16,7 +20,11 @@ import { scenariosRouter } from "./routes/scenarios";
 export async function createApp(): Promise<express.Express> {
   const app = express();
   const catalogs = await loadCatalogs();
-  initializeCaseStore(catalogs);
+  const humanReviews = await loadPersistedHumanReviews();
+  initializeCaseStore(catalogs, {
+    humanReviews,
+    persistHumanReviews: savePersistedHumanReviews
+  });
 
   app.use(cors());
   app.use(express.json());

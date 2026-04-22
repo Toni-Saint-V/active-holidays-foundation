@@ -3,12 +3,18 @@ import { z } from "zod";
 import {
   caseOverrideSchema,
   caseSignalsSchema,
+  humanReviewCreateRequestSchema,
+  humanReviewCreateResponseSchema,
+  humanReviewResponseSchema,
+  humanReviewTransitionRequestSchema,
+  humanReviewTransitionResponseSchema,
   pathPreferencesSchema,
   recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
   type Case,
   type CaseSignals,
-  type DecisionKind
+  type DecisionKind,
+  type HumanReviewSnapshot
 } from "@shared/contracts";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
@@ -24,6 +30,7 @@ import {
   ensureSameScenarioFamily
 } from "../lib/scenarioLab";
 import { HttpError } from "../middleware/errorHandler";
+import { requireInternalApiToken } from "../middleware/internalApi";
 import { validateBody, validateParams } from "../middleware/validate";
 import {
   driftDiff,
@@ -61,6 +68,23 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
 
 function computeResult(caseData: Case) {
   return runDecision({ case: caseData, catalogs: orchestratorCatalogs() });
+}
+
+function buildHumanReviewSnapshot(caseData: Case): HumanReviewSnapshot {
+  const latest = getCaseStore().latestRecordFor(caseData.id);
+  const result = latest?.result ?? computeResult(caseData);
+  return {
+    decisionId: latest?.decisionId ?? null,
+    verdict: result.verdict,
+    confidence: result.trust.confidence,
+    computedAt: result.computedAt,
+    lastCheckedAt: result.trust.lastCheckedAt,
+    nextActionLabel: result.nextAction.label,
+    summary:
+      result.verdict === "HUMAN_REVIEW"
+        ? "Автомат не подтвердил маршрут. Нужна ручная проверка."
+        : `Следующий шаг по кейсу: ${result.nextAction.label}.`
+  };
 }
 
 function recordDecision(
@@ -246,6 +270,72 @@ export function casesRouter(): Router {
     const result = computeResult(caseData);
     res.json(result.documents);
   });
+
+  router.get("/:id/human-review", validateParams(caseIdParams), (req, res) => {
+    const caseData = requireCase(getId(req));
+    const request = getCaseStore().latestHumanReviewFor(caseData.id);
+    res.json(humanReviewResponseSchema.parse({ request }));
+  });
+
+  router.post(
+    "/:id/human-review",
+    validateParams(caseIdParams),
+    validateBody(humanReviewCreateRequestSchema),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      const payload = humanReviewCreateRequestSchema.parse(req.body);
+      const response = getCaseStore().createOrReuseHumanReview({
+        caseId: caseData.id,
+        request: payload,
+        snapshot: buildHumanReviewSnapshot(caseData)
+      });
+      res.json(humanReviewCreateResponseSchema.parse(response));
+    }
+  );
+
+  router.post(
+    "/:id/human-review/transition",
+    requireInternalApiToken,
+    validateParams(caseIdParams),
+    validateBody(humanReviewTransitionRequestSchema),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      const payload = humanReviewTransitionRequestSchema.parse(req.body);
+      const request = getCaseStore().getHumanReviewById(payload.requestId);
+      if (!request) {
+        throw new HttpError(
+          404,
+          `Запрос ручной проверки ${payload.requestId} не найден.`,
+          "human_review_not_found"
+        );
+      }
+      if (request.caseId !== caseData.id) {
+        throw new HttpError(
+          409,
+          `Запрос ${payload.requestId} не относится к кейсу ${caseData.id}.`,
+          "human_review_case_mismatch"
+        );
+      }
+
+      try {
+        const next = getCaseStore().transitionHumanReview({
+          requestId: payload.requestId,
+          status: payload.status,
+          changedBy: "system",
+          note: payload.note ?? null
+        });
+        res.json(humanReviewTransitionResponseSchema.parse({ request: next }));
+      } catch (error) {
+        throw new HttpError(
+          409,
+          error instanceof Error
+            ? error.message
+            : "Не удалось изменить статус ручной проверки.",
+          "human_review_invalid_transition"
+        );
+      }
+    }
+  );
 
   router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));

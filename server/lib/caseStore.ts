@@ -9,11 +9,17 @@ import type {
   PathPreference,
   ReplayableSnapshot,
   ResultPayload,
-  Verdict
+  Verdict,
+  HumanReviewActor,
+  HumanReviewCreateRequest,
+  HumanReviewRequest,
+  HumanReviewSnapshot,
+  HumanReviewStatus
 } from "@shared/contracts";
 import {
   decisionLedgerEntrySchema,
   decisionRecordToLogEntry,
+  isHumanReviewTerminalStatus,
   isDecisionRecord,
   signalIdSchema,
   signalValueSchema
@@ -37,6 +43,38 @@ export type SnapshotDecisionRecordInput = {
   changedSignalIds: string[];
   changedPreferenceIds?: string[];
   now?: Date;
+};
+
+export type CreateOrReuseHumanReviewInput = {
+  caseId: string;
+  request: HumanReviewCreateRequest;
+  snapshot: HumanReviewSnapshot;
+  now?: Date;
+};
+
+export type TransitionHumanReviewInput = {
+  requestId: string;
+  status: HumanReviewStatus;
+  changedBy: HumanReviewActor;
+  note?: string | null;
+  now?: Date;
+};
+
+export type CaseStoreOptions = {
+  humanReviews?: HumanReviewRequest[];
+  persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
+};
+
+const ACTIVE_HUMAN_REVIEW_STATUSES: HumanReviewStatus[] = ["submitted", "in_queue", "in_review"];
+const ALLOWED_HUMAN_REVIEW_TRANSITIONS: Record<
+  HumanReviewStatus,
+  readonly HumanReviewStatus[]
+> = {
+  submitted: ["in_queue", "in_review", "resolved", "cancelled"],
+  in_queue: ["in_review", "resolved", "cancelled"],
+  in_review: ["resolved", "cancelled"],
+  resolved: [],
+  cancelled: []
 };
 
 function migrateLegacyEntry(entry: DecisionLogEntry): DecisionRecord {
@@ -69,9 +107,14 @@ export class CaseStore {
   private readonly byDecisionId = new Map<string, DecisionRecord>();
   private readonly byCaseId = new Map<string, DecisionRecord[]>();
   private readonly latestByCaseId = new Map<string, DecisionRecord>();
+  private readonly humanReviews: HumanReviewRequest[] = [];
+  private readonly humanReviewById = new Map<string, HumanReviewRequest>();
+  private readonly humanReviewByCaseId = new Map<string, HumanReviewRequest[]>();
+  private readonly persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
   private counter = 0;
 
-  constructor(initial: Catalogs) {
+  constructor(initial: Catalogs, options: CaseStoreOptions = {}) {
+    this.persistHumanReviews = options.persistHumanReviews;
     for (const entry of initial.cases) {
       const cloned = structuredClone(entry);
       this.cases.set(entry.id, cloned);
@@ -87,6 +130,9 @@ export class CaseStore {
       }
       const record = this.toRecord(parsed.data);
       this.appendRecord(record);
+    }
+    for (const request of options.humanReviews ?? []) {
+      this.appendHumanReview(structuredClone(request));
     }
   }
 
@@ -297,6 +343,110 @@ export class CaseStore {
     return found ? structuredClone(found) : null;
   }
 
+  latestHumanReviewFor(caseId: string): HumanReviewRequest | null {
+    const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
+    const latest = bucket
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    return latest ? structuredClone(latest) : null;
+  }
+
+  activeHumanReviewFor(caseId: string): HumanReviewRequest | null {
+    const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
+    const active = bucket
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .find((entry) => ACTIVE_HUMAN_REVIEW_STATUSES.includes(entry.status));
+    return active ? structuredClone(active) : null;
+  }
+
+  getHumanReviewById(requestId: string): HumanReviewRequest | null {
+    const request = this.humanReviewById.get(requestId);
+    return request ? structuredClone(request) : null;
+  }
+
+  createOrReuseHumanReview(
+    input: CreateOrReuseHumanReviewInput
+  ): { request: HumanReviewRequest; reused: boolean } {
+    const existing = this.activeHumanReviewFor(input.caseId);
+    if (existing) {
+      return { request: existing, reused: true };
+    }
+
+    this.counter += 1;
+    const now = (input.now ?? new Date()).toISOString();
+    const requestId = `hr_${input.caseId}_${this.counter}`;
+    const event = {
+      id: `${requestId}_submitted`,
+      at: now,
+      type: "submitted" as const,
+      status: "submitted" as const,
+      changedBy: "traveler" as const,
+      note: null
+    };
+    const request: HumanReviewRequest = {
+      id: requestId,
+      caseId: input.caseId,
+      status: "submitted",
+      channel: input.request.channel,
+      contact: input.request.contact,
+      message: input.request.message,
+      createdAt: now,
+      updatedAt: now,
+      closedAt: null,
+      durability: "persisted",
+      snapshot: structuredClone(input.snapshot),
+      events: [event]
+    };
+    this.persistHumanReviewSnapshot([...this.humanReviews, structuredClone(request)]);
+    this.appendHumanReview(request);
+    return { request: structuredClone(request), reused: false };
+  }
+
+  transitionHumanReview(input: TransitionHumanReviewInput): HumanReviewRequest {
+    const existing = this.humanReviewById.get(input.requestId);
+    if (!existing) {
+      throw new Error(`HumanReviewRequest ${input.requestId} не найден.`);
+    }
+    if (isHumanReviewTerminalStatus(existing.status)) {
+      throw new Error(`HumanReviewRequest ${input.requestId} уже закрыт и не может меняться.`);
+    }
+    if (existing.status === input.status) {
+      return structuredClone(existing);
+    }
+    if (!ALLOWED_HUMAN_REVIEW_TRANSITIONS[existing.status].includes(input.status)) {
+      throw new Error(
+        `Переход ${existing.status} -> ${input.status} для HumanReviewRequest ${input.requestId} запрещён.`
+      );
+    }
+
+    const now = (input.now ?? new Date()).toISOString();
+    const next: HumanReviewRequest = {
+      ...existing,
+      status: input.status,
+      updatedAt: now,
+      closedAt: isHumanReviewTerminalStatus(input.status) ? now : null,
+      events: [
+        ...existing.events,
+        {
+          id: `${existing.id}_${existing.events.length + 1}`,
+          at: now,
+          type: "status_changed",
+          status: input.status,
+          changedBy: input.changedBy,
+          note: input.note ?? null
+        }
+      ]
+    };
+    this.persistHumanReviewSnapshot(
+      this.humanReviews.map((request) =>
+        request.id === next.id ? structuredClone(next) : structuredClone(request)
+      )
+    );
+    this.replaceHumanReview(next);
+    return structuredClone(next);
+  }
+
   // Back-compat: some call sites may still want to record a minimal row when
   // the full result is not available. Constructs a legacy-style record with
   // placeholder fingerprints so it never deduplicates against real records.
@@ -342,7 +492,7 @@ export class CaseStore {
   }
 
   private observeGeneratedSequence(value: string): void {
-    const generatedDecision = /^(?:dec|log)_.+_(\d+)$/.exec(value);
+    const generatedDecision = /^(?:dec|log|hr)_.+_(\d+)$/.exec(value);
     if (generatedDecision) {
       const parsed = Number.parseInt(generatedDecision[1] ?? "", 10);
       if (Number.isInteger(parsed) && parsed > this.counter) {
@@ -374,12 +524,47 @@ export class CaseStore {
       this.latestByCaseId.set(record.caseId, record);
     }
   }
+
+  private appendHumanReview(request: HumanReviewRequest): void {
+    if (this.humanReviewById.has(request.id)) {
+      throw new Error(`HumanReviewRequest ${request.id} already exists in CaseStore.`);
+    }
+    this.observeGeneratedSequence(request.id);
+    this.humanReviews.push(request);
+    this.humanReviewById.set(request.id, request);
+    const bucket = this.humanReviewByCaseId.get(request.caseId) ?? [];
+    bucket.push(request);
+    this.humanReviewByCaseId.set(request.caseId, bucket);
+  }
+
+  private replaceHumanReview(request: HumanReviewRequest): void {
+    const existing = this.humanReviewById.get(request.id);
+    if (!existing) {
+      throw new Error(`HumanReviewRequest ${request.id} не найден.`);
+    }
+    const index = this.humanReviews.findIndex((entry) => entry.id === request.id);
+    if (index !== -1) {
+      this.humanReviews[index] = request;
+    }
+    this.humanReviewById.set(request.id, request);
+    const bucket = this.humanReviewByCaseId.get(request.caseId) ?? [];
+    const bucketIndex = bucket.findIndex((entry) => entry.id === request.id);
+    if (bucketIndex !== -1) {
+      bucket[bucketIndex] = request;
+    }
+    this.humanReviewByCaseId.set(request.caseId, bucket);
+  }
+
+  private persistHumanReviewSnapshot(requests: HumanReviewRequest[]): void {
+    if (!this.persistHumanReviews) return;
+    this.persistHumanReviews(requests.map((request) => structuredClone(request)));
+  }
 }
 
 let singleton: CaseStore | null = null;
 
-export function initializeCaseStore(catalogs: Catalogs): CaseStore {
-  singleton = new CaseStore(catalogs);
+export function initializeCaseStore(catalogs: Catalogs, options: CaseStoreOptions = {}): CaseStore {
+  singleton = new CaseStore(catalogs, options);
   return singleton;
 }
 
