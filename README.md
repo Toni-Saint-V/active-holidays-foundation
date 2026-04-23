@@ -108,7 +108,7 @@ Autopilot runner:
 
 - `npm run skills:autopilot -- --prompt "<request>"`
 - `npm run skills:autopilot -- --files "<csv paths>"`
-- add `--telemetry` or `--telemetry-file reports/skills/custom.jsonl` when you want runtime telemetry written to disk
+- add `--telemetry` or `--telemetry-file reports/automations/state/runtime-observed/custom-skill-telemetry.jsonl` when you want runtime telemetry written to disk
 
 ## Skill Autopilot
 
@@ -129,6 +129,7 @@ Telemetry usage:
 - set `SKILL_MODE_TELEMETRY=1` to record detect/start/autopilot runs
 - optionally set `SKILL_MODE_TELEMETRY_FILE` to override the default log path
 - run `npm run skills:telemetry:report` to inspect the current telemetry summary
+- default telemetry now writes into gitignored control-tower runtime-observed state
 
 ## Repo-Local Codex Automations
 

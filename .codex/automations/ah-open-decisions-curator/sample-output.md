@@ -18,8 +18,10 @@
 ## SYNC CONTRACT
 
 - Decision 1
+  - `identity`: `syncKey`
   - `recordTitle`: `RDC v3.0 should be reference-only`
   - `syncKey`: `decision:scope:rdc-companion-reference-only`
+  - `packetLifecycle`: `blocked`
   - `decisionStatus`: `open`
   - `urgency`: `high`
   - `owner`: `product-owner`
@@ -31,9 +33,13 @@
   - `confidence`: `high`
   - `lastVerifiedAt`: `2026-04-22T00:00:00+03:00`
   - `actionNeeded`: `Confirm canonical page ownership and mark the companion as reference-only.`
+  - `targetBinding`: `blocked_by_surface_drift`
+  - `recordTitleRole`: `display-only`
 - Decision 2
+  - `identity`: `syncKey`
   - `recordTitle`: `Release Gate should exist as an operational surface`
   - `syncKey`: `decision:operations:release-gate-database`
+  - `packetLifecycle`: `blocked`
   - `decisionStatus`: `open`
   - `urgency`: `medium`
   - `owner`: `engineering-owner`
@@ -45,13 +51,18 @@
   - `confidence`: `medium`
   - `lastVerifiedAt`: `2026-04-22T00:00:00+03:00`
   - `actionNeeded`: `Confirm whether Release Gate should be created before live write-back is enabled.`
+  - `targetBinding`: `blocked_by_target_binding`
+  - `recordTitleRole`: `display-only`
 
 ## NOTION TARGET
 
-- `Open Decisions`
+- Locked target required from `.codex/automations/notion-surface-lock.json`
+- No title-based resolution after lock
 - Linked references: `P0 · Master Doc — Vision & Boundaries`, `P0 · Definition of Final`
 
 ## VERIFY
 
 - Each decision has one concrete owner.
 - No more than three decisions were raised.
+- identity = `syncKey`
+- title/name only for read-only discovery before lock.

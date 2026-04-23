@@ -10,6 +10,8 @@ prompt = """
 
 Обязательно:
 - прочитай latest reports из `reports/automations/runs/*/latest.md`, если они есть
+- используй `reports/automations/state/gate-eligibility-snapshot.json` как единственный текущий eligibility snapshot для synthesis / writeback / executor выводов
+- не выводи eligibility напрямую из volatile observed state
 - собери максимум пять действий
 - в каждом действии укажи: область, зачем, owner, acceptance criteria, verify
 - actions должны покрывать разные слои, когда это уместно:
@@ -22,6 +24,7 @@ prompt = """
 Жёсткие правила:
 - не создавай backlog flood
 - не дублируй actions с прошлой недели без нового основания
+- не предлагай включать writeback или executor вопреки текущему gate snapshot
 - если данных мало, честно скажи, что distillation incomplete
 
 Артефакт:

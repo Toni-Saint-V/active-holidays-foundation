@@ -11,7 +11,10 @@ prompt = """
 
 Обязательно:
 - сначала собери repo reality: routes, screen surfaces, product autopilot, signal autopilot, trust surfaces, live preview, what-if, replay
-- затем, если доступен Notion, сравни с backbone: Vision, Execution, Open Decisions
+- затем, если доступен Notion, сравни repo reality с canonical anchors `P0`, `P1`, `P2`, `04 · Roadmap` и operational layer как read-only context через `.codex/automations/notion-surface-lock.json`
+- title/name only for read-only discovery before lock
+- если binding missing или ambiguous, фиксируй `blocked_by_target_binding`
+- не опирайся на legacy backbone wording как на текущий contract
 - ищи только улучшения, совместимые с текущей архитектурой
 - приоритет: clarity > trust > AI-native usefulness > speed > premium feel
 - если есть low-complexity / high-impact improvement, подготовь маленький patch plan или точечный patch
@@ -20,6 +23,7 @@ prompt = """
 - не выдумывай новый backend, ML-pipeline, API или аналитику
 - не делай broad redesign
 - не предлагай десять идей; выбери 1-3 сильных
+- сохраняй совместимость с upcoming Lovable integration и не строй target logic на exact surface name
 
 Артефакт:
 - обнови `reports/automations/runs/ah-product-os-radar/latest.md` и dated report, если запись файлов уместна

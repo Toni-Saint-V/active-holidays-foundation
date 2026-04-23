@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-23T00:00:00+03:00",
+  "requiredFeeders": [
+    {
+      "automationId": "ah-truth-freshness-watch",
+      "maxAgeHours": 80,
+      "requiredArtifacts": ["latest-md", "dated-report-md"]
+    },
+    {
+      "automationId": "ah-product-os-radar",
+      "maxAgeHours": 192,
+      "requiredArtifacts": ["latest-md", "dated-report-md"]
+    },
+    {
+      "automationId": "ah-execution-brief-sync",
+      "maxAgeHours": 120,
+      "requiredArtifacts": ["latest-md", "dated-report-md"]
+    },
+    {
+      "automationId": "ah-design-drift-vs-contract",
+      "maxAgeHours": 192,
+      "requiredArtifacts": ["latest-md", "dated-report-md"]
+    }
+  ],
+  "expectedArtifacts": {
+    "ah-agent-memory-guard": ["latest-md", "dated-report-md"],
+    "ah-copy-trust-upgrade": ["latest-md", "dated-report-md"],
+    "ah-design-drift-vs-contract": ["latest-md", "dated-report-md"],
+    "ah-draft-pr-executor": ["latest-md", "execution-run-json"],
+    "ah-execution-brief-sync": ["latest-md", "dated-report-md"],
+    "ah-next-best-action-distiller": ["latest-md", "dated-report-md"],
+    "ah-notion-sync-director": ["latest-md", "dated-report-md", "dry-run-diff-json"],
+    "ah-open-decisions-curator": ["latest-md", "dated-report-md"],
+    "ah-plugin-mcp-surface-watch": ["latest-md", "dated-report-md"],
+    "ah-product-os-radar": ["latest-md", "dated-report-md"],
+    "ah-release-gate-sync": ["latest-md", "dated-report-md"],
+    "ah-review-learning-distiller": ["latest-md", "dated-report-md"],
+    "ah-skill-dedupe-gap-harvester": ["latest-md", "dated-report-md"],
+    "ah-truth-freshness-watch": ["latest-md", "dated-report-md"],
+    "ah-ui-premium-polish-pass": ["latest-md", "dated-report-md"]
+  },
+  "gatingRules": {
+    "synthesisRequires": [
+      "required_feeders_fresh",
+      "gate_eligibility_snapshot"
+    ],
+    "directorDryRunRequires": [
+      "required_feeders_fresh",
+      "report_only_or_dry_run_packets",
+      "locked_target_contracts"
+    ],
+    "directorLiveWriteRequires": [
+      "writeback_enabled",
+      "freshness_passed",
+      "target_binding_passed",
+      "audit_confirmed",
+      "manual_approval_matched",
+      "dry_run_diff_present",
+      "diff_conflict_absent",
+      "packet_supersession_passed",
+      "packet_status_ready_for_sync"
+    ],
+    "executorRequires": [
+      "writeback_enabled",
+      "freshness_passed",
+      "target_binding_passed",
+      "eligible_packet_present",
+      "packet_supersession_passed",
+      "packet_status_ready_for_sync",
+      "isolated_worktree",
+      "automation_owned_branch",
+      "max_one_active_run_per_dedupe_key",
+      "retry_only_from_terminal_failure"
+    ]
+  },
+  "waiverHooks": [
+    "freshness:<automationId>",
+    "executor:<dedupeKey>"
+  ]
+}

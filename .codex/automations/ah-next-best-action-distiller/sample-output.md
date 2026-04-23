@@ -2,7 +2,8 @@
 
 ## WEEK PICTURE
 
-- Product and UI surfaced stronger opportunities than infra work this week.
+- Gate source of truth: `reports/automations/state/gate-eligibility-snapshot.json`.
+- Current projection says synthesis may stay report-only, while live writeback and executor remain blocked.
 
 ## TOP ACTIONS
 
@@ -23,3 +24,4 @@
 ## VERIFY
 
 - Each action has a named owner and acceptance criteria.
+- No eligibility call was derived from volatile observed state.

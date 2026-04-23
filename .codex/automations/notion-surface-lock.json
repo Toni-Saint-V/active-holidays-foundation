@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-04-23T00:00:00+03:00",
+  "canonicalAnchors": {
+    "P0_MASTER_DOC": {
+      "pageId": "62aa65b6-4df5-4918-99a8-c47cde375a3e",
+      "title": "P0 · Master Doc — Vision & Boundaries",
+      "status": "confirmed"
+    },
+    "P0_DEFINITION_OF_FINAL": {
+      "pageId": "f130eddd-1b5b-46db-aae9-dcae074665bc",
+      "title": "P0 · Definition of Final (core release)",
+      "status": "confirmed"
+    },
+    "P1_UX_ARCHITECTURE": {
+      "pageId": "d480a873-bf72-4b8e-93b6-17925f938ef8",
+      "title": "P1 · UX Architecture — Flow / State / Screens",
+      "status": "confirmed"
+    },
+    "P2_SCREEN_CONTRACTS": {
+      "pageId": "5a87ff18-a536-4887-95c1-f5dcf166ac5f",
+      "title": "P2 · Screen Contracts for Lovable",
+      "status": "confirmed"
+    },
+    "ROADMAP_INDEX": {
+      "pageId": "e41c9947-13c5-46fd-a53c-d0414f9fbd36",
+      "title": "04 · Roadmap",
+      "status": "confirmed"
+    },
+    "LEGACY_OPEN_DECISIONS_PAGE": {
+      "pageId": "170110c8-be95-49c9-9062-262ac953840c",
+      "title": "P0 · Open Decisions",
+      "status": "legacy_read_only"
+    }
+  },
+  "operationalSurfaces": {
+    "Execution": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "liveTitle": null,
+      "targetId": null,
+      "dataSourceId": null,
+      "surfaceContractHash": "1fbef467f815239b9dc924ba9caca969303008b5c46660c5f2f8256ea96c6028",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:execution",
+      "targetResolutionLifecycle": "hard_fail_unbound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Area",
+          "Status",
+          "Source",
+          "Confidence",
+          "Last Verified At",
+          "Action Needed",
+          "Evidence"
+        ],
+        "conflictingProperties": [],
+        "matchedProperties": []
+      },
+      "notes": [
+        "Separate Execution database was not found during the read-only audit.",
+        "Title-based discovery may stay read-only only until a locked Execution database exists.",
+        "Any write or update attempt before a locked target exists must fail as blocked_by_target_binding."
+      ]
+    },
+    "Open Decisions": {
+      "auditOutcome": "blocked_by_surface_drift",
+      "liveTitle": "🧭 Decisions — Live",
+      "targetId": "e6b27485-090f-469b-985d-798bec015f0a",
+      "dataSourceId": "collection://4a24fd69-3601-4542-9e61-33c38dd92468",
+      "surfaceContractHash": "21f374e3d0cea71844c657497d74be0c471ae399a400f6c6f7562cec0b491fdd",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:decision",
+      "targetResolutionLifecycle": "live_id_bound",
+      "compat": {
+        "additiveOnly": false,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Layer",
+          "Decision Status",
+          "Recommendation",
+          "Why Now",
+          "Urgency",
+          "Action Needed"
+        ],
+        "conflictingProperties": [
+          "Decision",
+          "Date",
+          "Type",
+          "Phase",
+          "Summary",
+          "Tags",
+          "Related Briefs",
+          "Related Roadmap",
+          "Supersedes"
+        ],
+        "matchedProperties": [
+          "Owner",
+          "Status",
+          "Source",
+          "Confidence",
+          "Evidence"
+        ]
+      },
+      "notes": [
+        "A same-purpose live database exists under a divergent name and schema.",
+        "Legacy same-page table on P0 · Open Decisions remains read-only until explicit cutover.",
+        "Post-lock writes or updates must resolve through the locked target id + dataSourceId + syncKey only.",
+        "Any title- or name-based write attempt must fail as blocked_by_target_binding."
+      ]
+    },
+    "Build Briefs": {
+      "auditOutcome": "blocked_by_property_conflict",
+      "liveTitle": "📦 Build Briefs",
+      "targetId": "2d1b987d-d3f5-4344-ba19-440ca8e6e144",
+      "dataSourceId": "collection://27cb05df-75bf-471c-8e06-1e29e5655051",
+      "surfaceContractHash": "26469586b8f1a2de587c5fcab6c52d61f653f8ed191256604268af703be8ef87",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:brief",
+      "targetResolutionLifecycle": "live_id_bound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Scope",
+          "Ready",
+          "Inputs Verified",
+          "Acceptance Criteria",
+          "Verify",
+          "Prompt Block",
+          "Source"
+        ],
+        "conflictingProperties": [
+          "Brief Name",
+          "Brief Type",
+          "Executor",
+          "Feature",
+          "Priority",
+          "Screens",
+          "Task",
+          "UX Flows",
+          "Status",
+          "Owner",
+          "Created",
+          "Updated"
+        ],
+        "matchedProperties": [
+          "✅ Acceptance Criteria"
+        ]
+      },
+      "notes": [
+        "Live Build Briefs target is locked by page id and data source id.",
+        "Compat must stay additive-only against the current live property types.",
+        "Post-lock writes or updates must resolve through the locked target id + dataSourceId + syncKey only.",
+        "Any title- or name-based write attempt must fail as blocked_by_target_binding."
+      ]
+    },
+    "Release Gate": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "liveTitle": null,
+      "targetId": null,
+      "dataSourceId": null,
+      "surfaceContractHash": "c9e88925a0d214f1380265e64c091d3279d494f225321e07f4a224c22dbbc4bf",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:gate",
+      "targetResolutionLifecycle": "hard_fail_unbound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Surface",
+          "Gate",
+          "Status",
+          "Blocking Reason",
+          "Source",
+          "Confidence",
+          "Last Verified At",
+          "Evidence"
+        ],
+        "conflictingProperties": [],
+        "matchedProperties": []
+      },
+      "notes": [
+        "Exact Release Gate database not found during the read-only audit.",
+        "Any write or update attempt before a locked target exists must fail as blocked_by_target_binding."
+      ]
+    },
+    "Automation Inbox": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "liveTitle": null,
+      "targetId": null,
+      "dataSourceId": null,
+      "surfaceContractHash": "e22006850d436482156d47686fdf20dbf0ab97b9dbb4653b1addb7d970bc7a92",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:inbox",
+      "targetResolutionLifecycle": "hard_fail_unbound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Packet Type",
+          "Severity",
+          "Status",
+          "Action Needed",
+          "Routed To",
+          "Source",
+          "Confidence",
+          "Last Verified At"
+        ],
+        "conflictingProperties": [],
+        "matchedProperties": []
+      },
+      "notes": [
+        "Exact Automation Inbox database not found during the read-only audit.",
+        "Any write or update attempt before a locked target exists must fail as blocked_by_target_binding."
+      ]
+    },
+    "Opportunities": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "liveTitle": null,
+      "targetId": null,
+      "dataSourceId": null,
+      "surfaceContractHash": "d17743882ca9416fcb025fa6de8682bd61bbac9fceff3c4064106851c791ed01",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:opportunity",
+      "targetResolutionLifecycle": "hard_fail_unbound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Idea",
+          "Why Now",
+          "Impact",
+          "Complexity",
+          "Source",
+          "Confidence",
+          "Status"
+        ],
+        "conflictingProperties": [],
+        "matchedProperties": []
+      },
+      "notes": [
+        "Exact Opportunities database not found during the read-only audit.",
+        "Any write or update attempt before a locked target exists must fail as blocked_by_target_binding."
+      ]
+    },
+    "Review Findings & Learnings": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "liveTitle": null,
+      "targetId": null,
+      "dataSourceId": null,
+      "surfaceContractHash": "747c7d41a8280b8af769baafbf5529de8ba2b2bfc6c5aad0952b981e025ab061",
+      "surfaceContractVersion": "2026-04-23-control-tower-v2.1:learning",
+      "targetResolutionLifecycle": "hard_fail_unbound",
+      "compat": {
+        "additiveOnly": true,
+        "missingProperties": [
+          "Record",
+          "Sync Key",
+          "Layer",
+          "Severity",
+          "Fix Path",
+          "Source",
+          "Confidence",
+          "Status",
+          "Evidence"
+        ],
+        "conflictingProperties": [],
+        "matchedProperties": []
+      },
+      "notes": [
+        "Exact Review Findings & Learnings database not found during the read-only audit.",
+        "Any write or update attempt before a locked target exists must fail as blocked_by_target_binding."
+      ]
+    }
+  }
+}

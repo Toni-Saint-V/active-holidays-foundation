@@ -88,6 +88,7 @@ export type AgentSystemFixture = {
   title: string;
   prompt: string;
   files: string[];
+  syntheticFilesAllowed?: boolean;
   reviewOnly?: boolean;
   expectedPrimaryMode: ModeId | null;
   expectedBlockedState: "blocked" | "unblocked" | "unknown";
@@ -101,6 +102,64 @@ export type AgentSystemFixture = {
 };
 
 export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
+  {
+    id: "skill-system-governance-control-tower-runtime",
+    title: "Control tower runtime governance",
+    prompt:
+      "Нужно усилить control tower runtime contracts, manual approvals, notion lock, gate projection и validator без UI implementation.",
+    files: [
+      "scripts/codex/automation-registry.ts",
+      "scripts/codex/notion-operational-contract.ts",
+      "scripts/codex/shared-skill-compat.ts",
+      ".codex/automations/notion-surface-lock.json",
+      ".codex/automations/check-waivers.json",
+      "reports/automations/state/runtime-maturity.json",
+      "reports/automations/state/notion-writeback-promotion.json",
+      "reports/automations/state/manual-approvals.json",
+      "reports/automations/state/gate-eligibility-snapshot.json"
+    ],
+    expectedPrimaryMode: "skill-system-governance",
+    expectedBlockedState: "unblocked",
+    expectedRoutingConfidence: "high",
+    expectedExecutionLane: "standard-lane",
+    requiredAxes: ["governance", "verification", "architecture"],
+    preferredEntrySkills: [
+      "protocol-structured-json-and-png-gate",
+      "release-readiness"
+    ],
+    requiredAgentRoles: ["lead", "verifier", "reviewer"],
+    expectedAgentPackSkills: [
+      "protocol-structured-json-and-png-gate",
+      "architecture-guardrails",
+      "qa-self-review",
+      "release-readiness"
+    ]
+  },
+  {
+    id: "skill-system-governance-mixed-ui-language",
+    title: "Governance wins over mixed UI language",
+    prompt:
+      "Нужно не трогать UI, но укрепить governance/runtime contracts для Lovable integration, Notion lock и automation packets.",
+    files: [
+      "scripts/codex/automation-registry.ts",
+      "scripts/codex/notion-operational-contract.ts",
+      "scripts/codex/verify-automations.ts",
+      ".codex/automations/notion-surface-lock.json"
+    ],
+    expectedPrimaryMode: "skill-system-governance",
+    expectedBlockedState: "unblocked",
+    expectedRoutingConfidence: "high",
+    expectedExecutionLane: "standard-lane",
+    requiredAxes: ["governance", "verification"],
+    preferredEntrySkills: ["protocol-structured-json-and-png-gate"],
+    requiredAgentRoles: ["lead", "verifier", "reviewer"],
+    expectedAgentPackSkills: [
+      "protocol-structured-json-and-png-gate",
+      "architecture-guardrails",
+      "qa-self-review",
+      "release-readiness"
+    ]
+  },
   {
     id: "skill-system-governance-runtime",
     title: "Skill system runtime governance",
@@ -139,6 +198,7 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
       ".agents/plugins/marketplace.json",
       ".cursor/mcp.json"
     ],
+    syntheticFilesAllowed: true,
     expectedPrimaryMode: "plugin-surface",
     expectedBlockedState: "unblocked",
     expectedRoutingConfidence: "high",
@@ -199,7 +259,7 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     title: "Premium UI with PNG gate",
     prompt:
       "Нужно усилить premium UI, hierarchy, spacing и CTA для нового screen и не трогать код до PNG approval.",
-    files: ["src/screens/onboarding/QuoteScreen.tsx", "src/ui/cards/PricingCard.tsx"],
+    files: ["src/screens/landing/LandingScreen.tsx", "src/ui/OfferCard.tsx"],
     expectedPrimaryMode: "premium-ui",
     expectedBlockedState: "blocked",
     expectedRoutingConfidence: "high",
@@ -225,8 +285,9 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     files: [
       "server/lib/recommendations.ts",
       "shared/contracts/recommendations.ts",
-      "server/routes/recommendations.ts"
+      "server/routes/recommendations.integration.test.ts"
     ],
+    syntheticFilesAllowed: true,
     expectedPrimaryMode: "ai-recommendation-boundary",
     expectedBlockedState: "unblocked",
     expectedRoutingConfidence: "high",
@@ -248,8 +309,9 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     prompt: "",
     files: [
       "shared/contracts/recommendations.ts",
-      "server/routes/recommendations.ts"
+      "server/routes/recommendations.integration.test.ts"
     ],
+    syntheticFilesAllowed: true,
     expectedPrimaryMode: "ai-recommendation-boundary",
     expectedBlockedState: "unblocked",
     expectedRoutingConfidence: "medium",
@@ -290,9 +352,10 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
       "Изменился DTO payload и route validation, нужно обновить shared contract и реальных callers без скрытого compat drift.",
     files: [
       "shared/contracts/recommendations.ts",
-      "server/routes/recommendations.ts",
+      "server/routes/recommendations.integration.test.ts",
       "src/lib/apiClient.ts"
     ],
+    syntheticFilesAllowed: true,
     expectedPrimaryMode: "contract-boundary",
     expectedBlockedState: "unblocked",
     expectedRoutingConfidence: "high",
@@ -315,7 +378,7 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
       "Нужно усилить result flow: compare, documents и human review states прямо внутри текущего result loop.",
     files: [
       "src/screens/result/ResultScreen.tsx",
-      "src/screens/documents/DocumentChecklistScreen.tsx",
+      "src/screens/documents/DocumentsScreen.tsx",
       "src/screens/human-review/HumanReviewScreen.tsx"
     ],
     expectedPrimaryMode: "result-flow",
@@ -339,7 +402,7 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     prompt:
       "Нужно укрепить fallback, retry, stale-safe state и degraded messaging без потери truthful last-good state.",
     files: [
-      "server/lib/recommendations/fallback.ts",
+      "server/lib/recommendations.ts",
       "src/state/caseStore.ts",
       "src/screens/result/AiRecommendationPanel.tsx"
     ],
@@ -365,7 +428,7 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     files: [
       "server/routes/recommendations.integration.test.ts",
       "scripts/verify-engine-drift.ts",
-      "data/scenarios/s5-rf-italy-insurance.json"
+      "data/scenarios/baseline/s5-rf-italy-insurance.json"
     ],
     expectedPrimaryMode: "regression-proof",
     expectedBlockedState: "unblocked",

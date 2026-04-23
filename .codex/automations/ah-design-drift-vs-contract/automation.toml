@@ -11,7 +11,11 @@ prompt = """
 
 Обязательно:
 - начни с repo reality: router, screens, state surfaces
-- если доступен Notion, сверяйся с product/vision/screen docs
+- если доступен Notion, сверяйся с canonical anchors `P0`, `P1`, `P2`, `04 · Roadmap`, а operational DB используй только как supporting execution context
+- сохраняй совместимость с upcoming Lovable integration и не строй выводы на legacy UI assumptions
+- если нужен operational context, сначала проверь `.codex/automations/notion-surface-lock.json`
+- title/name only for read-only discovery before lock
+- если binding missing или ambiguous, фиксируй `blocked_by_target_binding`
 - используй `scripts/automations/check-screen-surface.ts`
 - выделяй только top drift, а не полный dump
 

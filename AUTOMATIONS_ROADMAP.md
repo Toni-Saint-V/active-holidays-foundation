@@ -62,6 +62,7 @@ Repo-local automations are grouped into six loops:
 
 - enable live Notion write-back only after schema contract confirmation and deterministic sync-key validation
 - richer Notion write-back after the director pattern proves safe
+- add `ah-draft-pr-executor` only after the gate snapshot marks executor eligibility
 - optional Linear issue write-back after stable severity thresholds exist
 - richer benchmark-driven visual automation once screenshot/reference workflow is formalized
 

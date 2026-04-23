@@ -227,11 +227,24 @@ export const MODE_REGISTRY: ModeDefinition[] = [
       "metadata",
       "openai.yaml",
       "automation",
-      "codex surface"
+      "codex surface",
+      "control tower",
+      "runtime hardening",
+      "runtime contract",
+      "manual approval",
+      "manual approvals",
+      "writeback",
+      "write-back",
+      "notion lock",
+      "surface lock",
+      "gate eligibility",
+      "gate projection"
     ],
     filePatterns: [
       "^\\.codex/skills/",
       "^\\.codex/automations/",
+      "^reports/automations/state/",
+      "^reports/automations/README\\.md$",
       "^scripts/codex/",
       "^scripts/automations/",
       "^AGENTS\\.md$",
@@ -241,6 +254,7 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     ],
     verifyCommands: [
       "npm run skills:verify",
+      "npm run automations:verify",
       "npm run automations:check:skills",
       "npm run automations:check:context",
       "npm run typecheck"

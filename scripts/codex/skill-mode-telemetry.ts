@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { REPO_RUNTIME_MANIFEST } from "./repo-runtime-manifest.ts";
 
 export type SkillModeTelemetryConfig = {
   enabled: boolean;
@@ -51,7 +52,7 @@ type TelemetryReadResult = {
   skippedCorruptedLines: number;
 };
 
-const DEFAULT_TELEMETRY_PATH = "reports/skills/skill-mode-telemetry.jsonl";
+const DEFAULT_TELEMETRY_PATH = REPO_RUNTIME_MANIFEST.skillTelemetryPath;
 
 function parseTelemetryCliArgs(argv: string[]): TelemetryCliArgs {
   const result: TelemetryCliArgs = {

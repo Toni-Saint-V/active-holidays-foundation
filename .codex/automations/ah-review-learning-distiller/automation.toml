@@ -11,14 +11,18 @@ prompt = """
 Обязательно:
 - прочитай свежие review findings и latest automation reports, если они есть
 - оставайся в `report-first` режиме: output должен готовить packet для downstream sync, а не делать live write-back
+- используй `reports/automations/state/gate-eligibility-snapshot.json` как единственный текущий eligibility snapshot для downstream readiness
+- используй `.codex/automations/notion-surface-lock.json` как единственный live binding source
 - выдели recurring failure patterns: correctness, lifecycle, maintainability, trust, UX clarity
 - для каждого паттерна предложи одно системное улучшение: rule, checklist, skill update, test gap или execution guardrail
 - отделяй point fix от systemic fix
 - для каждого learning, который годится для downstream Notion sync, дай deterministic packet:
+  - `identity = `syncKey``
   - `recordTitle`
   - `syncKey` формата `learning:<layer-slug>:<pattern-slug>`
   - `notionSurface = Review Findings & Learnings`
   - `writeMode = UPSERT_RECORD_BY_SYNC_KEY`
+  - `packetLifecycle = draft | ready_for_sync | blocked | applied | superseded | stale`
   - `layer`
   - `severity`
   - `fixPath`
@@ -28,8 +32,11 @@ prompt = """
   - `confidence`
   - `lastVerifiedAt`
   - `actionNeeded`
+- `recordTitle` трактуй только как display-only
 - если паттерн на самом деле требует отдельного решения, укажи `rerouteTo = Open Decisions` вместо выдуманного learning record
-- если live surface name или schema conflict неочевидны, не выдумывай target; пометь `blocked_by_schema_contract`
+- если surface уже locked, target resolution для write/update возможен только через locked id + `syncKey`
+- title/name only for read-only discovery before lock
+- если binding или schema conflict неочевидны, не выдумывай target; пометь `blocked_by_target_binding` или `blocked_by_surface_drift`
 
 Жёсткие правила:
 - не дублируй одиночные баги без broader lesson

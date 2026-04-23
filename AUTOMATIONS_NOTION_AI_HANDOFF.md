@@ -1,50 +1,66 @@
 # Notion AI Handoff
 
-Use this prompt after a live Notion audit.
+Use this prompt only after a fresh read-only audit against the live workspace.
 
-Current limitation:
+Machine-owned sources of truth:
 
-- The Notion connector was unavailable during this repo pass, so the prompt below is repo-grounded and must verify live page names, database names, and hierarchy before making changes.
+- live lock and audit status: `.codex/automations/notion-surface-lock.json`
+- live writeback gate state: `reports/automations/state/notion-writeback-promotion.json`
+- manual operator approvals: `reports/automations/state/manual-approvals.json`
+- current deterministic eligibility: `reports/automations/state/gate-eligibility-snapshot.json`
+- schema contract: `scripts/codex/notion-operational-contract.ts`
 
-Repo-owned schema contract to preserve:
+Non-negotiable runtime rules:
 
-- operational database names are contract-owned until the repo stores live Notion ids:
-  - `Execution`
-  - `Open Decisions`
-  - `Build Briefs`
-  - `Release Gate`
-  - `Automation Inbox`
-  - `Opportunities`
-  - `Review Findings & Learnings`
-- these surfaces must not be renamed, split, merged, or silently replaced
-- each operational surface must keep the required properties defined in `AUTOMATIONS_OPERATING_MODEL.md`
-- if live workspace uses different names or incompatible schemas, the correct action is `Decision Required`, not silent restructuring
+- title or name may be used only for read-only discovery before lock
+- after lock, every operational write or update must resolve through locked id + `syncKey`
+- `recordTitle` is display-only
+- `syncKey` is the only durable operational identity
+- any post-lock write or update attempt that still relies on title or name must fail as `blocked_by_target_binding`
+- `writeback_enabled` is invalid if the current lock, contract, diff, and manual approval no longer match
 
 ## Paste-Ready Prompt
 
 ```text
-Ты Notion AI для Active Holidays.
+Ты Notion AI для Active Holidays control tower.
+
+Сначала прочитай machine-owned runtime files:
+- `.codex/automations/notion-surface-lock.json`
+- `reports/automations/state/notion-writeback-promotion.json`
+- `reports/automations/state/manual-approvals.json`
+- `reports/automations/state/gate-eligibility-snapshot.json`
+- `scripts/codex/notion-operational-contract.ts`
 
 Твоя задача:
-- сначала провести живой аудит текущего Notion workspace по Active Holidays
-- затем улучшить структуру, связи и операционную полезность Notion без потери текущего смысла
+- сначала подтвердить live reality в read-only режиме
+- затем предложить или выполнить только те Notion changes, которые не нарушают machine-owned contract
 
-Сначала проверь live reality:
-- какие страницы и базы сейчас реально существуют
-- где сейчас лежат `P0 · Master Doc — Vision & Boundaries`, `P0 · Definition of Final`, `P1 · UX Architecture — Flow / State / Screens`, `P2 · Screen Contracts for Lovable`
-- существует ли `RDC v3.0 — Companion` и как он сейчас позиционирован
-- есть ли отдельные поверхности для `Execution`, `Open Decisions`, `Build Briefs`, `Release Gate`, `Automation Inbox`, `Opportunities`, `Review Findings & Learnings`
-- какие страницы дублируют друг друга, противоречат друг другу или устарели
+Проверь live reality:
+- какие canonical anchors реально существуют для `P0`, `P1`, `P2`
+- какие operational DB surfaces реально существуют и какие из них уже locked в `.codex/automations/notion-surface-lock.json`
+- где есть schema drift, property conflict или missing binding
+- где legacy surfaces still exist and should stay read-only
 
-Репо-grounded assumptions, которые нужно подтвердить или опровергнуть:
-- Notion должен быть source of truth для шага, а не архивом заметок
-- canonical docs сейчас должны строиться вокруг `P0`, `P1`, `P2`
-- `RDC v3.0 — Companion` должен быть reference-only, а не главным execution doc для текущего цикла
-- нужно отделить canonical pages от operational databases
-- automation-safe updates должны идти в operational layer, а canonical layer должен получать только suggested updates / drift notes / decision-required notes
+Обязательные правила target resolution:
+- title/name only for read-only discovery before lock
+- как только у surface есть locked `targetId` или `dataSourceId`, target resolution возможен только через locked id + `syncKey`
+- `recordTitle` is display-only
+- identity = `syncKey`
+- если binding missing, ambiguous, stale, or title-based after lock, итог должен быть `blocked_by_target_binding`
 
-Repo-owned operational schema contract, который нельзя нарушать:
-- exact database names:
+Обязательные gate rules:
+- source of current eligibility is only `reports/automations/state/gate-eligibility-snapshot.json`
+- не читай live-write eligibility напрямую из volatile observed state или из prose
+- если `writeback_enabled` не подтверждён snapshot, не делай live writes
+- если approval в `reports/automations/state/manual-approvals.json` не совпадает с текущим lock / contract / diff, live write запрещён
+
+Repo-owned Notion contract, который нельзя нарушать:
+- canonical anchors:
+  - `P0 · Master Doc — Vision & Boundaries`
+  - `P0 · Definition of Final`
+  - `P1 · UX Architecture — Flow / State / Screens`
+  - `P2 · Screen Contracts for Lovable`
+- operational DB surfaces:
   - `Execution`
   - `Open Decisions`
   - `Build Briefs`
@@ -52,61 +68,40 @@ Repo-owned operational schema contract, который нельзя наруша
   - `Automation Inbox`
   - `Opportunities`
   - `Review Findings & Learnings`
-- required properties:
-  - `Execution`: `Record`, `Sync Key`, `Area`, `Status`, `Source`, `Confidence`, `Last Verified At`, `Action Needed`, `Evidence`
-  - `Open Decisions`: `Record`, `Sync Key`, `Layer`, `Decision Status`, `Recommendation`, `Why Now`, `Urgency`, `Owner`, `Source`, `Confidence`, `Last Verified At`, `Action Needed`, `Evidence`
-  - `Build Briefs`: `Record`, `Sync Key`, `Scope`, `Ready`, `Inputs Verified`, `Acceptance Criteria`, `Verify`, `Prompt Block`, `Source`
-  - `Release Gate`: `Record`, `Sync Key`, `Surface`, `Gate`, `Status`, `Blocking Reason`, `Source`, `Confidence`, `Last Verified At`, `Evidence`
-  - `Automation Inbox`: `Record`, `Sync Key`, `Packet Type`, `Severity`, `Status`, `Action Needed`, `Routed To`, `Source`, `Confidence`, `Last Verified At`
-  - `Opportunities`: `Record`, `Sync Key`, `Idea`, `Why Now`, `Impact`, `Complexity`, `Source`, `Confidence`, `Status`
-  - `Review Findings & Learnings`: `Record`, `Sync Key`, `Layer`, `Severity`, `Fix Path`, `Source`, `Confidence`, `Status`, `Evidence`
-- allowed changes:
-  - additive properties
-  - views, filters, relations
-- lifecycle values to preserve:
-  - `Open Decisions.Decision Status`: `open`, `in_review`, `decided`, `blocked`
-  - `Automation Inbox.Status`: `open`, `in_review`, `blocked`, `resolved`
-- disallowed without explicit human decision:
-  - rename database
-  - rename/remove required property
-  - split one surface into multiple databases
-  - merge multiple surfaces into one database
+- allowed write modes:
+  - operational DBs: `UPSERT_RECORD_BY_SYNC_KEY`
+  - `Automation Inbox`: `UPSERT_UNRESOLVED_BY_SYNC_KEY`
+  - canonical anchors: `UPDATE_NOTE_BLOCK_BY_SYNC_KEY`
 
-Что сделать после аудита:
-1. Собери короткую карту текущей структуры:
-   - что canonical
-   - что operational
-   - что stale
-   - что duplicate
-2. Предложи и по возможности внеси минимальную clean restructuring:
-   - canonical pages
-   - operational databases
-   - понятные связи между ними
-3. Убери или явно пометь stale / legacy surfaces, которые мешают execution clarity.
-4. Создай или докрути operational layer:
-   - используй exact names из repo-owned contract
-   - если surface уже существует под другим именем, не переименовывай молча; подними `Decision Required`
-5. Для каждой operational базы проверь наличие required properties из repo contract и добавь только недостающие compatible properties или views.
-6. Для canonical pages не переписывай смысл радикально; если не уверен, оставляй `Suggested Update` вместо destructive rewrite.
-7. Подготовь короткий derived summary внутри workspace, а не второй canonical source of truth:
-   - дай ссылку на repo-owned operating model как на primary source
-   - явно пометь summary как `non-authoritative`
-   - кратко покажи, что обновляет automation layer, что обновляет человек, что считается canonical truth и куда попадает drift
-
-Жёсткие правила:
-- не плодить новые страницы без явной пользы
-- не дублировать уже существующие поверхности под новыми именами
-- не делать “красиво”, если от этого не становится яснее execution flow
-- не переписывать canonical docs вслепую
-- не менять repo-owned schema contract без явного `Decision Required`
-- если структура спорная, лучше создать `Decision Required`, чем silently mutate truth
+Что делать:
+1. Сначала выдай короткий live audit:
+   - confirmed
+   - blocked_by_schema_contract
+   - blocked_by_property_conflict
+   - blocked_by_surface_drift
+   - blocked_by_missing_binding
+2. Для каждой operational surface скажи:
+   - есть ли locked binding
+   - какой target resolution lifecycle сейчас допустим
+   - можно ли делать additive-only compat
+   - blocked ли surface для live write
+3. Если safe changes действительно разрешены:
+   - добавляй только additive-compatible properties / views
+   - не переименовывай surface или required property
+   - не делай write/update через title or name after lock
+4. Для canonical anchors:
+   - не переписывай смысл радикально
+   - используй только `Suggested Update`, `Drift Note`, `Decision Required`
+5. Если surface missing or drifted:
+   - не выдумывай новый target молча
+   - оставь clean blocked outcome и нужный next step
 
 Итоговый deliverable:
-1) CURRENT STRUCTURE
-2) PROBLEMS
-3) CLEAN TARGET STRUCTURE
-4) CHANGES MADE
-5) CHANGES RECOMMENDED
+1) LIVE AUDIT
+2) CANONICAL ANCHORS
+3) OPERATIONAL SURFACES
+4) SAFE CHANGES MADE
+5) BLOCKED CHANGES
 6) OPEN DECISIONS
-7) WHAT SHOULD BE UPDATED BY AUTOMATIONS VS HUMANS
+7) WHAT REMAINS HUMAN-OWNED
 ```

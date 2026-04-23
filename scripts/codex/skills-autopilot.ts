@@ -90,6 +90,11 @@ export type RecommendedAgentPackInput = {
 
 const AREA_PATTERNS: Array<{ area: FileSurfaceArea; pattern: RegExp }> = [
   { area: "governance", pattern: /^\.codex\/skills\// },
+  {
+    area: "governance",
+    pattern: /^\.codex\/automations\/(check-waivers\.json|notion-surface-lock\.json)$/
+  },
+  { area: "governance", pattern: /^reports\/automations\/state\// },
   { area: "governance", pattern: /^scripts\/codex\// },
   { area: "plugin", pattern: /^plugins\// },
   { area: "plugin", pattern: /^\.agents\/plugins\// },
@@ -110,7 +115,8 @@ const AREA_PATTERNS: Array<{ area: FileSurfaceArea; pattern: RegExp }> = [
   { area: "docs", pattern: /^AGENTS\.md$/ },
   { area: "docs", pattern: /^README\.md$/ },
   { area: "docs", pattern: /^RUNBOOK\.md$/ },
-  { area: "docs", pattern: /^AUTOMATIONS_[A-Z_]+\.md$/ }
+  { area: "docs", pattern: /^AUTOMATIONS_[A-Z_]+\.md$/ },
+  { area: "docs", pattern: /^reports\/automations\/README\.md$/ }
 ];
 
 const DEEP_MODES = new Set([

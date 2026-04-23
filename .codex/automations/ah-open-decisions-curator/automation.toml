@@ -12,22 +12,27 @@ prompt = """
 Обязательно:
 - прочитай latest reports из `reports/automations/runs/*/latest.md`, если они есть
 - оставайся в `report-first` режиме: output должен готовить packet для downstream sync, а не делать live write-back
+- используй `reports/automations/state/gate-eligibility-snapshot.json` как единственный текущий eligibility snapshot для downstream readiness
 - выдели максимум три решения, которые реально блокируют ясность, delivery или качество
 - по каждому решению дай: проблема, варианты, recommendation, why now, urgency, owner
 - для каждого решения подготовь deterministic fields для downstream sync:
+  - `identity = `syncKey``
   - `syncKey` формата `decision:<layer-slug>:<decision-slug>`
   - `recordTitle`
   - `notionSurface = Open Decisions`
   - `writeMode = UPSERT_RECORD_BY_SYNC_KEY`
+  - `packetLifecycle = draft | ready_for_sync | blocked | applied | superseded | stale`
   - `sourceReportId`
   - `source`
   - `confidence`
   - `lastVerifiedAt`
   - `actionNeeded`
   - `decisionStatus = open | in_review | decided | blocked`
+- `recordTitle` трактуй только как display-only
 - если repo reality уже фактически выбрала один путь, пометь это отдельно
-- если доступен Notion, укажи целевой target в `Open Decisions` и связанную canonical page
-- если live surface name или schema conflict неочевидны, не выдумывай новый target; пометь `blocked_by_schema_contract`
+- если доступен Notion, используй locked target из `.codex/automations/notion-surface-lock.json`; после lock target resolution по title/name запрещён
+- title/name only for read-only discovery before lock
+- если binding отсутствует, неоднозначен или surface drift остаётся, не выдумывай target; пометь `blocked_by_target_binding` или `blocked_by_surface_drift`
 
 Жёсткие правила:
 - не создавай decision flood

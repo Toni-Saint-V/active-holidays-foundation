@@ -11,13 +11,17 @@ prompt = """
 Обязательно:
 - собери build / typecheck / test / review / automation report signals
 - оставайся в `report-first` режиме: output должен готовить packet для downstream sync, а не делать live write-back
+- используй `reports/automations/state/gate-eligibility-snapshot.json` как единственный текущий eligibility snapshot для downstream readiness
+- используй `.codex/automations/notion-surface-lock.json` как единственный live binding source
 - если есть свежие findings, не прячь их в summary
 - разложи состояние по слоям: domain, API, UI, trust, automation layer
 - если snapshot годится для downstream Notion sync, для каждого gate record дай deterministic packet:
+  - `identity = `syncKey``
   - `recordTitle`
   - `syncKey` формата `gate:<surface-slug>:<gate-slug>`
   - `notionSurface = Release Gate`
   - `writeMode = UPSERT_RECORD_BY_SYNC_KEY`
+  - `packetLifecycle = draft | ready_for_sync | blocked | applied | superseded | stale`
   - `surface`
   - `gate`
   - `status`
@@ -27,7 +31,10 @@ prompt = """
   - `confidence`
   - `lastVerifiedAt`
   - `actionNeeded`
-- если live surface name или schema conflict неочевидны, не выдумывай target; пометь `blocked_by_schema_contract`
+- `recordTitle` трактуй только как display-only
+- если surface уже locked, target resolution для write/update возможен только через locked id + `syncKey`
+- title/name only for read-only discovery before lock
+- если binding или schema conflict неочевидны, не выдумывай target; пометь `blocked_by_target_binding` или `blocked_by_surface_drift`
 
 Жёсткие правила:
 - не называй ready то, что не подтверждено

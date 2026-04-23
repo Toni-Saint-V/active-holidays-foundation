@@ -12,13 +12,20 @@ prompt = """
 Обязательно:
 - прочитай `AGENTS.md`, `RUNBOOK.md`, `AUTOMATIONS_*`
 - проверь текущие сильные/слабые места по последним automation reports
-- если доступен Notion Execution, вытащи только то, что реально нужно для следующего шага
+- используй `reports/automations/state/gate-eligibility-snapshot.json` как source of truth для текущего gate состояния
+- если нужен context из `Execution`, сначала открой `.codex/automations/notion-surface-lock.json`
+- title/name only for read-only discovery before lock
+- если у `Execution` нет locked `targetId` / `dataSourceId`, не выдумывай target и помечай `blocked_by_target_binding`
+- если lock существует, target resolution допустим только через locked target id + dataSourceId + `syncKey`
+- если доступен Notion operational layer, используй только canonical anchors и locked operational targets как read-only context
+- не резолви `Execution` или любую другую operational DB по title/name после появления lock; ориентируйся только на machine-owned lock state
 - собери один компактный execution brief и один paste-ready prompt block
 
 Жёсткие правила:
 - никаких mega-prompts
 - не дублируй то, что уже прямо сказано в AGENTS
 - не пиши задачи, которые нельзя начать из текущего repo state
+- не читай eligibility напрямую из volatile observed state
 
 Артефакт:
 - обнови `reports/automations/runs/ah-execution-brief-sync/latest.md`

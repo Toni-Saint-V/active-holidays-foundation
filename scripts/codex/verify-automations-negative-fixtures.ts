@@ -1,0 +1,400 @@
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { computeGateEligibilitySnapshot, type GateEligibilitySnapshot } from "./automation-runtime-governance.ts";
+import {
+  getOperationalSurfaceContractHash,
+  getOperationalSurfaceContractVersion
+} from "./notion-operational-contract.ts";
+import { REPO_RUNTIME_MANIFEST } from "./repo-runtime-manifest.ts";
+
+const execFileAsync = promisify(execFile);
+
+type Scenario = {
+  id: string;
+  kind: "semantic" | "integrity";
+  expectedExitCode: number;
+  expectedSubstring: string;
+  recomputeSnapshot?: boolean;
+  mutate: (repoRoot: string) => Promise<void>;
+  assertProjection?: (snapshot: GateEligibilitySnapshot) => string | null;
+};
+
+async function copyRepo(sourceRoot: string, targetRoot: string): Promise<void> {
+  const excluded = new Set([
+    ".git",
+    "node_modules",
+    "dist",
+    "coverage",
+    "output",
+    ".DS_Store"
+  ]);
+  await cp(sourceRoot, targetRoot, {
+    recursive: true,
+    filter: (sourcePath) => {
+      const relativePath = path.relative(sourceRoot, sourcePath);
+      if (!relativePath || relativePath === ".") return true;
+      return !relativePath.split(path.sep).some((segment) => excluded.has(segment));
+    }
+  });
+}
+
+async function recomputeSnapshot(repoRoot: string): Promise<void> {
+  const snapshot = await computeGateEligibilitySnapshot(repoRoot);
+  const snapshotPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.gateEligibilitySnapshotPath);
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+}
+
+async function readJson<T>(target: string): Promise<T> {
+  return JSON.parse(await readFile(target, "utf8")) as T;
+}
+
+async function writeJson(target: string, value: unknown): Promise<void> {
+  await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+async function writeReportPair(
+  repoRoot: string,
+  automationId: string,
+  isoTimestamp: string
+): Promise<void> {
+  const reportRoot = path.join(repoRoot, REPO_RUNTIME_MANIFEST.runtimeReportsRoot, automationId);
+  await mkdir(reportRoot, { recursive: true });
+  const datePart = isoTimestamp.slice(0, 10);
+  const markdown = `---\nlastVerifiedAt: ${isoTimestamp}\n---\n\n# ${automationId}\n\nNear-green fixture.\n`;
+  await writeFile(path.join(reportRoot, "latest.md"), markdown, "utf8");
+  await writeFile(path.join(reportRoot, `${datePart}.md`), markdown, "utf8");
+}
+
+async function setupNearGreenBaseline(repoRoot: string): Promise<void> {
+  const fixtureTime = "2026-04-23T12:00:00.000Z";
+  const executionTargetId = "execution-target-near-green";
+  const executionDataSourceId = "collection://execution-near-green";
+  const executionDiffHash = "near-green-diff-hash";
+
+  await rm(path.join(repoRoot, REPO_RUNTIME_MANIFEST.runtimeObservedRoot), {
+    recursive: true,
+    force: true
+  });
+  await rm(path.join(repoRoot, REPO_RUNTIME_MANIFEST.executionRunsRoot), {
+    recursive: true,
+    force: true
+  });
+
+  for (const automationId of [
+    "ah-truth-freshness-watch",
+    "ah-product-os-radar",
+    "ah-execution-brief-sync",
+    "ah-design-drift-vs-contract",
+    "ah-open-decisions-curator",
+    "ah-release-gate-sync",
+    "ah-review-learning-distiller",
+    "ah-notion-sync-director"
+  ]) {
+    await writeReportPair(repoRoot, automationId, fixtureTime);
+  }
+
+  const directorReportsRoot = path.join(
+    repoRoot,
+    REPO_RUNTIME_MANIFEST.runtimeReportsRoot,
+    "ah-notion-sync-director"
+  );
+  await mkdir(directorReportsRoot, { recursive: true });
+  await writeJson(path.join(directorReportsRoot, "dry-run-diff.json"), {
+    kind: "notion_dry_run_diff",
+    packets: [
+      {
+        surface: "Execution",
+        packetKey:
+          "Execution:execution:near-green:ah-notion-sync-director:near-green:2026-04-23T12:00:00.000Z:near-green-diff-hash",
+        syncKey: "execution:near-green",
+        sourceReportId: "ah-notion-sync-director:near-green",
+        lastVerifiedAt: fixtureTime,
+        packetLifecycle: "ready_for_sync",
+        diffHash: executionDiffHash,
+        dedupeKey: "executor:Execution:execution:near-green"
+      }
+    ]
+  });
+
+  const lockPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.notionSurfaceLockPath);
+  const lock = await readJson<Record<string, unknown>>(lockPath);
+  const lockOperational = (lock.operationalSurfaces ?? {}) as Record<string, Record<string, unknown>>;
+  lockOperational.Execution = {
+    ...(lockOperational.Execution ?? {}),
+    auditOutcome: "confirmed",
+    targetId: executionTargetId,
+    dataSourceId: executionDataSourceId,
+    targetResolutionLifecycle: "live_id_bound"
+  };
+  lock.operationalSurfaces = lockOperational;
+  await writeJson(lockPath, lock);
+
+  const promotionPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.notionWritebackPromotionPath);
+  const promotion = await readJson<Record<string, unknown>>(promotionPath);
+  const promotionSurfaces = (promotion.surfaces ?? {}) as Record<string, Record<string, unknown>>;
+  promotionSurfaces.Execution = {
+    ...(promotionSurfaces.Execution ?? {}),
+    currentState: "writeback_enabled",
+    targetId: executionTargetId,
+    dataSourceId: executionDataSourceId,
+    requiredContractHash: getOperationalSurfaceContractHash("Execution"),
+    requiredContractVersion: getOperationalSurfaceContractVersion("Execution"),
+    requiredDiffHash: executionDiffHash,
+    operatorUpdatedAt: fixtureTime,
+    operatorUpdatedBy: "negative-harness",
+    rationale: "Near-green baseline"
+  };
+  promotion.surfaces = promotionSurfaces;
+  await writeJson(promotionPath, promotion);
+
+  const approvalsPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.manualApprovalsPath);
+  await writeJson(approvalsPath, {
+    schemaVersion: 1,
+    approvals: [
+      {
+        approvalId: "near-green-execution-approval",
+        surface: "Execution",
+        targetId: executionTargetId,
+        dataSourceId: executionDataSourceId,
+        contractHash: getOperationalSurfaceContractHash("Execution"),
+        contractVersion: getOperationalSurfaceContractVersion("Execution"),
+        diffHash: executionDiffHash,
+        approvedAt: fixtureTime,
+        approvedBy: "negative-harness",
+        expiresAt: "2026-12-31T00:00:00.000Z"
+      }
+    ]
+  });
+
+  await recomputeSnapshot(repoRoot);
+}
+
+async function runVerify(repoRoot: string): Promise<{ exitCode: number; output: string }> {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      "node",
+      ["--experimental-strip-types", "scripts/codex/verify-automations.ts"],
+      {
+        cwd: repoRoot,
+        encoding: "utf8"
+      }
+    );
+    return { exitCode: 0, output: `${stdout}\n${stderr}` };
+  } catch (error) {
+    const typed = error as {
+      code?: number;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
+    return {
+      exitCode: typeof typed.code === "number" ? typed.code : 1,
+      output: `${typed.stdout ?? ""}\n${typed.stderr ?? typed.message ?? ""}`
+    };
+  }
+}
+
+async function appendDirectorVolatilePath(repoRoot: string): Promise<void> {
+  const samplePath = path.join(
+    repoRoot,
+    ".codex/automations/ah-notion-sync-director/sample-output.md"
+  );
+  const text = await readFile(samplePath, "utf8");
+  await writeFile(
+    samplePath,
+    `${text.trimEnd()}\n\n- Eligibility source override: reports/automations/state/runtime-observed/test.json\n`,
+    "utf8"
+  );
+}
+
+async function addMalformedDryRunPacket(repoRoot: string): Promise<void> {
+  const directorReportsRoot = path.join(
+    repoRoot,
+    REPO_RUNTIME_MANIFEST.runtimeReportsRoot,
+    "ah-notion-sync-director"
+  );
+  await mkdir(directorReportsRoot, { recursive: true });
+  const badPacketPath = path.join(directorReportsRoot, "dry-run-diff.json");
+  await writeFile(
+    badPacketPath,
+    `${JSON.stringify(
+      {
+        kind: "notion_dry_run_diff",
+        packets: [
+          {
+            surface: "Execution",
+            syncKey: "exec:negative",
+            sourceReportId: "report-negative",
+            packetLifecycle: "ready_for_sync",
+            diffHash: "deadbeef"
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
+async function addDuplicateSyncKeyPacket(repoRoot: string): Promise<void> {
+  const directorReportsRoot = path.join(
+    repoRoot,
+    REPO_RUNTIME_MANIFEST.runtimeReportsRoot,
+    "ah-notion-sync-director"
+  );
+  const dryRunPath = path.join(directorReportsRoot, "dry-run-diff.json");
+  const payload = await readJson<{ kind: string; packets?: Array<Record<string, unknown>> }>(dryRunPath);
+  const packets = Array.isArray(payload.packets) ? payload.packets : [];
+  packets.push({
+    surface: "Execution",
+    packetKey:
+      "Execution:execution:near-green:ah-notion-sync-director:duplicate:2026-04-23T12:00:00.000Z:near-green-diff-hash",
+    syncKey: "execution:near-green",
+    sourceReportId: "ah-notion-sync-director:duplicate",
+    lastVerifiedAt: "2026-04-23T12:00:00.000Z",
+    packetLifecycle: "ready_for_sync",
+    diffHash: "near-green-diff-hash",
+    dedupeKey: "executor:Execution:execution:near-green",
+    supersedesPacketKey: null,
+    supersededByPacketKey: null,
+    supersessionReason: null
+  });
+  await writeJson(dryRunPath, { ...payload, kind: "notion_dry_run_diff", packets });
+}
+
+async function tamperStoredSnapshot(repoRoot: string): Promise<void> {
+  const snapshotPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.gateEligibilitySnapshotPath);
+  const snapshot = JSON.parse(await readFile(snapshotPath, "utf8")) as Record<string, unknown>;
+  snapshot.projectionHash = "tampered-projection-hash";
+  await writeFile(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+}
+
+const SCENARIOS: Scenario[] = [
+  {
+    id: "baseline_passes",
+    kind: "semantic",
+    expectedExitCode: 0,
+    expectedSubstring: "[OK] verified",
+    mutate: async () => {},
+    assertProjection: (snapshot) => {
+      if (!snapshot.eligibility.directorLiveWrite.enabledSurfaces.includes("Execution")) {
+        return "near-green baseline must enable Execution live-write surface";
+      }
+      if (snapshot.eligibility.executor.status !== "eligible") {
+        return "near-green baseline must make executor eligible";
+      }
+      if (snapshot.eligibility.executor.eligiblePackets.length === 0) {
+        return "near-green baseline must produce at least one eligible packet";
+      }
+      return null;
+    }
+  },
+  {
+    id: "rejects_direct_volatile_prompt_read",
+    kind: "semantic",
+    expectedExitCode: 1,
+    expectedSubstring: "must not read volatile runtime paths directly",
+    mutate: appendDirectorVolatilePath
+  },
+  {
+    id: "rejects_malformed_dry_run_packet",
+    kind: "semantic",
+    expectedExitCode: 1,
+    expectedSubstring: "invalid dry-run packet",
+    recomputeSnapshot: true,
+    mutate: addMalformedDryRunPacket
+  },
+  {
+    id: "blocks_duplicate_sync_key_packets",
+    kind: "semantic",
+    expectedExitCode: 1,
+    expectedSubstring: "requires deterministic ready_for_sync dry-run diff",
+    recomputeSnapshot: true,
+    mutate: addDuplicateSyncKeyPacket,
+    assertProjection: (snapshot) => {
+      const executionStatus = snapshot.dryRunDiffStatus.Execution;
+      if (executionStatus.status !== "conflict") {
+        return "duplicate syncKey packets must produce conflict status";
+      }
+      if (
+        !executionStatus.reasons.includes("blocked_by_multiple_current_packets_for_sync_key")
+      ) {
+        return "duplicate syncKey packets must include blocked_by_multiple_current_packets_for_sync_key";
+      }
+      if (snapshot.eligibility.executor.eligiblePackets.length > 0) {
+        return "duplicate syncKey packets must block executor eligible packets";
+      }
+      return null;
+    }
+  },
+  {
+    id: "detects_snapshot_tamper",
+    kind: "integrity",
+    expectedExitCode: 1,
+    expectedSubstring: "snapshot drift detected",
+    mutate: tamperStoredSnapshot
+  }
+];
+
+async function main() {
+  const sourceRoot = process.cwd();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "ah-automations-negative-"));
+  const baseRepoRoot = path.join(tempRoot, "base");
+  await copyRepo(sourceRoot, baseRepoRoot);
+
+  const failures: string[] = [];
+  let semanticCases = 0;
+
+  for (const scenario of SCENARIOS) {
+    const scenarioRepoRoot = path.join(tempRoot, scenario.id);
+    await cp(baseRepoRoot, scenarioRepoRoot, { recursive: true });
+    await setupNearGreenBaseline(scenarioRepoRoot);
+    await scenario.mutate(scenarioRepoRoot);
+    if (scenario.recomputeSnapshot) {
+      await recomputeSnapshot(scenarioRepoRoot);
+    }
+    if (scenario.kind === "semantic") semanticCases += 1;
+
+    if (scenario.assertProjection) {
+      const snapshot = await computeGateEligibilitySnapshot(scenarioRepoRoot);
+      const projectionFailure = scenario.assertProjection(snapshot);
+      if (projectionFailure) {
+        failures.push(`${scenario.id}: projection assertion failed: ${projectionFailure}`);
+        continue;
+      }
+    }
+
+    const result = await runVerify(scenarioRepoRoot);
+    const hasExpectedText = result.output.includes(scenario.expectedSubstring);
+    if (result.exitCode !== scenario.expectedExitCode || !hasExpectedText) {
+      const outputSnippet = result.output.slice(0, 800).replace(/\s+/g, " ").trim();
+      failures.push(
+        `${scenario.id}: expected exit ${scenario.expectedExitCode} and text "${scenario.expectedSubstring}", got exit ${result.exitCode}; output=${outputSnippet}`
+      );
+    } else {
+      console.log(`[OK] ${scenario.id}`);
+    }
+  }
+
+  await rm(tempRoot, { recursive: true, force: true });
+
+  if (semanticCases < 2) {
+    failures.push("negative harness must contain at least two semantic scenarios");
+  }
+
+  if (failures.length > 0) {
+    for (const failure of failures) console.error(`[FAIL] ${failure}`);
+    process.exit(1);
+  }
+
+  console.log(`[OK] negative fixtures passed: ${SCENARIOS.length}`);
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : "negative fixture run failed");
+  process.exit(1);
+});

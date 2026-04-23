@@ -18,10 +18,12 @@
 ## SYNC CONTRACT
 
 - Learning 1
+  - `identity`: `syncKey`
   - `recordTitle`: `Release-ready language must stay verification-bound`
   - `syncKey`: `learning:release:verification-bound-language`
   - `notionSurface`: `Review Findings & Learnings`
   - `writeMode`: `UPSERT_RECORD_BY_SYNC_KEY`
+  - `packetLifecycle`: `blocked`
   - `layer`: `release`
   - `severity`: `high`
   - `fixPath`: `Tighten release gate wording and proof requirements before any ready verdict.`
@@ -31,11 +33,15 @@
   - `confidence`: `high`
   - `lastVerifiedAt`: `2026-04-22T00:00:00+03:00`
   - `actionNeeded`: `Keep release language blocked until the smallest relevant verification stack actually ran.`
+  - `targetBinding`: `blocked_by_target_binding`
+  - `recordTitleRole`: `display-only`
 - Learning 2
+  - `identity`: `syncKey`
   - `recordTitle`: `Notion-facing execution truth needs one owner layer`
   - `syncKey`: `learning:notion:notion-sync-director-owner-layer`
   - `notionSurface`: `Review Findings & Learnings`
   - `writeMode`: `UPSERT_RECORD_BY_SYNC_KEY`
+  - `packetLifecycle`: `blocked`
   - `layer`: `notion`
   - `severity`: `medium`
   - `fixPath`: `Keep operational truth flowing through the sync director instead of ad hoc doc edits.`
@@ -45,12 +51,16 @@
   - `confidence`: `medium`
   - `lastVerifiedAt`: `2026-04-22T00:00:00+03:00`
   - `actionNeeded`: `Keep new Notion-facing automations packetized and routed through the director.`
+  - `targetBinding`: `blocked_by_target_binding`
+  - `recordTitleRole`: `display-only`
 
 ## NOTION TARGET
 
-- `Review Findings & Learnings`
+- Locked `Review Findings & Learnings` target required from `.codex/automations/notion-surface-lock.json`
 - Cross-link to `Execution` when a repeated pattern affects live work
 
 ## VERIFY
 
 - Each learning maps to a repeated pattern, not a one-off bug.
+- identity = `syncKey`
+- title/name only for read-only discovery before lock.

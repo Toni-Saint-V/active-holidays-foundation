@@ -8,5 +8,12 @@ coverage
 npm-debug.log*
 *.tsbuildinfo
 reports/automations/runs
-reports/automations/state
+reports/automations/state/*
+!reports/automations/state/runtime-maturity.json
+!reports/automations/state/notion-writeback-promotion.json
+!reports/automations/state/open-decisions-legacy-bridge.json
+!reports/automations/state/manual-approvals.json
+!reports/automations/state/gate-eligibility-snapshot.json
+reports/automations/state/runtime-observed/
+reports/automations/state/execution-runs/
 output/server-state

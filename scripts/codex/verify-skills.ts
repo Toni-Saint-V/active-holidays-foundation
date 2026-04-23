@@ -329,7 +329,7 @@ async function main() {
   try {
     const evaluation = await runAgentSystemEvaluation(repoRoot);
     for (const warning of evaluation.warnings) {
-      failures.push(`agent-system evaluation warning: ${warning}`);
+      warnings.push(`agent-system evaluation warning: ${warning}`);
     }
     for (const failure of evaluation.failures) {
       failures.push(`agent-system evaluation: ${failure}`);

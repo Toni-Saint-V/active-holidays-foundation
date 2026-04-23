@@ -43,6 +43,12 @@ Optional narrow sync:
 npm run automations:sync -- --only=ah-product-os-radar,ah-ui-premium-polish-pass
 ```
 
+If you need a destructive reinstall that also resets installed `status`, use:
+
+```bash
+npm run automations:sync -- --force-reset-installed-state
+```
+
 ## Activation Model
 
 - repo defaults are intentionally `PAUSED`
@@ -56,7 +62,7 @@ Recommended first activation order:
 4. `ah-ui-premium-polish-pass`
 5. `ah-design-drift-vs-contract`
 
-Because the local CLI does not expose a stable automation-status command during this audit, activation should be done in the Codex automation UI or by editing the copied `automation.toml` files in `${CODEX_HOME:-$HOME/.codex}/automations/` using the live status value supported by that Codex build.
+Because the local CLI does not expose a stable automation-status command during this audit, activation should be done in the Codex automation UI or by editing the copied `automation.toml` files in `${CODEX_HOME:-$HOME/.codex}/automations/` using the live status value supported by that Codex build. `automations:sync` now preserves the installed `status` field by default; only `--force-reset-installed-state` resets it.
 
 ## How To Disable
 
@@ -67,9 +73,21 @@ Because the local CLI does not expose a stable automation-status command during 
 
 - dated runs belong in `reports/automations/runs/<automation-id>/`
 - current pointer belongs in `reports/automations/runs/<automation-id>/latest.md`
-- optional local state belongs in `reports/automations/state/`
+- tracked deterministic state belongs in:
+  - `.codex/automations/notion-surface-lock.json`
+  - `.codex/automations/check-waivers.json`
+  - `reports/automations/state/runtime-maturity.json`
+  - `reports/automations/state/notion-writeback-promotion.json`
+  - `reports/automations/state/open-decisions-legacy-bridge.json`
+  - `reports/automations/state/manual-approvals.json`
+  - `reports/automations/state/gate-eligibility-snapshot.json`
+- volatile runtime-observed state belongs in:
+  - `reports/automations/state/runtime-observed/*.json`
+  - `reports/automations/state/execution-runs/*.json`
 
-These runtime paths are gitignored. Example outputs stay committed next to each automation definition as `sample-output.md`.
+Tracked singleton state is part of the repo-owned control-tower contract.
+Only volatile runtime-observed state stays gitignored.
+Example outputs stay committed next to each automation definition as `sample-output.md`.
 
 ## Deterministic Helpers
 
@@ -126,3 +144,4 @@ npm run skills:verify
 - external write-back is disabled
 - truth/process automations report first, then human approves changes
 - premium UI automations stay focused on one strong improvement at a time
+- live Notion writeback stays fail-closed unless lock, contract hash, diff hash, manual approval, and promotion state all match

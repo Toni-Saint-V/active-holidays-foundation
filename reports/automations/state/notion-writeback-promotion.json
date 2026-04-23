@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-23T00:00:00+03:00",
+  "surfaces": {
+    "Execution": {
+      "currentState": "report_only",
+      "targetId": null,
+      "dataSourceId": null,
+      "requiredContractHash": "1fbef467f815239b9dc924ba9caca969303008b5c46660c5f2f8256ea96c6028",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:execution",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "No locked Execution database exists yet."
+    },
+    "Open Decisions": {
+      "currentState": "schema_drift_blocked",
+      "targetId": "e6b27485-090f-469b-985d-798bec015f0a",
+      "dataSourceId": "collection://4a24fd69-3601-4542-9e61-33c38dd92468",
+      "requiredContractHash": "21f374e3d0cea71844c657497d74be0c471ae399a400f6c6f7562cec0b491fdd",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:decision",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Surface drift and legacy table cutover remain unresolved."
+    },
+    "Build Briefs": {
+      "currentState": "schema_drift_blocked",
+      "targetId": "2d1b987d-d3f5-4344-ba19-440ca8e6e144",
+      "dataSourceId": "collection://27cb05df-75bf-471c-8e06-1e29e5655051",
+      "requiredContractHash": "26469586b8f1a2de587c5fcab6c52d61f653f8ed191256604268af703be8ef87",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:brief",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Live Build Briefs schema still needs additive compat work before enablement."
+    },
+    "Release Gate": {
+      "currentState": "report_only",
+      "targetId": null,
+      "dataSourceId": null,
+      "requiredContractHash": "c9e88925a0d214f1380265e64c091d3279d494f225321e07f4a224c22dbbc4bf",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:gate",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Exact Release Gate surface is still missing."
+    },
+    "Automation Inbox": {
+      "currentState": "report_only",
+      "targetId": null,
+      "dataSourceId": null,
+      "requiredContractHash": "e22006850d436482156d47686fdf20dbf0ab97b9dbb4653b1addb7d970bc7a92",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:inbox",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Exact Automation Inbox surface is still missing."
+    },
+    "Opportunities": {
+      "currentState": "report_only",
+      "targetId": null,
+      "dataSourceId": null,
+      "requiredContractHash": "d17743882ca9416fcb025fa6de8682bd61bbac9fceff3c4064106851c791ed01",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:opportunity",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Exact Opportunities surface is still missing."
+    },
+    "Review Findings & Learnings": {
+      "currentState": "report_only",
+      "targetId": null,
+      "dataSourceId": null,
+      "requiredContractHash": "747c7d41a8280b8af769baafbf5529de8ba2b2bfc6c5aad0952b981e025ab061",
+      "requiredContractVersion": "2026-04-23-control-tower-v2.1:learning",
+      "requiredDiffHash": null,
+      "operatorUpdatedAt": "2026-04-23T00:00:00+03:00",
+      "operatorUpdatedBy": "repo",
+      "rationale": "Exact Review Findings & Learnings surface is still missing."
+    }
+  },
+  "stateHistory": [
+    {
+      "surface": "Build Briefs",
+      "toState": "schema_drift_blocked",
+      "changedAt": "2026-04-23T00:00:00+03:00",
+      "changedBy": "repo",
+      "reason": "Live schema audit found additive compat gaps."
+    },
+    {
+      "surface": "Open Decisions",
+      "toState": "schema_drift_blocked",
+      "changedAt": "2026-04-23T00:00:00+03:00",
+      "changedBy": "repo",
+      "reason": "Live operational surface drifts from the locked contract and legacy page-table remains active."
+    }
+  ]
+}

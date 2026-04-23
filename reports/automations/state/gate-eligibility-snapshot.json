@@ -1,0 +1,573 @@
+{
+  "schemaVersion": 1,
+  "evaluatedAt": "2026-04-22T21:00:00.000Z",
+  "sourceHashes": {
+    "runtimeMaturity": "a1b4bd05286160b5f4673974f4b80eca1db31204e1d46a4b222833ba6790795c",
+    "notionSurfaceLock": "64efa7c30b687514615d0ed0a84ea18b27c4768cadfe126f7fe7922ea9d367a9",
+    "notionWritebackPromotion": "ea3921d617293e012b7a5211a8d96a8f9a4b8777dfa8587e6a39ada56374037f",
+    "manualApprovals": "d987c51e6d3279dd42ca4cc5dbcf55c6550d685187505ce6417d8063119bfe8a",
+    "checkWaivers": "e0f936192f6ee6b7357aa2a8c3fc6e3e6e0fbcca8cbbec5cf76cb588b2034cfa",
+    "openDecisionsLegacyBridge": "d3fb10d3c7112bbd151cdb5aa29230496e54d75b9b6fdbe8b79907110c5114b6",
+    "observedState": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "executionRuns": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "reportInventory": "b038ce36d9564c6cf8f33a3910379bfa5f830e1664b807ad0e9fe3d3462042c5",
+    "dryRunReportEvidence": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "dryRunObservedEvidence": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "feederStatus": {
+    "ah-truth-freshness-watch": {
+      "status": "blocked_by_missing_artifacts",
+      "maxAgeHours": 80,
+      "latestReportAgeHours": null,
+      "missingArtifacts": [
+        "latest-md",
+        "dated-report-md"
+      ],
+      "waivedBy": []
+    },
+    "ah-product-os-radar": {
+      "status": "blocked_by_missing_artifacts",
+      "maxAgeHours": 192,
+      "latestReportAgeHours": null,
+      "missingArtifacts": [
+        "latest-md",
+        "dated-report-md"
+      ],
+      "waivedBy": []
+    },
+    "ah-execution-brief-sync": {
+      "status": "blocked_by_missing_artifacts",
+      "maxAgeHours": 120,
+      "latestReportAgeHours": null,
+      "missingArtifacts": [
+        "latest-md",
+        "dated-report-md"
+      ],
+      "waivedBy": []
+    },
+    "ah-design-drift-vs-contract": {
+      "status": "blocked_by_missing_artifacts",
+      "maxAgeHours": 192,
+      "latestReportAgeHours": null,
+      "missingArtifacts": [
+        "latest-md",
+        "dated-report-md"
+      ],
+      "waivedBy": []
+    }
+  },
+  "dependencyStatus": {
+    "ah-draft-pr-executor": {
+      "ah-notion-sync-director": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 48,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    },
+    "ah-next-best-action-distiller": {
+      "ah-truth-freshness-watch": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 80,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-product-os-radar": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-execution-brief-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 120,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-design-drift-vs-contract": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-open-decisions-curator": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-release-gate-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-review-learning-distiller": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    },
+    "ah-notion-sync-director": {
+      "ah-truth-freshness-watch": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 80,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-product-os-radar": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-execution-brief-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 120,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-design-drift-vs-contract": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-open-decisions-curator": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-release-gate-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-review-learning-distiller": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 96,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    },
+    "ah-open-decisions-curator": {
+      "ah-truth-freshness-watch": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 80,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-product-os-radar": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-execution-brief-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 120,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-design-drift-vs-contract": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    },
+    "ah-release-gate-sync": {
+      "ah-truth-freshness-watch": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 80,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-product-os-radar": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-execution-brief-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 120,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-design-drift-vs-contract": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    },
+    "ah-review-learning-distiller": {
+      "ah-truth-freshness-watch": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 80,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-product-os-radar": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-execution-brief-sync": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 120,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      },
+      "ah-design-drift-vs-contract": {
+        "status": "blocked_by_missing_artifacts",
+        "maxAgeHours": 192,
+        "latestReportAgeHours": null,
+        "missingArtifacts": [
+          "latest-md",
+          "dated-report-md"
+        ],
+        "waivedBy": []
+      }
+    }
+  },
+  "notionAudit": {
+    "Execution": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "hard_fail_unbound"
+    },
+    "Open Decisions": {
+      "auditOutcome": "blocked_by_surface_drift",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "live_id_bound"
+    },
+    "Build Briefs": {
+      "auditOutcome": "blocked_by_property_conflict",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "live_id_bound"
+    },
+    "Release Gate": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "hard_fail_unbound"
+    },
+    "Automation Inbox": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "hard_fail_unbound"
+    },
+    "Opportunities": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "hard_fail_unbound"
+    },
+    "Review Findings & Learnings": {
+      "auditOutcome": "blocked_by_missing_binding",
+      "targetBindingPassed": false,
+      "targetResolutionLifecycle": "hard_fail_unbound"
+    }
+  },
+  "promotionStatus": {
+    "Execution": {
+      "currentState": "report_only",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "1fbef467f815239b9dc924ba9caca969303008b5c46660c5f2f8256ea96c6028",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:execution",
+      "currentDiffHash": null
+    },
+    "Open Decisions": {
+      "currentState": "schema_drift_blocked",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "21f374e3d0cea71844c657497d74be0c471ae399a400f6c6f7562cec0b491fdd",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:decision",
+      "currentDiffHash": null
+    },
+    "Build Briefs": {
+      "currentState": "schema_drift_blocked",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "26469586b8f1a2de587c5fcab6c52d61f653f8ed191256604268af703be8ef87",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:brief",
+      "currentDiffHash": null
+    },
+    "Release Gate": {
+      "currentState": "report_only",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "c9e88925a0d214f1380265e64c091d3279d494f225321e07f4a224c22dbbc4bf",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:gate",
+      "currentDiffHash": null
+    },
+    "Automation Inbox": {
+      "currentState": "report_only",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "e22006850d436482156d47686fdf20dbf0ab97b9dbb4653b1addb7d970bc7a92",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:inbox",
+      "currentDiffHash": null
+    },
+    "Opportunities": {
+      "currentState": "report_only",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "d17743882ca9416fcb025fa6de8682bd61bbac9fceff3c4064106851c791ed01",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:opportunity",
+      "currentDiffHash": null
+    },
+    "Review Findings & Learnings": {
+      "currentState": "report_only",
+      "matchedApprovalIds": [],
+      "promotionBindingStatus": "not_required",
+      "approvalStatus": "not_required",
+      "currentContractHash": "747c7d41a8280b8af769baafbf5529de8ba2b2bfc6c5aad0952b981e025ab061",
+      "currentContractVersion": "2026-04-23-control-tower-v2.1:learning",
+      "currentDiffHash": null
+    }
+  },
+  "dryRunDiffStatus": {
+    "Execution": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Open Decisions": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Build Briefs": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Release Gate": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Automation Inbox": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Opportunities": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    },
+    "Review Findings & Learnings": {
+      "status": "missing",
+      "currentDiffHash": null,
+      "currentPacketKeys": [],
+      "conflictKeys": [],
+      "evidenceSource": "none",
+      "invalidPacketCount": 0,
+      "reasons": [
+        "blocked_by_missing_dry_run_diff"
+      ]
+    }
+  },
+  "invalidDryRunPackets": [],
+  "eligibility": {
+    "synthesis": {
+      "status": "blocked",
+      "reasons": [
+        "blocked_by_freshness:ah-next-best-action-distiller,ah-open-decisions-curator,ah-release-gate-sync,ah-review-learning-distiller"
+      ],
+      "automationIds": [
+        "ah-next-best-action-distiller",
+        "ah-open-decisions-curator",
+        "ah-release-gate-sync",
+        "ah-review-learning-distiller"
+      ]
+    },
+    "directorDryRun": {
+      "status": "blocked",
+      "reasons": [
+        "blocked_by_freshness:ah-design-drift-vs-contract,ah-execution-brief-sync,ah-open-decisions-curator,ah-product-os-radar,ah-release-gate-sync,ah-review-learning-distiller,ah-truth-freshness-watch"
+      ]
+    },
+    "directorLiveWrite": {
+      "status": "blocked",
+      "reasons": [
+        "blocked_by_freshness:ah-design-drift-vs-contract,ah-execution-brief-sync,ah-open-decisions-curator,ah-product-os-radar,ah-release-gate-sync,ah-review-learning-distiller,ah-truth-freshness-watch",
+        "blocked_by_writeback_promotion"
+      ],
+      "enabledSurfaces": []
+    },
+    "executor": {
+      "status": "blocked",
+      "reasons": [
+        "blocked_by_freshness:ah-design-drift-vs-contract,ah-execution-brief-sync,ah-open-decisions-curator,ah-product-os-radar,ah-release-gate-sync,ah-review-learning-distiller,ah-truth-freshness-watch",
+        "blocked_by_freshness:ah-notion-sync-director",
+        "blocked_by_no_ready_packet",
+        "blocked_by_writeback_promotion"
+      ],
+      "blockingDedupeKeys": [],
+      "subGates": {
+        "freshness": "blocked",
+        "writebackPromotion": "blocked",
+        "readyPacketObserved": "blocked",
+        "eligiblePacketPresent": "blocked",
+        "executorLane": "passed"
+      },
+      "eligiblePackets": [],
+      "blockedPackets": []
+    }
+  },
+  "projectionHash": "c50035118ef6acb9adb59cd912196f8dd3700d816dd080b12edcc0f0d43ddc15"
+}

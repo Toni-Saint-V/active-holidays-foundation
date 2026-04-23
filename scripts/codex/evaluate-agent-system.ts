@@ -256,6 +256,19 @@ function readYamlValue(text: string, key: string): string | null {
   return match?.[1] ?? null;
 }
 
+async function collectMissingFixtureFiles(
+  repoRoot: string,
+  fixture: AgentSystemFixture
+): Promise<string[]> {
+  const missing: string[] = [];
+  for (const relativePath of fixture.files) {
+    if (!(await exists(path.join(repoRoot, relativePath)))) {
+      missing.push(relativePath);
+    }
+  }
+  return missing;
+}
+
 export async function loadAgentMetadata(repoRoot: string): Promise<Map<string, AgentMetadata>> {
   const skillsRoot = path.join(repoRoot, ".codex", "skills");
   const metadata = new Map<string, AgentMetadata>();
@@ -447,6 +460,12 @@ export async function runAgentSystemEvaluation(
   ) as Record<ModeId, RecommendedAgent[]>;
 
   for (const fixture of AGENT_SYSTEM_FIXTURES) {
+    const missingFixtureFiles = await collectMissingFixtureFiles(repoRoot, fixture);
+    if (missingFixtureFiles.length > 0 && !fixture.syntheticFilesAllowed) {
+      const message = `fixture ${fixture.id}: missing repo files ${missingFixtureFiles.join(", ")}`;
+      failures.push(message);
+    }
+
     const packet = resolveStartPacket(fixture);
     const notes: string[] = [];
     const fixtureWarnings: string[] = [];

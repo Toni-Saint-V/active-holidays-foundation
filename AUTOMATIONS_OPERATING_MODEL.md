@@ -204,12 +204,20 @@ Rule:
 
 ### Repo-Owned Schema Contract
 
-Until the repo stores live Notion ids, the primary mapping rule is the exact operational surface name. Notion AI and automation actors must not silently rename, split, or merge these surfaces.
+Repo-owned Notion targeting is machine-first:
 
-If the live workspace already contains an equivalent surface under a different name:
+- canonical anchors live in `.codex/automations/notion-surface-lock.json` as page bindings
+- operational databases live in the same lock file as `targetId` / `dataSourceId` bindings
+- title or name may be used only for read-only discovery before lock
+- once an operational surface has a locked `targetId` or `dataSourceId`, all write or update resolution must use the locked id plus `syncKey`
+- after lock, `recordTitle` is display-only and never participates in target resolution
+- any write or update attempt through title or name after lock must fail as `blocked_by_target_binding`
+- this rule now applies to every operational DB surface, not only `Execution`
 
-- do not rename or merge it automatically
-- create a `Decision Required` or blocked sync packet
+If the live workspace already contains an equivalent surface under a different name or schema:
+
+- do not rename, merge, or repoint it automatically
+- emit `Decision Required`, `blocked_by_surface_drift`, or `blocked_by_target_binding`
 - keep the repo contract unchanged until a human approves the migration
 
 Required operational surfaces and properties:
@@ -238,25 +246,64 @@ Disallowed without explicit human approval:
 
 ### Deterministic Write Contract
 
+Runtime state layers:
+
+- tracked deterministic state:
+  - `.codex/automations/notion-surface-lock.json`
+  - `.codex/automations/check-waivers.json`
+  - `reports/automations/state/runtime-maturity.json`
+  - `reports/automations/state/notion-writeback-promotion.json`
+  - `reports/automations/state/open-decisions-legacy-bridge.json`
+  - `reports/automations/state/manual-approvals.json`
+  - `reports/automations/state/gate-eligibility-snapshot.json`
+- volatile runtime-observed state:
+  - `reports/automations/state/runtime-observed/*.json`
+  - `reports/automations/state/execution-runs/*.json`
+- synthesis, director, and executor eligibility must read only the deterministic projection in `reports/automations/state/gate-eligibility-snapshot.json`
+- volatile runtime-observed state may inform the projection but must never authorize writeback or executor actions directly
+- projection inputs must be content-owned: reports use frontmatter or dated filenames for timestamps, observed JSON uses explicit `observedAt` / `lastVerifiedAt`, and filesystem `mtime` is never an eligibility input
+- `reports/automations/state/notion-writeback-promotion.json` may not move to `writeback_enabled` unless the current lock, contract, diff, and manual approval still match
+- `reports/automations/state/manual-approvals.json` stays addressable and fail-closed by exact tuple:
+  - `surface`
+  - `targetId`
+  - `dataSourceId`
+  - `contractHash` or `contractVersion`
+  - `diffHash`
+  - `approvedAt`
+  - `approvedBy`
+  - `expiresAt`
+
 Default mode:
 
-- all Notion-facing automation stays `report-first` until the live workspace is manually confirmed against the schema contract above
+- all Notion-facing automation stays `report-first`
+- live writeback stays disabled until the deterministic projection shows matching audit, target binding, promotion, approval, freshness, and dry-run diff state
 
 Notion-facing packet envelope:
 
 - any report that is meant for future Notion sync must carry:
+  - `identity = syncKey`
   - `recordTitle`
   - `syncKey`
   - `notionSurface`
   - `writeMode`
   - `sourceReportId`
+  - `packetKey`
   - `source`
   - `confidence`
   - `lastVerifiedAt`
   - `actionNeeded`
+  - `packetLifecycle`
+  - `diffHash`
+  - `dedupeKey`
+  - `supersedesPacketKey`
+  - `supersededByPacketKey`
+  - `supersessionReason`
 - target-specific lifecycle fields:
   - `Open Decisions`: `decisionStatus`, `whyNow`, `urgency`, `owner`
   - `Automation Inbox`: `status`
+- `recordTitle` is display-only; operational identity is `syncKey`
+- supersession is resolved by `surface + syncKey`; conflicting current packets for the same `syncKey` block writeback/executor as `blocked_by_multiple_current_packets_for_sync_key`
+- `dedupeKey` is deterministic: `executor:<surface>:<syncKey>`
 - if a producer cannot emit this envelope, the packet is not eligible for live write-back and must stay report-only
 
 Deterministic `syncKey` formats:
@@ -289,6 +336,10 @@ Blocked conditions:
 
 - schema mismatch between repo contract and live Notion
 - missing required property or ambiguous surface mapping
+- missing or mismatched locked `targetId` / `dataSourceId`
+- manual approval that does not match current surface, target binding, contract hash/version, and diff hash
+- any promotion state that no longer matches the current lock / contract / diff projection
+- title-based or name-based write intent after lock
 - no safe target block on a canonical page
 - no deterministic `syncKey` can be derived from the source packet
 
@@ -299,9 +350,9 @@ Blocked conditions:
 - priority: `critical`
 - business goal: capture real repo-vs-Notion-vs-report contradictions as clean decision records.
 - trigger / schedule: Mon/Wed/Fri `10:00` Europe/Moscow.
-- inputs: latest automation reports, execution drift, release blockers, canonical docs.
-- tools / integrations: local reports, optional Notion read.
-- exact behavior: outputs at most three decisions with recommendation, urgency, target Notion surface, deterministic `syncKey`, and `UPSERT_RECORD_BY_SYNC_KEY` write intent.
+- inputs: latest automation reports, execution drift, release blockers, canonical docs, `reports/automations/state/gate-eligibility-snapshot.json`.
+- tools / integrations: local reports, read-only `.codex/automations/notion-surface-lock.json`.
+- exact behavior: outputs at most three decisions with recommendation, urgency, deterministic `syncKey`, explicit `packetLifecycle`, and blocked target state when the live lock or schema is not eligible.
 - artifacts produced: `reports/automations/runs/ah-open-decisions-curator/latest.md`.
 - success criteria: blocking ambiguity becomes explicit and actionable instead of living in chat history.
 
@@ -310,9 +361,9 @@ Blocked conditions:
 - priority: `critical`
 - business goal: keep release truth evidence-backed and visible inside the project operating layer.
 - trigger / schedule: Mon-Fri `13:30` Europe/Moscow.
-- inputs: build/typecheck/test/review/automation signals.
-- tools / integrations: local repo checks, optional Notion write target.
-- exact behavior: produces a gate snapshot split into `green`, `blocking`, and `manual verify needed`, plus deterministic `Release Gate` packets with `syncKey`, `notionSurface`, `writeMode`, and evidence fields when the report is safe for downstream sync.
+- inputs: build/typecheck/test/review/automation signals plus `reports/automations/state/gate-eligibility-snapshot.json`.
+- tools / integrations: local repo checks, read-only `.codex/automations/notion-surface-lock.json`.
+- exact behavior: produces a gate snapshot split into `green`, `blocking`, and `manual verify needed`, plus deterministic `Release Gate` packets with `syncKey`, `notionSurface`, `writeMode`, `packetLifecycle`, and evidence fields without reading volatile eligibility directly.
 - artifacts produced: `reports/automations/runs/ah-release-gate-sync/latest.md`.
 - success criteria: the project can answer “what is actually ready?” without guesswork.
 
@@ -321,8 +372,8 @@ Blocked conditions:
 - priority: `high`
 - business goal: convert repeated findings into system improvements instead of isolated fixes.
 - trigger / schedule: Tue/Fri `16:00` Europe/Moscow.
-- inputs: review findings, automation reports, release-gate friction.
-- tools / integrations: local reports, optional Notion `Review Findings & Learnings`.
+- inputs: review findings, automation reports, release-gate friction, `reports/automations/state/gate-eligibility-snapshot.json`.
+- tools / integrations: local reports, read-only `.codex/automations/notion-surface-lock.json`.
 - exact behavior: identifies recurring patterns and routes them to rules, checklists, skills, or tests, while emitting deterministic learning packets or explicit reroutes to `Open Decisions` when the pattern is really a pending decision.
 - artifacts produced: `reports/automations/runs/ah-review-learning-distiller/latest.md`.
 - success criteria: repeated bugs and review comments start shrinking over time.
@@ -332,9 +383,9 @@ Blocked conditions:
 - priority: `critical`
 - business goal: safely update Notion operational truth from evidence packets without damaging canonical docs.
 - trigger / schedule: Mon-Fri `19:00` Europe/Moscow.
-- inputs: latest reports across decisions, release truth, briefs, drift, opportunities, and learnings.
+- inputs: latest reports across decisions, release truth, briefs, drift, opportunities, and learnings plus `.codex/automations/notion-surface-lock.json`, `reports/automations/state/notion-writeback-promotion.json`, `reports/automations/state/manual-approvals.json`, and `reports/automations/state/gate-eligibility-snapshot.json`.
 - tools / integrations: Notion write path when available.
-- exact behavior: stays report-first by default, validates the live workspace against the repo-owned schema contract, then updates operational surfaces only through deterministic packet envelopes with `recordTitle`, `syncKey`, `notionSurface`, `writeMode`, `sourceReportId`, `source`, `confidence`, `lastVerifiedAt`, and `actionNeeded`, and creates keyed notes for canonical pages when needed.
+- exact behavior: stays report-first by default, runs `dry_run` unless the deterministic gate projection says live write is eligible, and updates operational surfaces only through locked ids + `syncKey`, never by title or name.
 - artifacts produced: `reports/automations/runs/ah-notion-sync-director/latest.md`.
 - success criteria: Notion stays current while every write remains attributable and reversible.
 
@@ -343,7 +394,7 @@ Blocked conditions:
 - external writes remain disabled by default for all automations except the explicitly enabled director pattern
 - if Notion is unavailable, the automation must emit a blocked packet instead of pretending the sync succeeded
 - no other automation should write directly to canonical pages
-- even `ah-notion-sync-director` must stay `report-first` until the schema contract is checked manually against the live workspace
+- even `ah-notion-sync-director` must stay `report-first` and `dry_run` until audit, promotion, diff, and approval all match in `reports/automations/state/gate-eligibility-snapshot.json`
 
 ### Activation Order
 
@@ -361,5 +412,5 @@ Then enable:
 1. `ah-open-decisions-curator`
 2. `ah-release-gate-sync`
 3. `ah-review-learning-distiller`
-4. `ah-notion-sync-director` in `report-first` mode
-5. live write-back only after schema-contract confirmation
+4. `ah-notion-sync-director` in `dry_run`
+5. live write-back only after audit confirmation, deterministic diff, matching manual approval, and `writeback_enabled`

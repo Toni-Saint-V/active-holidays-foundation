@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-23T00:00:00+03:00",
+  "rows": [
+    {
+      "legacyRowId": "D1",
+      "syncKey": "decision:legacy-open-decisions:d1",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D2",
+      "syncKey": "decision:legacy-open-decisions:d2",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D3",
+      "syncKey": "decision:legacy-open-decisions:d3",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D4",
+      "syncKey": "decision:legacy-open-decisions:d4",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D5",
+      "syncKey": "decision:legacy-open-decisions:d5",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D6",
+      "syncKey": "decision:legacy-open-decisions:d6",
+      "futureDatabaseTargetStatus": "pending_database_cutover"
+    },
+    {
+      "legacyRowId": "D7",
+      "syncKey": "decision:legacy-open-decisions:d7",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D8",
+      "syncKey": "decision:legacy-open-decisions:d8",
+      "futureDatabaseTargetStatus": "pending_database_cutover"
+    },
+    {
+      "legacyRowId": "D9",
+      "syncKey": "decision:legacy-open-decisions:d9",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D10",
+      "syncKey": "decision:legacy-open-decisions:d10",
+      "futureDatabaseTargetStatus": "pending_database_cutover"
+    },
+    {
+      "legacyRowId": "D11",
+      "syncKey": "decision:legacy-open-decisions:d11",
+      "futureDatabaseTargetStatus": "pending_database_cutover"
+    },
+    {
+      "legacyRowId": "D12",
+      "syncKey": "decision:legacy-open-decisions:d12",
+      "futureDatabaseTargetStatus": "pending_database_cutover"
+    },
+    {
+      "legacyRowId": "D13",
+      "syncKey": "decision:legacy-open-decisions:d13",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D14",
+      "syncKey": "decision:legacy-open-decisions:d14",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    },
+    {
+      "legacyRowId": "D15",
+      "syncKey": "decision:legacy-open-decisions:d15",
+      "futureDatabaseTargetStatus": "legacy_title_read_only"
+    }
+  ]
+}
