@@ -20,3 +20,5 @@ output/server-state
 automation/yepcode/**/runs
 automation/yepcode/**/.env
 automation/yepcode/**/.env.*
+.superpowers/
+reports/autonomous/

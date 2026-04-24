@@ -30,7 +30,10 @@
     "automations:check:context": "node --experimental-strip-types scripts/automations/check-context-surface.ts",
     "automations:check:all": "npm run automations:verify && npm run automations:verify:negative && npm run automations:check:truth && npm run automations:check:screens && npm run automations:check:flow && npm run automations:check:skills && npm run automations:check:context",
     "yepcode:orchestrator:dry-run": "node automation/yepcode/active-holidays-orchestrator/workflows/index.cjs --input automation/yepcode/active-holidays-orchestrator/examples/example-inputs.json --case feature-idea",
-    "yepcode:orchestrator:test": "node automation/yepcode/active-holidays-orchestrator/tests/orchestrator.check.cjs"
+    "yepcode:orchestrator:test": "node automation/yepcode/active-holidays-orchestrator/tests/orchestrator.check.cjs",
+    "autonomous:next": "tsx scripts/autonomous/next-best-task-loop.ts",
+    "autonomous:next:write": "tsx scripts/autonomous/next-best-task-loop.ts --write",
+    "autonomous:verify": "tsx scripts/autonomous/verify-autonomous-os.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
