@@ -33,6 +33,37 @@ export type Scores = {
   effort: number;
 };
 
+export type ImpactScoreKey =
+  | "trust"
+  | "conversion"
+  | "polish"
+  | "engineeringHealth"
+  | "strategicFit";
+export type CostScoreKey = "risk" | "effort";
+export type TieBreakerField =
+  | "balancedScore"
+  | "impact"
+  | "cost"
+  | "scores.strategicFit"
+  | "scores.engineeringHealth"
+  | "id";
+export type TieBreakerDirection = "asc" | "desc";
+
+export type ScoringModel = {
+  schemaVersion: 1;
+  impactWeights: Record<ImpactScoreKey, number>;
+  costWeights: Record<CostScoreKey, number>;
+  tieBreakers: Array<{
+    field: TieBreakerField;
+    direction: TieBreakerDirection;
+  }>;
+};
+
+export type ScoringModelSummary = {
+  schemaVersion: 1;
+  tieBreakers: string[];
+};
+
 export type Candidate = {
   id: string;
   title: string;
@@ -69,6 +100,7 @@ export type NextTaskResult = {
   blockedCandidates: ScoredCandidate[];
   gitStatus: string[];
   trackedGitStatus: string[];
+  scoringModel: ScoringModelSummary;
   founderReport: string;
 };
 
@@ -108,6 +140,7 @@ export type ExecutionPacket = {
 
 export const repoRoot = process.cwd();
 export const candidatesPath = path.join(repoRoot, ".autonomous", "task-candidates.json");
+export const scoringModelPath = path.join(repoRoot, ".autonomous", "scoring-model.json");
 export const outputDir = path.join(repoRoot, "reports", "autonomous");
 
 const planningBlockedApprovalGates = new Set<ApprovalGate>([
@@ -125,16 +158,6 @@ const executorBlockedApprovalGates = new Set<ApprovalGate>([
   "ui_design_approval"
 ]);
 const knownApprovalGates = new Set<string>(approvalGates);
-
-const weights = {
-  trust: 0.26,
-  conversion: 0.2,
-  polish: 0.18,
-  engineeringHealth: 0.22,
-  strategicFit: 0.14,
-  risk: 0.18,
-  effort: 0.12
-} as const;
 
 export const defaultVerificationCommands = [
   "npm run autonomous:verify",
@@ -156,6 +179,101 @@ function read(filePath: string): string {
 
 export function readJson<T>(filePath: string): T {
   return JSON.parse(read(filePath)) as T;
+}
+
+const impactScoreKeys = [
+  "trust",
+  "conversion",
+  "polish",
+  "engineeringHealth",
+  "strategicFit"
+] as const satisfies readonly ImpactScoreKey[];
+const costScoreKeys = ["risk", "effort"] as const satisfies readonly CostScoreKey[];
+const tieBreakerFields = new Set<TieBreakerField>([
+  "balancedScore",
+  "impact",
+  "cost",
+  "scores.strategicFit",
+  "scores.engineeringHealth",
+  "id"
+]);
+const tieBreakerDirections = new Set<TieBreakerDirection>(["asc", "desc"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertWeight(
+  modelPart: Record<string, unknown>,
+  weightName: ImpactScoreKey | CostScoreKey,
+  groupName: "impactWeights" | "costWeights"
+): number {
+  const value = modelPart[weightName];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid scoring model: ${groupName}.${weightName} must be a finite non-negative number.`);
+  }
+  return value;
+}
+
+export function readScoringModel(currentRepoRoot = repoRoot): ScoringModel {
+  const raw = readJson<unknown>(path.join(currentRepoRoot, ".autonomous", "scoring-model.json"));
+  if (!isRecord(raw)) {
+    throw new Error("Invalid scoring model: root must be an object.");
+  }
+  if (raw.schemaVersion !== 1) {
+    throw new Error("Invalid scoring model: schemaVersion must be 1.");
+  }
+  if (!isRecord(raw.impactWeights)) {
+    throw new Error("Invalid scoring model: impactWeights must be an object.");
+  }
+  if (!isRecord(raw.costWeights)) {
+    throw new Error("Invalid scoring model: costWeights must be an object.");
+  }
+  const impactWeights = Object.fromEntries(
+    impactScoreKeys.map((key) => [
+      key,
+      assertWeight(raw.impactWeights as Record<string, unknown>, key, "impactWeights")
+    ])
+  ) as Record<ImpactScoreKey, number>;
+  const costWeights = Object.fromEntries(
+    costScoreKeys.map((key) => [
+      key,
+      assertWeight(raw.costWeights as Record<string, unknown>, key, "costWeights")
+    ])
+  ) as Record<CostScoreKey, number>;
+
+  if (!Array.isArray(raw.tieBreakers) || raw.tieBreakers.length === 0) {
+    throw new Error("Invalid scoring model: tieBreakers must be a non-empty array.");
+  }
+  const tieBreakers = raw.tieBreakers.map((entry) => {
+    if (!isRecord(entry)) {
+      throw new Error("Invalid scoring model: each tieBreaker must be an object.");
+    }
+    if (!tieBreakerFields.has(entry.field as TieBreakerField)) {
+      throw new Error("Invalid scoring model: tieBreaker field is not supported.");
+    }
+    if (!tieBreakerDirections.has(entry.direction as TieBreakerDirection)) {
+      throw new Error("Invalid scoring model: tieBreaker direction must be asc or desc.");
+    }
+    return {
+      field: entry.field as TieBreakerField,
+      direction: entry.direction as TieBreakerDirection
+    };
+  });
+
+  return {
+    schemaVersion: 1,
+    impactWeights,
+    costWeights,
+    tieBreakers
+  };
+}
+
+function summarizeScoringModel(model: ScoringModel): ScoringModelSummary {
+  return {
+    schemaVersion: model.schemaVersion,
+    tieBreakers: model.tieBreakers.map((tieBreaker) => `${tieBreaker.field}:${tieBreaker.direction}`)
+  };
 }
 
 export function getGitStatus(options?: { repoRoot?: string; trackedOnly?: boolean }): string[] {
@@ -209,10 +327,11 @@ function getBlockedApprovalGates(mode: NextTaskMode): Set<ApprovalGate> {
 
 export function scoreCandidate(
   candidate: Candidate,
-  options?: { currentRepoRoot?: string; mode?: NextTaskMode }
+  options?: { currentRepoRoot?: string; mode?: NextTaskMode; scoringModel?: ScoringModel }
 ): ScoredCandidate {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const mode = options?.mode ?? "planning";
+  const scoringModel = options?.scoringModel ?? readScoringModel(currentRepoRoot);
   const scores = {
     trust: clampScore(candidate.scores.trust),
     conversion: clampScore(candidate.scores.conversion),
@@ -224,12 +343,13 @@ export function scoreCandidate(
   };
 
   const impact =
-    scores.trust * weights.trust +
-    scores.conversion * weights.conversion +
-    scores.polish * weights.polish +
-    scores.engineeringHealth * weights.engineeringHealth +
-    scores.strategicFit * weights.strategicFit;
-  const cost = scores.risk * weights.risk + scores.effort * weights.effort;
+    scores.trust * scoringModel.impactWeights.trust +
+    scores.conversion * scoringModel.impactWeights.conversion +
+    scores.polish * scoringModel.impactWeights.polish +
+    scores.engineeringHealth * scoringModel.impactWeights.engineeringHealth +
+    scores.strategicFit * scoringModel.impactWeights.strategicFit;
+  const cost =
+    scores.risk * scoringModel.costWeights.risk + scores.effort * scoringModel.costWeights.effort;
   const balancedScore = Math.round((impact - cost) * 10) / 10;
   const unknownApprovalGates = candidate.requiresApproval.filter(
     (gate) => !knownApprovalGates.has(gate)
@@ -252,6 +372,43 @@ export function scoreCandidate(
     missingEvidence,
     eligible: blockedGates.length === 0 && missingEvidence.length === 0
   };
+}
+
+function getTieBreakerValue(candidate: ScoredCandidate, field: TieBreakerField): number | string {
+  switch (field) {
+    case "balancedScore":
+      return candidate.balancedScore;
+    case "impact":
+      return candidate.impact;
+    case "cost":
+      return candidate.cost;
+    case "scores.strategicFit":
+      return candidate.scores.strategicFit;
+    case "scores.engineeringHealth":
+      return candidate.scores.engineeringHealth;
+    case "id":
+      return candidate.id;
+  }
+}
+
+function compareScoredCandidates(
+  left: ScoredCandidate,
+  right: ScoredCandidate,
+  scoringModel: ScoringModel
+): number {
+  for (const tieBreaker of scoringModel.tieBreakers) {
+    const leftValue = getTieBreakerValue(left, tieBreaker.field);
+    const rightValue = getTieBreakerValue(right, tieBreaker.field);
+    if (leftValue === rightValue) continue;
+
+    const comparison =
+      typeof leftValue === "string" && typeof rightValue === "string"
+        ? leftValue.localeCompare(rightValue)
+        : Number(leftValue) - Number(rightValue);
+    return tieBreaker.direction === "asc" ? comparison : -comparison;
+  }
+
+  return 0;
 }
 
 export function buildFounderReport(
@@ -340,13 +497,14 @@ export function selectNextTask(options?: {
 }): NextTaskResult {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const mode = options?.mode ?? "planning";
+  const scoringModel = readScoringModel(currentRepoRoot);
   const candidateFile = readJson<CandidateFile>(path.join(currentRepoRoot, ".autonomous", "task-candidates.json"));
   const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
   const trackedGitStatus =
     options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
   const scored = candidateFile.candidates
-    .map((candidate) => scoreCandidate(candidate, { currentRepoRoot, mode }))
-    .sort((left, right) => right.balancedScore - left.balancedScore);
+    .map((candidate) => scoreCandidate(candidate, { currentRepoRoot, mode, scoringModel }))
+    .sort((left, right) => compareScoredCandidates(left, right, scoringModel));
   const eligible = scored.filter((candidate) => candidate.eligible);
   const selected = eligible[0] ?? null;
   const founderReport = buildFounderReport(selected, gitStatus, mode);
@@ -360,6 +518,7 @@ export function selectNextTask(options?: {
     blockedCandidates: scored.filter((candidate) => !candidate.eligible),
     gitStatus,
     trackedGitStatus,
+    scoringModel: summarizeScoringModel(scoringModel),
     founderReport
   };
 }

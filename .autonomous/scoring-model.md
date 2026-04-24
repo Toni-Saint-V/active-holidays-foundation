@@ -1,5 +1,11 @@
 # Autonomous Scoring Model
 
+## Source Of Truth
+
+`.autonomous/scoring-model.json` is the machine-readable scoring contract used by the runtime.
+This document explains the model for humans; do not change weights or tie-breakers here without
+updating the JSON contract and tests in the same branch.
+
 ## Balanced Score
 
 Each candidate receives 0-10 points for impact and cost dimensions.
@@ -18,6 +24,19 @@ cost =
 
 balanced_score = round((impact - cost) * 10) / 10
 ```
+
+## Deterministic Tie-Breakers
+
+When candidates have the same balanced score, the runtime sorts by the JSON tie-breakers in order:
+
+1. `balancedScore` descending
+2. `impact` descending
+3. `cost` ascending
+4. `scores.strategicFit` descending
+5. `scores.engineeringHealth` descending
+6. `id` ascending
+
+This avoids accidental dependence on candidate file order.
 
 ## Dimensions
 
