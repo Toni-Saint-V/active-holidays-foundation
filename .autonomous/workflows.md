@@ -48,4 +48,13 @@ Produces a concise report with product impact, technical impact, verification, r
 
 ## Workflow Boundary
 
-The first implementation focuses on workflows 1, 2, 4, 5, 9, and 10. Workflows 3, 6, 7, and 8 require additional executor permissions and are activated only after the selection layer proves stable.
+The current implementation fully supports workflows 1, 2, 4, 5, 9, and 10.
+
+Workflow 3 now exists in Stage A form:
+
+- select only executor-safe candidates
+- fail closed on dirty tracked state
+- create a local `codex/*` branch only in explicit write mode
+- keep external writes disabled
+
+Workflows 6, 7, and 8 still require additional executor permissions and are activated only after the Stage A branch-preparation layer proves stable.

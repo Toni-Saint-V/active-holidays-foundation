@@ -57,6 +57,23 @@ PRs must include:
 - verification
 - risk and rollback
 
+## Local Executor Stage
+
+Stage A local executor may proceed only when:
+
+- the selected task is executor-safe
+- tracked git state is clean
+- the run starts from `main`
+- the target branch does not already exist
+- external writes remain disabled
+
+Branch policy:
+
+- branch name format: `codex/autonomous-<candidate-id>`
+- push is not automatic
+- PR publish is not automatic
+- merge into `main` remains founder-approved only
+
 ## CodeRabbit Gate
 
 Run CodeRabbit review when available. If unavailable because of auth, rate limit, or network failure:

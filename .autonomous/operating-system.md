@@ -30,7 +30,7 @@ flowchart TD
   I --> K["Notion/GitHub sync plan"]
 ```
 
-## Components
+## Target Components
 
 ### Runtime Scanner
 
@@ -103,14 +103,21 @@ Every run ends with:
 
 ## Current Minimal Working Version
 
-This branch implements the repo-owned control layer:
+This branch implements the repo-owned Stage A control layer:
 
 - `.autonomous/*` operating docs
 - deterministic scoring candidates
+- `scripts/autonomous/runtime.ts`
 - `scripts/autonomous/next-best-task-loop.ts`
+- `scripts/autonomous/execute-autonomous-task.ts`
 - `scripts/autonomous/verify-autonomous-os.ts`
 - `npm run autonomous:next`
+- `npm run autonomous:execute`
 - `npm run autonomous:verify`
 - GitHub Actions check workflow
 
-It does not yet run autonomous code edits by itself. That is intentional: the first durable step is a verifiable task-selection and safety layer before granting executor write authority.
+Stage A now supports executor-safe task selection, dry-run execution packets, local `codex/*` branch preparation, and baseline verification without enabling live external writes.
+
+The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, validates evidence and approval gates, scores candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
+
+It still does not autonomously edit product code, push branches, open PRs, merge into `main`, or perform live Notion/GitHub writeback by itself. Those remain explicitly gated.

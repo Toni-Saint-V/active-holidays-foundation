@@ -12,6 +12,18 @@ type Source = {
   volatilityScore: number;
 };
 
+type CheckWaiver = {
+  appliesTo: string;
+  affectedChecks: string[];
+  affectedAutomationIds: string[];
+  reason: string;
+  expiresAt: string;
+};
+
+type CheckWaiverState = {
+  waivers: CheckWaiver[];
+};
+
 type RecordWithSource = {
   sourceId?: string;
   sources?: Array<{ id: string }>;
@@ -27,6 +39,14 @@ async function loadJson<T>(relativePath: string): Promise<T> {
   const target = path.join(process.cwd(), relativePath);
   const raw = await readFile(target, "utf8");
   return JSON.parse(raw) as T;
+}
+
+async function loadOptionalJson<T>(relativePath: string, fallback: T): Promise<T> {
+  try {
+    return await loadJson<T>(relativePath);
+  } catch {
+    return fallback;
+  }
 }
 
 function dayAge(iso: string): number | null {
@@ -45,8 +65,26 @@ function collectSourceIds(records: RecordWithSource[]): string[] {
   return ids;
 }
 
+function hasActiveFreshnessWaiver(sourceId: string, waivers: CheckWaiver[]): boolean {
+  const now = Date.now();
+  return waivers.some((waiver) => {
+    const expiresAt = Date.parse(waiver.expiresAt);
+    return (
+      waiver.appliesTo === sourceId &&
+      waiver.affectedChecks.includes("freshness:ah-truth-freshness-watch") &&
+      waiver.affectedAutomationIds.includes("ah-truth-freshness-watch") &&
+      Number.isFinite(expiresAt) &&
+      expiresAt > now
+    );
+  });
+}
+
 async function main() {
   const sources = await loadJson<Source[]>("data/db/sources.json");
+  const waiverState = await loadOptionalJson<CheckWaiverState>(
+    ".codex/automations/check-waivers.json",
+    { waivers: [] }
+  );
   const visaRules = await loadJson<RecordWithSource[]>("data/db/visa_rules.json");
   const restrictions = await loadJson<RecordWithSource[]>("data/db/country_restrictions.json");
   const residency = await loadJson<RecordWithSource[]>("data/db/residency_programs.json");
@@ -76,7 +114,10 @@ async function main() {
     const isReferenced = referencedSet.has(source.id);
     if (age > threshold && isReferenced) {
       const message = `${source.id} stale ${age}d > ${threshold}d (${source.tier})`;
-      if (source.tier === "crowdsourced") warnings.push(message);
+      if (source.tier === "crowdsourced" || hasActiveFreshnessWaiver(source.id, waiverState.waivers)) {
+        warnings.push(message);
+        if (source.tier !== "crowdsourced") warnings.push(`${source.id} freshness waiver active`);
+      }
       else failures.push(message);
     } else if (age > threshold && !isReferenced) {
       warnings.push(`${source.id} stale but unused ${age}d > ${threshold}d (${source.tier})`);
