@@ -49,6 +49,14 @@
 - Use `npm run automations:sync -- --dry-run` before copying repo-local automations into `$CODEX_HOME`.
 - Runtime outputs belong in `reports/automations/` and must not turn into committed noise.
 
+## Artifact Ownership Rules
+
+- Keep deterministic source-of-truth state tracked only when a repo contract explicitly lists it.
+- Keep browser captures in `output/playwright/`; use them as local proof or external review evidence, not as default committed source.
+- Keep generated PDFs and copy packs in `output/pdf/` unless a curated document is intentionally moved into docs or Notion.
+- Keep design approval packs in `reports/design/`; commit them only as a deliberate artifact pack after explicit approval.
+- Keep scratch generation work in `tmp/` and root `.playwright-cli/` local-only.
+
 ## Plugin / MCP Surface Rules
 
 - Prefer existing runtime plugins and shared skills before adding any repo-local plugin scaffold.
