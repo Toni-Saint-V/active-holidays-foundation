@@ -17,3 +17,13 @@ reports/automations/state/*
 reports/automations/state/runtime-observed/
 reports/automations/state/execution-runs/
 output/server-state
+output/playwright/
+output/pdf/
+automation/yepcode/**/runs
+automation/yepcode/**/.env
+automation/yepcode/**/.env.*
+.superpowers/
+reports/autonomous/
+reports/design/
+.playwright-cli/
+tmp/

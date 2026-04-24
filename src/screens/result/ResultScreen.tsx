@@ -1,105 +1,50 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, GitBranch, Sparkles } from "lucide-react";
-import {
-  caseOverrideSchema,
-  type ProductType
-} from "@shared/contracts";
+import { ArrowLeft, ArrowRight, MoreHorizontal } from "lucide-react";
+import type { ProductType } from "@shared/contracts";
 import { useCaseStore } from "@/state/caseStore";
-import { Badge, Button, Card } from "@/ui/primitives";
-import { ExpandableRow } from "@/ui/Accordion";
-import { ConfidenceGauge } from "@/ui/ConfidenceGauge";
-import { RiskPulse } from "@/ui/RiskPulse";
-import { OfferCard } from "@/ui/OfferCard";
-import { TemporalWhatIf } from "@/ui/TemporalWhatIf";
-import { ReplayTimeline } from "@/ui/ReplayTimeline";
-import { ForkDivider } from "@/ui/ForkDivider";
-import { SignalRow } from "@/ui/SignalRow";
 import { EmptyState } from "@/ui/EmptyState";
-import { verdictTone } from "@/theme/tokens";
-import { cinematic, staggerChild, staggerParent } from "@/animations/variants";
+import { BottomSheet } from "@/ui/BottomSheet";
+import { useToast } from "@/ui/Toast";
+import { defaultCaseByProduct, findScenarioCaseId } from "@/lib/caseDefaults";
 import { useScreenView } from "@/instrumentation/screenView";
 import { track } from "@/instrumentation/events";
-import { useToast } from "@/ui/Toast";
-import { formatDate, formatPercent } from "@/lib/format";
+import { fadeRise, staggerChild, staggerParent } from "@/animations/variants";
 import {
-  defaultCaseByProduct,
-  findScenarioCaseId,
-  productTypeLabel
-} from "@/lib/caseDefaults";
-import { AiRecommendationPanel } from "./AiRecommendationPanel";
+  HeaderButton,
+  PrimaryCTA,
+  ScreenHeader,
+  SectionLabel,
+  UtilityLink
+} from "@/components/ah/ScreenCore";
+import { SemanticBridge } from "@/components/ah/SemanticBridge";
+import {
+  AIInsightChip,
+  DocumentRow,
+  EvidenceStrip
+} from "@/components/ah/SignalBlocks";
 import { ResultCompareSurface } from "./ResultCompareSurface";
+import { AiRecommendationPanel } from "./AiRecommendationPanel";
+import { buildResultScreenModel } from "@/presentation/activeHolidays";
 
 type ResultScreenProps = {
   productType?: ProductType;
   screenName?: string;
 };
 
-const whatIfConfigByProduct: Record<
-  ProductType,
-  {
-    label: string;
-    signalId: "timeline_weeks" | "trip_duration_days" | "slot_available_weeks";
-    unit: (value: number) => string;
-    min: number;
-    max: number;
-    reason: (value: number) => string;
-  }
-> = {
-  travel: {
-    label: "Сдвинуть горизонт поездки",
-    signalId: "timeline_weeks",
-    unit: (value: number) => `${value} нед.`,
-    min: -12,
-    max: 12,
-    reason: (weeks: number) =>
-      `Сценарий «а что, если…»: горизонт изменён на ${weeks} недель.`
-  },
-  insurance_adult: {
-    label: "Сдвинуть длительность поездки",
-    signalId: "trip_duration_days",
-    unit: (value: number) => `${value} дн.`,
-    min: -14,
-    max: 21,
-    reason: (days: number) =>
-      `Сценарий «а что, если…»: длительность изменена на ${days} дней.`
-  },
-  residency_es: {
-    label: "Сдвинуть срок подачи",
-    signalId: "slot_available_weeks",
-    unit: (value: number) => `${value} нед.`,
-    min: -8,
-    max: 16,
-    reason: (weeks: number) =>
-      `Сценарий «а что, если…»: ближайшее окно подачи ${weeks} недель.`
-  }
-};
-
-const confidenceCapLabels: Record<string, string> = {
-  active_blocker: "активный блокер",
-  human_review_trigger: "нужна ручная проверка",
-  missing_mandatory_signal: "не хватает обязательных данных",
-  rule_conflict: "есть конфликт правил"
-};
-
-const bulletToneLabels: Record<string, string> = {
-  positive: "усиливает шанс",
-  warning: "нужна доработка",
-  negative: "мешает пройти",
-  review: "нужен человек",
-  neutral: "нейтрально"
-};
-
-function whatIfConfigFor(productType: ProductType) {
-  return whatIfConfigByProduct[productType];
-}
+type SheetMode = "basis" | "compare" | "tools" | "ai" | null;
 
 export function ResultScreen({ productType, screenName = "result" }: ResultScreenProps = {}) {
   useScreenView(screenName);
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const [sheet, setSheet] = useState<SheetMode>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [activeBridgeNode, setActiveBridgeNode] = useState<"docs" | "step" | "review">("docs");
+
   const caseIdFromUrl = searchParams.get("case");
   const {
     activeCase,
@@ -113,7 +58,6 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     loadAudit,
     recompute,
     fork,
-    overrideSignal,
     scenarioLabError,
     scenarioLabStatus,
     status,
@@ -125,11 +69,10 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
   }, [bootstrap, scenarios.length]);
 
   const defaultCaseId = useMemo(() => {
-    if (!productType) {
-      return scenarios[0]?.caseId ?? defaultCaseByProduct.travel;
-    }
+    if (!productType) return scenarios[0]?.caseId ?? defaultCaseByProduct.travel;
     return findScenarioCaseId(scenarios, productType);
   }, [productType, scenarios]);
+
   const requestedCaseId = useMemo(() => {
     if (!caseIdFromUrl) return null;
     if (!productType) return caseIdFromUrl;
@@ -147,407 +90,325 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
     if (target && target !== activeCaseId) {
       void loadCase(target);
     }
-  }, [requestedCaseId, activeCaseId, activeCaseMatchesProduct, defaultCaseId, loadCase]);
+  }, [requestedCaseId, activeCaseMatchesProduct, activeCaseId, defaultCaseId, loadCase]);
 
-  const primaryOffer = activeResult?.primaryPath ?? null;
-  const verdict = activeResult?.verdict ?? null;
-  const tone = verdict ? verdictTone[verdict] : null;
-  const isHumanReview = verdict === "HUMAN_REVIEW";
-  const activeProductType: ProductType | null =
-    activeResult?.productType ?? activeCase?.productType ?? null;
-  const humanReviewTriggers =
-    activeResult?.ruleResults.filter(
-      (rule) => rule.fired && rule.output.type === "human_review_trigger"
-    ) ?? [];
+  const screenModel = useMemo(
+    () =>
+      activeResult
+        ? buildResultScreenModel({
+            result: activeResult,
+            scenarioLab: activeScenarioLab
+          })
+        : null,
+    [activeResult, activeScenarioLab]
+  );
 
-  const whatIfConfig = activeProductType ? whatIfConfigFor(activeProductType) : null;
-  const baseWhatIfValue = useMemo(() => {
-    if (!activeCase || !whatIfConfig) return 0;
-    const signal = activeCase.signals.find((item) => item.id === whatIfConfig.signalId);
-    return typeof signal?.value === "number" ? signal.value : 0;
-  }, [activeCase, whatIfConfig]);
-
-  async function handleTemporalApply(value: number) {
-    if (!activeCase || !whatIfConfig) return;
-    track({ type: "whatif_triggered", signalId: whatIfConfig.signalId });
-    try {
-      await overrideSignal(activeCase.id, {
-        signalId: caseOverrideSchema.shape.signalId.parse(whatIfConfig.signalId),
-        value,
-        reason: whatIfConfig.reason(value),
-        appliedAt: new Date().toISOString()
-      });
-      toast.push(`Пересчитали движком для ${whatIfConfig.unit(value)}.`, "success");
-    } catch (error) {
-      toast.push(
-        error instanceof Error ? error.message : "Пересчёт не удался.",
-        "error"
-      );
-    }
-  }
-
-  async function handleFork() {
-    if (!activeCase) return;
-    const forkedId = await fork(activeCase.id, `Форк кейса ${activeCase.title}`);
-    if (forkedId) {
-      toast.push("Создан форк — сравните решения рядом.", "success");
-      navigate(`/result?case=${encodeURIComponent(forkedId)}`);
-    }
-  }
-
-  function handleNextActionClick() {
-    if (!activeCase || !activeResult) return;
-    track({ type: "cta_clicked", cta: `result_primary_${activeResult.nextAction.type}` });
-    navigate(`/${activeResult.nextAction.targetScreen}?case=${encodeURIComponent(activeCase.id)}`);
-  }
+  useEffect(() => {
+    if (!screenModel) return;
+    setActiveBridgeNode(screenModel.bridge.activeNodeId);
+  }, [screenModel]);
 
   if (status === "error") {
     return (
       <EmptyState
         title="Ошибка загрузки"
-        description={errorMessage ?? "Попробуйте обновить или выбрать другой сценарий."}
+        description={errorMessage ?? "Попробуйте обновить кейс или открыть другой сценарий."}
         action={
-          <Button variant="secondary" onClick={() => loadCase(defaultCaseId)}>
+          <button
+            type="button"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface2 px-4 text-sm font-semibold text-textPrimary"
+            onClick={() => loadCase(defaultCaseId)}
+          >
             Загрузить сценарий
-          </Button>
+          </button>
         }
       />
     );
   }
 
-  if (!activeResult || !activeCase || !tone) {
+  if (!activeResult || !activeCase) {
     return (
-      <Card>
-        <p className="animate-pulse text-sm text-textSecondary">Прогоняем движок…</p>
-      </Card>
+      <div className="min-h-screen bg-base px-4 py-4">
+        <div className="mx-auto flex min-h-[calc(100dvh-32px)] max-w-[430px] items-center justify-center rounded-[32px] border border-border bg-surface">
+          <p className="text-sm text-textSecondary">Собираем результат по кейсу…</p>
+        </div>
+      </div>
     );
   }
 
+  const result = activeResult;
+  const caseData = activeCase;
+  const model = buildResultScreenModel({
+    result,
+    scenarioLab: activeScenarioLab
+  });
+
+  function handleNextActionClick() {
+    track({ type: "cta_clicked", cta: `result_primary_${result.nextAction.type}` });
+    navigate(`/${model.cta.targetScreen}?case=${encodeURIComponent(caseData.id)}`);
+  }
+
+  async function handleFork() {
+    const forkedId = await fork(caseData.id, `Форк кейса ${caseData.title}`);
+    if (forkedId) {
+      toast.push("Создан форк кейса.", "success");
+      navigate(`/result?case=${encodeURIComponent(forkedId)}`);
+      setSheet(null);
+    }
+  }
+
+  function handleBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  }
+
   return (
-    <motion.div
-      variants={staggerParent}
-      initial="initial"
-      animate="animate"
-      className="grid gap-4"
-    >
-      <motion.section variants={staggerChild}>
-        <motion.div variants={cinematic} initial="initial" animate="animate">
-          <Card className={`grid gap-4 ${tone.surface} ring-1 ${tone.ring}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge
-                  tone={
-                    verdict === "GO"
-                      ? "positive"
-                      : verdict === "NOT_NOW"
-                        ? "negative"
-                        : verdict === "HUMAN_REVIEW"
-                          ? "review"
-                          : "warning"
-                  }
-                >
-                  {tone.label}
-                </Badge>
-                <Badge tone="neutral">{productTypeLabel(activeResult.productType)}</Badge>
-                <span className="text-[11px] uppercase tracking-wide text-textMuted">
-                  Обновлено {formatDate(activeResult.computedAt)}
-                </span>
-              </div>
-              {isHumanReview ? (
-                <span className="max-w-xs text-right text-xs text-textSecondary">
-                  Маршрут, уверенность и риски подтвердит оператор после ручной проверки.
-                </span>
-              ) : (
-                <Link
-                  to={`/trust?case=${encodeURIComponent(activeCase.id)}`}
-                  className="inline-flex items-center gap-2 text-xs text-accent"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  Разобрать уверенность
-                </Link>
-              )}
-            </div>
-            <div>
-              <h2 className="text-3xl font-semibold text-textPrimary sm:text-4xl">
-                {activeCase.title}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm text-textSecondary">
-                Следующее действие: {activeResult.nextAction.label}. {activeResult.nextAction.detail}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={handleNextActionClick}>
-                {activeResult.nextAction.label}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button variant="secondary" onClick={() => void recompute(activeCase.id)}>
-                Пересчитать заново
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      </motion.section>
-
-      {!isHumanReview && (
-        <motion.section variants={staggerChild}>
-          <AiRecommendationPanel
-            caseId={activeCase.id}
-            computedAt={activeResult.computedAt}
-            preferences={activeCase.preferences}
-            onOpenScenario={(scenarioCaseId) =>
-              navigate(`/result?case=${encodeURIComponent(scenarioCaseId)}`)
-            }
-          />
-        </motion.section>
-      )}
-
-      {isHumanReview ? (
-        <motion.section variants={staggerChild}>
-          <Card className="grid gap-3">
-            <p className="text-sm font-medium text-textPrimary">Ручная проверка в работе</p>
-            <p className="text-sm text-textSecondary">
-              Автомат остановился на передаче кейса оператору: пока человек не подтвердит
-              решение, мы не показываем основной маршрут, оценку уверенности и карту рисков.
-            </p>
-            {humanReviewTriggers.length > 0 && (
-              <div className="grid gap-2">
-                {humanReviewTriggers.map((rule) => (
-                  <div
-                    key={rule.ruleId}
-                    className="rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-3"
-                  >
-                    <p className="text-sm font-medium text-textPrimary">Что требует проверки</p>
-                    <p className="mt-1 text-xs text-textSecondary">{rule.explanation}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </motion.section>
-      ) : (
-        <motion.section variants={staggerChild}>
-          <Card>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-textPrimary">Уверенность движка</p>
-              <span className="text-[11px] uppercase tracking-wide text-textMuted">
-                применены пределы:{" "}
-                {activeResult.trust.confidenceBreakdown.capsApplied.length
-                  ? activeResult.trust.confidenceBreakdown.capsApplied
-                      .map((item) => confidenceCapLabels[item] ?? item)
-                      .join(", ")
-                  : "нет"}
-              </span>
-            </div>
-            <ConfidenceGauge
-              breakdown={activeResult.trust.confidenceBreakdown}
-              accentColor={tone.accent}
+    <>
+      <motion.div
+        variants={staggerParent}
+        initial="initial"
+        animate="animate"
+        className="ah-ambient-frame min-h-screen bg-base px-4 py-4"
+      >
+        <div className="relative mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-[430px] flex-col gap-4">
+          <motion.div variants={staggerChild}>
+            <ScreenHeader
+              left={
+                <HeaderButton
+                  icon={<ArrowLeft className="h-5 w-5" />}
+                  onClick={handleBack}
+                  aria-label="Назад"
+                />
+              }
+              center={
+                <span className="text-base font-semibold text-textPrimary">Результат</span>
+              }
+              right={
+                <HeaderButton
+                  icon={<MoreHorizontal className="h-5 w-5" />}
+                  onClick={() => setSheet("tools")}
+                  aria-label="Открыть инструменты"
+                />
+              }
             />
-          </Card>
-        </motion.section>
-      )}
+          </motion.div>
 
-      {!isHumanReview && activeResult.criticalRisk && (
-        <motion.section variants={staggerChild}>
-          <Card padding="none" className="overflow-hidden">
-            <div className="p-5">
-              <p className="text-[11px] uppercase tracking-wide text-textMuted">Критический риск</p>
-              <div className="mt-2">
-                <RiskPulse risk={activeResult.criticalRisk} />
+          <motion.section variants={staggerChild} className="grid gap-4">
+            <SectionLabel tone={result.verdict === "HUMAN_REVIEW" ? "info" : "need"}>
+              {model.eyebrow}
+            </SectionLabel>
+            <motion.div variants={fadeRise} className="grid gap-3">
+              <h1 className="text-[38px] font-extrabold leading-[0.96] tracking-[-0.05em] text-textPrimary">
+                {model.heading}
+              </h1>
+              <p className="text-[14px] text-textMuted">{model.meta}</p>
+              <p className="max-w-[380px] text-[16px] leading-[1.34] text-textSecondary">
+                {model.supportingLine}
+              </p>
+            </motion.div>
+          </motion.section>
+
+          <motion.section variants={staggerChild}>
+            <PrimaryCTA
+              label={model.cta.label}
+              subcopy={model.cta.subcopy}
+              onClick={handleNextActionClick}
+              trailing={<ArrowRight className="h-4 w-4" />}
+              compact
+            />
+          </motion.section>
+
+          <motion.section variants={staggerChild} className="grid gap-3">
+            <SemanticBridge
+              leftChip={model.bridge.leftChip}
+              rightChip={model.bridge.rightChip}
+              nodes={model.bridge.nodes}
+              activeNodeId={activeBridgeNode}
+              onNodeSelect={(id) => setActiveBridgeNode(id as "docs" | "step" | "review")}
+              onBridgeTap={() => setSheet("basis")}
+            />
+            <p className="text-sm text-textSecondary">{model.bridge.summary[activeBridgeNode]}</p>
+          </motion.section>
+
+          <motion.section variants={staggerChild}>
+            <EvidenceStrip signals={model.evidence} />
+          </motion.section>
+
+          <motion.section variants={staggerChild} className="grid gap-4">
+            <div className="flex items-end justify-between gap-4">
+              <div className="grid gap-1">
+                <SectionLabel tone="need">{model.workSection.eyebrow}</SectionLabel>
+                <h2 className="text-[32px] font-extrabold leading-[1] tracking-[-0.03em] text-textPrimary">
+                  {model.workSection.heading}
+                </h2>
+              </div>
+              <div className="flex items-center gap-4">
+                <UtilityLink onClick={() => setSheet("basis")}>Основание</UtilityLink>
+                <UtilityLink onClick={() => setSheet("compare")}>Сравнить</UtilityLink>
               </div>
             </div>
-          </Card>
-        </motion.section>
-      )}
-
-      {!isHumanReview && activeResult.risks.length > 0 && (
-        <motion.section variants={staggerChild}>
-          <Card className="grid gap-3">
-            <p className="text-sm font-medium text-textPrimary">Риски в работе</p>
-            <div className="grid gap-2 md:grid-cols-2">
-              {activeResult.risks.map((risk) => (
-                <RiskPulse key={risk.id} risk={risk} />
+            <div className="grid gap-3">
+              {model.workSection.rows.map((item) => (
+                <DocumentRow
+                  key={item.id}
+                  title={item.title}
+                  meta={item.meta}
+                  status={item.status}
+                  tone={item.tone}
+                />
               ))}
             </div>
-          </Card>
-        </motion.section>
-      )}
+          </motion.section>
 
-      <motion.section variants={staggerChild}>
+          <motion.section variants={staggerChild}>
+            <AIInsightChip
+              summary={model.ai.summary}
+              reasons={model.ai.reasons}
+              action={model.ai.action}
+              expanded={aiOpen}
+              onToggle={() => setAiOpen((current) => !current)}
+              onOpenFull={() => setSheet("ai")}
+            />
+          </motion.section>
+
+          {model.compareCard ? (
+            <motion.section variants={staggerChild} className="mt-auto pb-2">
+              <button
+                type="button"
+                onClick={() => setSheet("compare")}
+                className="flex w-full items-center justify-between rounded-[24px] border border-border bg-surface2 px-4 py-4 text-left transition hover:border-borderStrong"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-textPrimary">
+                    {model.compareCard.title}
+                  </p>
+                  <p className="mt-1 text-sm text-textSecondary">
+                    {model.compareCard.summary}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-textMuted">
+                  secondary
+                </span>
+              </button>
+            </motion.section>
+          ) : null}
+        </div>
+      </motion.div>
+
+      <BottomSheet
+        open={sheet === "basis"}
+        onClose={() => setSheet(null)}
+        title="Основание решения"
+      >
+        <div className="grid gap-4">
+          <div className="rounded-[20px] border border-border bg-surface2 px-4 py-4">
+            <p className="text-sm font-semibold text-textPrimary">Почему такое решение</p>
+            <div className="mt-3 grid gap-2">
+              {model.basisSheet.whyBullets.map((bullet) => (
+                <p key={bullet} className="text-sm text-textSecondary">
+                  {bullet}
+                </p>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-[20px] border border-border bg-surface2 px-4 py-4">
+            <p className="text-sm font-semibold text-textPrimary">Доверие и ограничения</p>
+            <p className="mt-3 text-sm text-textSecondary">{model.basisSheet.trustSummary}</p>
+            {model.basisSheet.topRiskLabels.map((riskLabel) => (
+              <p key={riskLabel} className="mt-2 text-sm text-textSecondary">
+                {riskLabel}
+              </p>
+            ))}
+            <div className="mt-4">
+              <Link
+                to={`/trust?case=${encodeURIComponent(caseData.id)}`}
+                className="text-sm font-semibold text-info"
+                onClick={() => setSheet(null)}
+              >
+                Открыть экран доверия
+              </Link>
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={sheet === "compare"}
+        onClose={() => setSheet(null)}
+        title="Сравнить сценарии"
+      >
         <ResultCompareSurface
           lab={activeScenarioLab}
           loading={scenarioLabStatus === "loading"}
           errorMessage={scenarioLabError}
-          onOpenTarget={(targetScreen) =>
-            navigate(`/${targetScreen}?case=${encodeURIComponent(activeCase.id)}`)
-          }
+          onOpenTarget={(targetScreen) => {
+            setSheet(null);
+            navigate(`/${targetScreen}?case=${encodeURIComponent(caseData.id)}`);
+          }}
         />
-      </motion.section>
+      </BottomSheet>
 
-      {!isHumanReview && primaryOffer ? (
-        <motion.section variants={staggerChild} className="grid gap-3">
-          <p className="text-sm font-medium text-textPrimary">
-            Основной сценарий
-          </p>
-          <OfferCard offer={primaryOffer} selected showBoosts />
-        </motion.section>
-      ) : !isHumanReview ? (
-        <motion.section variants={staggerChild}>
-          <EmptyState
-            title="Сейчас подходящего варианта нет"
-            description="Либо сработал блокер, либо правило ушло в ручную проверку. Смотрите риски и объяснение решения ниже."
-          />
-        </motion.section>
-      ) : null}
+      <BottomSheet
+        open={sheet === "ai"}
+        onClose={() => setSheet(null)}
+        title="AI-разбор"
+      >
+        <AiRecommendationPanel
+          caseId={caseData.id}
+          computedAt={result.computedAt}
+          preferences={caseData.preferences}
+          onOpenScenario={(scenarioCaseId) => {
+            setSheet(null);
+            navigate(`/result?case=${encodeURIComponent(scenarioCaseId)}`);
+          }}
+        />
+      </BottomSheet>
 
-      {!isHumanReview && (
-        <motion.section variants={staggerChild}>
-          <Card className="grid gap-3">
-            <p className="text-sm font-medium text-textPrimary">Почему такое решение</p>
-            <div className="grid gap-2">
-              {activeResult.whyBullets.map((bullet) => (
-                <ExpandableRow
-                  key={bullet.id}
-                  id={bullet.id}
-                  title={bullet.text}
-                  subtitle="Что именно повлияло на решение"
-                  right={
-                    <Badge
-                      tone={
-                        bullet.tone === "positive"
-                          ? "positive"
-                          : bullet.tone === "negative"
-                            ? "negative"
-                            : bullet.tone === "review"
-                              ? "review"
-                              : bullet.tone === "warning"
-                                ? "warning"
-                              : "neutral"
-                      }
-                    >
-                      {bulletToneLabels[bullet.tone] ?? "фактор"}
-                    </Badge>
-                  }
-                  screen={screenName}
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-textMuted">Влияющие сигналы</p>
-                      <div className="mt-2 grid gap-1">
-                        {activeResult.decisionSignals
-                          .filter((signal) => bullet.signalIds.includes(signal.id))
-                          .map((signal) => (
-                            <SignalRow key={signal.id} signal={signal} />
-                          ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-textMuted">Действие правила</p>
-                      <ul className="mt-2 grid gap-1 text-xs text-textSecondary">
-                        {activeResult.ruleResults
-                          .filter((rule) => rule.ruleId === bullet.ruleId)
-                          .map((rule) => (
-                            <li key={rule.ruleId} className="rounded-lg bg-surface-2 px-3 py-2">
-                              <p className="text-textPrimary">{rule.explanation}</p>
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  </div>
-                </ExpandableRow>
-              ))}
+      <BottomSheet
+        open={sheet === "tools"}
+        onClose={() => setSheet(null)}
+        title="Инструменты кейса"
+      >
+        <div className="grid gap-3">
+          <button
+            type="button"
+            className="rounded-[18px] border border-border bg-surface2 px-4 py-4 text-left text-sm font-semibold text-textPrimary"
+            onClick={() => {
+              void recompute(caseData.id);
+              setSheet(null);
+            }}
+          >
+            Пересчитать кейс
+          </button>
+          <button
+            type="button"
+            className="rounded-[18px] border border-border bg-surface2 px-4 py-4 text-left text-sm font-semibold text-textPrimary"
+            onClick={() => void handleFork()}
+          >
+            Форкнуть кейс
+          </button>
+          <button
+            type="button"
+            className="rounded-[18px] border border-border bg-surface2 px-4 py-4 text-left text-sm font-semibold text-textPrimary"
+            onClick={() => {
+              void loadAudit(caseData.id);
+              setSheet(null);
+            }}
+          >
+            Загрузить аудит
+          </button>
+          {audit ? (
+            <div className="rounded-[18px] border border-border bg-surface2 px-4 py-4">
+              <p className="text-sm text-textSecondary">
+                Аудит загружен: {audit.trail.totalMs.toFixed(1)} мс.
+              </p>
             </div>
-          </Card>
-        </motion.section>
-      )}
-
-      {whatIfConfig && (
-        <motion.section variants={staggerChild}>
-          <TemporalWhatIf
-            label={whatIfConfig.label}
-            baseValue={baseWhatIfValue}
-            unit={whatIfConfig.unit}
-            min={whatIfConfig.min}
-            max={whatIfConfig.max}
-            onApply={handleTemporalApply}
-            loading={status === "loading"}
-          />
-        </motion.section>
-      )}
-
-      {!isHumanReview && (
-        <motion.section variants={staggerChild}>
-          <Card className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-medium text-textPrimary">Реплей шагов движка</p>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  void loadAudit(activeCase.id);
-                  track({ type: "replay_opened", caseId: activeCase.id });
-                }}
-                leadingIcon={<Sparkles className="h-3 w-3" />}
-              >
-                Загрузить аудит
-              </Button>
-            </div>
-            <AnimatePresence>
-              {audit && (
-                <motion.div
-                  key="replay"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <ReplayTimeline trail={audit.trail} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Card>
-        </motion.section>
-      )}
-
-      <motion.section variants={staggerChild}>
-        <ForkDivider onFork={handleFork} disabled={status === "loading"} />
-        <Card className="grid gap-3">
-          <p className="text-sm font-medium text-textPrimary">Сценарный форк</p>
-          <p className="text-xs text-textSecondary">
-            Форк создаёт независимую копию кейса. Меняйте сигналы и сравнивайте два
-            решения бок-о-бок — исходный кейс остаётся нетронутым.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              leadingIcon={<GitBranch className="h-4 w-4" />}
-              onClick={handleFork}
-            >
-              Форкнуть кейс
-            </Button>
-            <Link to="/profile">
-              <Button variant="ghost">Открыть все кейсы</Button>
-            </Link>
-          </div>
-        </Card>
-      </motion.section>
-
-      <motion.section variants={staggerChild}>
-        <Card className="grid gap-2">
-          <p className="text-sm font-medium text-textPrimary">Общий снимок решения</p>
-          <p className="text-xs text-textSecondary">
-            Продукт: {productTypeLabel(activeResult.productType)}.{" "}
-            {isHumanReview
-              ? "Финальный маршрут, уровень уверенности и карту рисков подтвердит оператор."
-              : `Вычислено за ${activeResult.auditTrail.totalMs.toFixed(1)} мс · уверенность ${formatPercent(activeResult.trust.confidence)}.`}
-          </p>
-          {activeResult.assumptions.length > 0 && (
-            <ul className="mt-1 grid gap-1 text-xs text-textMuted">
-              {activeResult.assumptions.map((item) => (
-                <li key={item.id}>• {item.label}</li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </motion.section>
-    </motion.div>
+          ) : null}
+        </div>
+      </BottomSheet>
+    </>
   );
 }

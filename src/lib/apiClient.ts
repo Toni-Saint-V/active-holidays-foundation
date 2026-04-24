@@ -13,6 +13,9 @@ import {
   documentsReadinessSchema,
   caseOverrideSchema,
   caseSignalsSchema,
+  humanReviewCreateRequestSchema,
+  humanReviewCreateResponseSchema,
+  humanReviewResponseSchema,
   pathPreferencesSchema,
   recommendationDetailRequestSchema,
   recommendationDetailSchema,
@@ -29,6 +32,8 @@ import {
   type CaseOverride,
   type CaseSignals,
   type DecisionLogEntry,
+  type HumanReviewCreateRequest,
+  type HumanReviewRequest,
   type IntakePreview,
   type IntakeQueue,
   type Offer,
@@ -206,6 +211,24 @@ export const apiClient = {
   },
   async audit(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema);
+  },
+  async humanReview(id: string): Promise<HumanReviewRequest | null> {
+    const response = await request(
+      `/api/cases/${encodeURIComponent(id)}/human-review`,
+      humanReviewResponseSchema
+    );
+    return response.request;
+  },
+  async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
+    const body = humanReviewCreateRequestSchema.parse(payload);
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/human-review`,
+      humanReviewCreateResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(body)
+      }
+    );
   },
   async documents(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema);

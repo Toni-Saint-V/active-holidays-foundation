@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "autonomy-runtime-scoring",
+      "title": "Make autonomous next-best-task scoring deterministic and repo-owned",
+      "productReason": "The product cannot improve autonomously if task selection stays subjective.",
+      "evidence": [".autonomous/scoring-model.md", "scripts/autonomous/next-best-task-loop.ts"],
+      "category": "engineering_health",
+      "scores": {
+        "trust": 7,
+        "conversion": 5,
+        "polish": 5,
+        "engineeringHealth": 10,
+        "strategicFit": 10,
+        "risk": 2,
+        "effort": 3
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "yepcode-orchestrator-scheduling",
+      "title": "Promote the YepCode task orchestrator from local dry-run to scheduled dry-run reports",
+      "productReason": "Founder input and repo gaps need a recurring intake loop before live writeback is safe.",
+      "evidence": ["automation/yepcode/active-holidays-orchestrator/README.md"],
+      "category": "automation",
+      "scores": {
+        "trust": 8,
+        "conversion": 6,
+        "polish": 4,
+        "engineeringHealth": 8,
+        "strategicFit": 9,
+        "risk": 4,
+        "effort": 5
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "notion-writeback-lock",
+      "title": "Lock Notion task database identity before any autonomous live writeback",
+      "productReason": "Notion should reflect execution truth without risking strategic record drift.",
+      "evidence": [".codex/automations/notion-surface-lock.json", ".autonomous/safety-gates.md"],
+      "category": "trust",
+      "scores": {
+        "trust": 10,
+        "conversion": 4,
+        "polish": 3,
+        "engineeringHealth": 8,
+        "strategicFit": 9,
+        "risk": 7,
+        "effort": 6
+      },
+      "requiresApproval": ["live_notion_strategic_writeback"]
+    },
+    {
+      "id": "review-gate-hardening",
+      "title": "Make local self-review and CodeRabbit fallback explicit in the executor loop",
+      "productReason": "Autonomy needs review evidence, and CodeRabbit can be rate-limited or unavailable.",
+      "evidence": [".autonomous/safety-gates.md"],
+      "category": "engineering_health",
+      "scores": {
+        "trust": 8,
+        "conversion": 4,
+        "polish": 4,
+        "engineeringHealth": 9,
+        "strategicFit": 8,
+        "risk": 3,
+        "effort": 4
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "truth-freshness-product-impact",
+      "title": "Tie truth freshness failures to product impact and next task generation",
+      "productReason": "Trust-critical stale data should automatically become actionable product work.",
+      "evidence": ["scripts/automations/check-source-freshness.ts", "data/db/sources.json"],
+      "category": "trust",
+      "scores": {
+        "trust": 10,
+        "conversion": 6,
+        "polish": 4,
+        "engineeringHealth": 7,
+        "strategicFit": 9,
+        "risk": 4,
+        "effort": 5
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "mobile-result-flow-polish",
+      "title": "Select the next mobile result-flow polish task from live screen evidence",
+      "productReason": "Market-grade quality depends on the result flow feeling clear, premium, and trustworthy on mobile.",
+      "evidence": ["src/screens/result/ResultScreen.tsx", "src/presentation/activeHolidays/resultScreenModel.ts"],
+      "category": "polish",
+      "scores": {
+        "trust": 8,
+        "conversion": 8,
+        "polish": 10,
+        "engineeringHealth": 5,
+        "strategicFit": 8,
+        "risk": 5,
+        "effort": 6
+      },
+      "requiresApproval": ["ui_design_approval"]
+    },
+    {
+      "id": "conversion-cta-instrumentation",
+      "title": "Close CTA instrumentation gaps before optimizing conversion",
+      "productReason": "The system should not optimize conversion without reliable event evidence.",
+      "evidence": ["scripts/automations/check-flow-instrumentation.ts", "src/instrumentation/events.ts"],
+      "category": "conversion",
+      "scores": {
+        "trust": 6,
+        "conversion": 9,
+        "polish": 5,
+        "engineeringHealth": 8,
+        "strategicFit": 8,
+        "risk": 3,
+        "effort": 5
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "founder-report-standard",
+      "title": "Standardize founder reports across autonomous runs",
+      "productReason": "Autonomous work needs a consistent, low-noise executive summary.",
+      "evidence": [".autonomous/founder-report-template.md"],
+      "category": "operations",
+      "scores": {
+        "trust": 7,
+        "conversion": 4,
+        "polish": 6,
+        "engineeringHealth": 7,
+        "strategicFit": 8,
+        "risk": 1,
+        "effort": 2
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "github-actions-autonomous-checks",
+      "title": "Run autonomous OS verification in GitHub Actions",
+      "productReason": "Merge-ready autonomy requires checks that run outside the local machine.",
+      "evidence": [".github/workflows/autonomous-checks.yml"],
+      "category": "engineering_health",
+      "scores": {
+        "trust": 7,
+        "conversion": 3,
+        "polish": 3,
+        "engineeringHealth": 10,
+        "strategicFit": 9,
+        "risk": 3,
+        "effort": 4
+      },
+      "requiresApproval": []
+    },
+    {
+      "id": "executor-branch-policy",
+      "title": "Define branch, PR, and cleanup policy for autonomous executor runs",
+      "productReason": "Autonomous code edits need predictable branch names, PR evidence, and cleanup behavior.",
+      "evidence": [".autonomous/safety-gates.md", "AGENTS.md"],
+      "category": "operations",
+      "scores": {
+        "trust": 8,
+        "conversion": 3,
+        "polish": 3,
+        "engineeringHealth": 9,
+        "strategicFit": 9,
+        "risk": 3,
+        "effort": 3
+      },
+      "requiresApproval": []
+    }
+  ]
+}

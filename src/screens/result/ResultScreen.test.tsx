@@ -38,49 +38,15 @@ function iconStub(props: SVGProps<SVGSVGElement>) {
 }
 
 vi.mock("lucide-react", () => ({
+  ArrowLeft: iconStub,
   ArrowRight: iconStub,
-  GitBranch: iconStub,
-  Sparkles: iconStub
+  MoreHorizontal: iconStub,
+  Sparkles: iconStub,
+  X: iconStub
 }));
 
 vi.mock("@/state/caseStore", () => ({
   useCaseStore: vi.fn()
-}));
-
-vi.mock("@/ui/ConfidenceGauge", () => ({
-  ConfidenceGauge: () => <div data-testid="confidence-gauge" />
-}));
-
-vi.mock("@/ui/RiskPulse", () => ({
-  RiskPulse: ({ risk }: { risk: { label: string } }) => (
-    <div data-testid="risk-pulse">{risk.label}</div>
-  )
-}));
-
-vi.mock("@/ui/OfferCard", () => ({
-  OfferCard: ({ offer }: { offer: { id: string } }) => (
-    <div data-testid="offer-card">{offer.id}</div>
-  )
-}));
-
-vi.mock("@/ui/TemporalWhatIf", () => ({
-  TemporalWhatIf: () => <div data-testid="what-if" />
-}));
-
-vi.mock("@/ui/ReplayTimeline", () => ({
-  ReplayTimeline: () => <div data-testid="replay-timeline" />
-}));
-
-vi.mock("@/ui/ForkDivider", () => ({
-  ForkDivider: () => <div data-testid="fork-divider" />
-}));
-
-vi.mock("./AiRecommendationPanel", () => ({
-  AiRecommendationPanel: () => <div data-testid="ai-recommendation-panel" />
-}));
-
-vi.mock("@/ui/SignalRow", () => ({
-  SignalRow: ({ signal }: { signal: { id: string } }) => <div>{signal.id}</div>
 }));
 
 vi.mock("@/instrumentation/screenView", () => ({
@@ -95,40 +61,75 @@ vi.mock("@/ui/Toast", () => ({
   useToast: () => ({ push: vi.fn() })
 }));
 
+vi.mock("./AiRecommendationPanel", () => ({
+  AiRecommendationPanel: () => <div data-testid="ai-recommendation-panel">AI panel</div>
+}));
+
+vi.mock("./ResultCompareSurface", () => ({
+  ResultCompareSurface: () => <div data-testid="compare-surface">Compare surface</div>
+}));
+
 const useCaseStoreMock = vi.mocked(useCaseStore);
 
 function createStore(overrides: Partial<Record<string, unknown>> = {}) {
   const activeResult = {
-    verdict: "GO",
+    version: "rdc.v1",
     productType: "travel",
+    caseId: "s1-rf-italy",
     computedAt: "2026-04-17T10:00:00.000Z",
+    verdict: "GO",
     nextAction: {
       type: "start_application",
+      priority: "path",
       label: "Начать заявку",
       detail: "Можно переходить к следующему шагу.",
-      targetScreen: "result"
+      targetScreen: "documents",
+      triggeredBy: ["primary_path"]
     },
     trust: {
       confidence: 0.74,
       confidenceBreakdown: {
         value: 0.74,
+        base: 0.74,
         capsApplied: [],
         factors: []
-      }
+      },
+      volatilityScore: 0.12,
+      sources: [],
+      lastCheckedAt: "2026-04-17T10:00:00.000Z"
     },
     primaryPath: {
       id: "italy_c_tourism",
       productType: "travel",
-      title: "Шенген C"
+      title: "Шенген C",
+      kind: "consular_visa",
+      citizenship: "RU",
+      destination: "IT",
+      processingWeeks: 4,
+      estCostRub: 15000,
+      description: "Основной маршрут",
+      requirements: [{ id: "passport", label: "Паспорт", mandatory: true }],
+      score: 0.91,
+      baseScore: 0.88,
+      ruleBoosts: [],
+      blockers: [],
+      eligible: true
     },
     alternativePaths: [],
     criticalRisk: null,
     risks: [],
-    whyBullets: [],
+    whyBullets: [
+      {
+        id: "why-1",
+        text: "Маршрут подтверждён по текущим сигналам.",
+        ruleId: "R10",
+        signalIds: ["destination"],
+        tone: "positive"
+      }
+    ],
     decisionSignals: [],
     ruleResults: [],
     assumptions: [],
-    version: "rdc.v1",
     documents: {
       score: 0.71,
       readyCount: 5,
@@ -136,16 +137,24 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
       items: [
         {
           id: "insurance",
-          label: "Страховка на всю поездку",
+          label: "Страховка",
           status: "attention_needed",
           detail: "Нужен полис с покрытием не ниже 30000€.",
+          pathId: "italy_c_tourism"
+        },
+        {
+          id: "statement",
+          label: "Выписка",
+          status: "attention_needed",
+          detail: "Нужна выписка за 6 месяцев.",
           pathId: "italy_c_tourism"
         }
       ]
     },
     auditTrail: {
       totalMs: 14.2
-    }
+    },
+    preview: false
   };
 
   return {
@@ -153,7 +162,9 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
       id: "s1-rf-italy",
       title: "S1 · Петербург → Италия",
       productType: "travel",
+      preferences: [],
       signals: [],
+      createdAt: "2026-04-17T10:00:00.000Z",
       updatedAt: "2026-04-17T10:00:00.000Z"
     },
     activeCaseId: "s1-rf-italy",
@@ -163,29 +174,21 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
       caseId: "s1-rf-italy",
       generatedAt: "2026-04-17T10:00:00.000Z",
       baseResult: activeResult,
-      issues: [
-        {
-          id: "issue:documents",
-          title: "Документы",
-          detail: "Не хватает 2 документов из 7 — доготовить перед подачей.",
-          severity: "medium",
-          kind: "warning",
-          ruleId: "R10",
-          signalIds: ["documents_ready_count", "documents_required_count"]
-        }
-      ],
+      issues: [],
       scenarios: [
         {
           id: "documents-ready",
           type: "documents",
           title: "Добрать обязательные документы",
-          summary: "Закрываем недостающий чеклист по текущему пути и смотрим, как меняется исход.",
+          summary: "Сценарий усиливает текущий маршрут без смены основного пути.",
           recommended: true,
           nextAction: {
             type: "upload_missing_docs",
+            priority: "blocking",
             label: "Перейти к документам",
-            detail: "Сначала закройте недостающий чеклист.",
-            targetScreen: "documents"
+            detail: "Закройте недостающий чеклист.",
+            targetScreen: "documents",
+            triggeredBy: ["documents_ready_count"]
           },
           comparison: {
             verdictBefore: "GO",
@@ -194,7 +197,7 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
             confidenceAfter: 0.82,
             primaryPathBefore: { id: "italy_c_tourism", label: "Шенген C" },
             primaryPathAfter: { id: "italy_c_tourism", label: "Шенген C" },
-            resolvedRisks: ["Страховка на всю поездку"],
+            resolvedRisks: [],
             remainingRisks: [],
             documents: {
               readyCountBefore: 5,
@@ -202,61 +205,15 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
               requiredCount: 7,
               itemsToCollect: []
             },
-            whyChanged: ["Чеклист становится полным, поэтому решение становится устойчивее."]
+            whyChanged: ["Чеклист становится полным."]
           },
           plan: {
             headline: "После этого сценария следующий шаг — перейти к документам.",
-            firstSteps: ["Подготовить страховку на всю поездку."],
+            firstSteps: ["Подготовить страховку."],
             criticalSteps: ["Не отправлять заявку с неполным пакетом."],
-            canWait: ["Дополнительные улучшения можно делать уже после полного чеклиста."],
+            canWait: [],
             humanReviewRequired: false,
             humanReviewReason: null
-          }
-        },
-        {
-          id: "human-review",
-          type: "human_review",
-          title: "Передать кейс в ручную проверку",
-          summary: "Если автоматический пересчёт не даёт нормальный исход, не рисуем оптимизм и зовём человека.",
-          recommended: false,
-          nextAction: {
-            type: "send_for_review",
-            label: "Открыть ручную проверку",
-            detail: "Нужна ручная проверка.",
-            targetScreen: "human-review"
-          },
-          comparison: {
-            verdictBefore: "GO",
-            verdictAfter: "HUMAN_REVIEW",
-            confidenceBefore: 0.74,
-            confidenceAfter: 0.55,
-            primaryPathBefore: { id: "italy_c_tourism", label: "Шенген C" },
-            primaryPathAfter: { id: null, label: null },
-            resolvedRisks: [],
-            remainingRisks: ["Нужна ручная проверка"],
-            documents: {
-              readyCountBefore: 5,
-              readyCountAfter: 5,
-              requiredCount: 7,
-              itemsToCollect: [
-                {
-                  id: "insurance",
-                  label: "Страховка на всю поездку",
-                  status: "attention_needed",
-                  detail: "Нужен полис с покрытием не ниже 30000€.",
-                  pathId: "italy_c_tourism"
-                }
-              ]
-            },
-            whyChanged: ["Автоматического сценария недостаточно."]
-          },
-          plan: {
-            headline: "Автоматического улучшения недостаточно — нужен человек.",
-            firstSteps: ["Подготовить текущие материалы по кейсу."],
-            criticalSteps: ["Нужна ручная проверка."],
-            canWait: [],
-            humanReviewRequired: true,
-            humanReviewReason: "Нужна ручная проверка."
           }
         }
       ],
@@ -269,7 +226,6 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
         triggeredBy: []
       }
     },
-    paths: [],
     scenarios: [],
     audit: null,
     bootstrap: vi.fn().mockResolvedValue(undefined),
@@ -277,7 +233,6 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
     loadAudit: vi.fn().mockResolvedValue(undefined),
     recompute: vi.fn().mockResolvedValue(undefined),
     fork: vi.fn().mockResolvedValue(null),
-    setPreferences: vi.fn().mockResolvedValue(undefined),
     overrideSignal: vi.fn().mockResolvedValue(undefined),
     scenarioLabStatus: "ready",
     scenarioLabError: null,
@@ -308,6 +263,7 @@ describe("ResultScreen", () => {
           id: "s1-rf-italy",
           title: "S1 · Петербург → Италия",
           productType: "travel",
+          preferences: [],
           signals: [],
           createdAt: "2026-04-17T10:00:00.000Z",
           updatedAt: "2026-04-17T10:00:00.000Z"
@@ -338,6 +294,7 @@ describe("ResultScreen", () => {
           id: "s1-rf-italy",
           title: "S1 · Петербург → Италия",
           productType: "travel",
+          preferences: [],
           signals: [],
           createdAt: "2026-04-17T10:00:00.000Z",
           updatedAt: "2026-04-17T10:00:00.000Z"
@@ -381,121 +338,22 @@ describe("ResultScreen", () => {
     });
   });
 
-  it("hides deterministic surfaces when the verdict is HUMAN_REVIEW", () => {
+  it("renders manual review state without a fake confirmed path", () => {
     const baseStore = createStore();
 
     useCaseStoreMock.mockReturnValue(
       createStore({
-        activeCase: {
-          id: "s3-us-spb-business",
-          title: "S3 · Нью-Йорк → Санкт-Петербург",
-          productType: "travel",
-          signals: [],
-          createdAt: "2026-04-17T10:00:00.000Z",
-          updatedAt: "2026-04-17T10:00:00.000Z"
-        },
-        activeCaseId: "s3-us-spb-business",
         activeResult: {
           ...(baseStore.activeResult ?? {}),
           verdict: "HUMAN_REVIEW",
-          computedAt: "2026-04-17T10:00:00.000Z",
+          primaryPath: null,
           nextAction: {
             type: "send_for_review",
+            priority: "human_review",
             label: "Передать менеджеру",
-            detail: "Нужна ручная проверка.",
-            targetScreen: "human-review"
-          },
-          primaryPath: {
-            id: "italy_c_tourism",
-            productType: "travel",
-            title: "Шенген C"
-          },
-          alternativePaths: [
-            {
-              id: "alt_path",
-              productType: "travel",
-              title: "Альтернатива"
-            }
-          ],
-          criticalRisk: {
-            id: "risk_critical",
-            label: "Критический риск"
-          },
-          risks: [
-            {
-              id: "risk_warning",
-              label: "Риск в работе"
-            }
-          ],
-          ruleResults: [
-            {
-              ruleId: "r06_sanctions_review",
-              explanation: "Санкционный контекст требует ручной проверки.",
-              fired: true,
-              output: {
-                type: "human_review_trigger"
-              }
-            }
-          ]
-        }
-      })
-    );
-
-    renderScreen(<ResultScreen />);
-
-    expect(screen.getByText("Ручная проверка в работе")).toBeInTheDocument();
-    expect(
-      screen.getByText("Маршрут, уверенность и риски подтвердит оператор после ручной проверки.")
-    ).toBeInTheDocument();
-    expect(screen.queryAllByText("Уверенность движка")).toHaveLength(0);
-    expect(screen.queryAllByText("Риски в работе")).toHaveLength(0);
-    expect(screen.queryAllByText("Основной маршрут")).toHaveLength(0);
-    expect(screen.queryAllByText("Почему такое решение")).toHaveLength(0);
-    expect(screen.queryAllByText("Реплей шагов движка")).toHaveLength(0);
-    expect(screen.queryByTestId("confidence-gauge")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("offer-card")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("risk-pulse")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Как улучшить шанс").length).toBeGreaterThan(0);
-  });
-
-  it("renders decision scenario lab and updates the plan when another scenario is selected", async () => {
-    useCaseStoreMock.mockReturnValue(
-      createStore()
-    );
-
-    renderScreen(<ResultScreen />);
-
-    expect(screen.getAllByText("Как улучшить шанс").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Что мешает сейчас").length).toBeGreaterThan(0);
-    expect(screen.getByText("Документы")).toBeInTheDocument();
-    expect(screen.getByText("Добрать обязательные документы")).toBeInTheDocument();
-    expect(screen.getByText("Подготовить страховку на всю поездку.")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Передать кейс в ручную проверку/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Автоматического улучшения недостаточно — нужен человек.")).toBeInTheDocument();
-    });
-  });
-
-  it("shows honest dead-end state when no helpful scenarios are available", () => {
-    useCaseStoreMock.mockReturnValue(
-      createStore({
-        activeScenarioLab: {
-          ...createStore().activeScenarioLab,
-          scenarios: [
-            {
-              ...createStore().activeScenarioLab.scenarios[1],
-              recommended: true
-            }
-          ],
-          recommendedScenarioId: "human-review",
-          noHelpfulScenarios: true,
-          humanReviewEscalation: {
-            required: true,
-            title: "Нужна ручная проверка",
-            detail: "Если ни один сценарий не даёт нормальный исход, кейс нужно передать человеку.",
-            triggeredBy: ["no_helpful_scenarios"]
+            detail: "Автомат не может честно подтвердить маршрут.",
+            targetScreen: "human-review",
+            triggeredBy: ["human_review_trigger"]
           }
         }
       })
@@ -503,9 +361,41 @@ describe("ResultScreen", () => {
 
     renderScreen(<ResultScreen />);
 
-    expect(screen.getByText("полезных сравнений нет")).toBeInTheDocument();
-    expect(
-      screen.getByText("Если ни один сценарий не даёт нормальный исход, кейс нужно передать человеку.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Нужна ручная проверка")).toBeInTheDocument();
+    expect(screen.getAllByText("Передать менеджеру").length).toBeGreaterThan(0);
+    expect(screen.getByText("Нужен оператор")).toBeInTheDocument();
+    expect(screen.queryByText("Маршрут подтверждён")).not.toBeInTheDocument();
+  });
+
+  it("opens the basis sheet from the utility action", async () => {
+    useCaseStoreMock.mockReturnValue(createStore());
+
+    renderScreen(<ResultScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Основание" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Основание решения")).toBeInTheDocument();
+      expect(screen.getByText("Маршрут подтверждён по текущим сигналам.")).toBeInTheDocument();
+    });
+  });
+
+  it("opens compare and AI sheets from secondary actions", async () => {
+    useCaseStoreMock.mockReturnValue(createStore());
+
+    renderScreen(<ResultScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Сравнить" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("compare-surface")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /AI: сначала/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Полный разбор" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-recommendation-panel")).toBeInTheDocument();
+    });
   });
 });
