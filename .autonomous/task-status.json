@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "tasks": [
+    {
+      "id": "autonomy-runtime-scoring",
+      "status": "completed",
+      "updatedAt": "2026-04-24T10:43:20.000Z",
+      "evidence": [
+        "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7",
+        "749f0c6cd0c2ffcd829e7aca2241d6d02b4af1f7"
+      ],
+      "note": "Repo-owned scoring contract merged through PR #7."
+    },
+    {
+      "id": "github-actions-autonomous-checks",
+      "status": "completed",
+      "updatedAt": "2026-04-24T10:11:57.000Z",
+      "evidence": [
+        "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/6",
+        "e6741423a31a75effe612ffabc07c676138d3b2f"
+      ],
+      "note": "Autonomous verification workflow expanded in Stage A executor PR #6."
+    },
+    {
+      "id": "executor-branch-policy",
+      "status": "completed",
+      "updatedAt": "2026-04-24T10:11:57.000Z",
+      "evidence": [
+        "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/6",
+        "e6741423a31a75effe612ffabc07c676138d3b2f"
+      ],
+      "note": "Stage A executor branch and safety policy documented in PR #6."
+    }
+  ]
+}

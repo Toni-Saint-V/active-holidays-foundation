@@ -51,9 +51,26 @@ async function writeScoringModel(
   );
 }
 
+async function writeTaskStatus(
+  tasks: Array<Record<string, unknown>> = []
+) {
+  await writeRepoFile(
+    ".autonomous/task-status.json",
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        tasks
+      },
+      null,
+      2
+    )
+  );
+}
+
 beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), "autonomous-runtime-"));
   await writeScoringModel();
+  await writeTaskStatus();
 });
 
 afterEach(async () => {
@@ -64,6 +81,130 @@ afterEach(async () => {
 });
 
 describe("autonomous runtime", () => {
+  it("excludes completed candidates from selection while keeping them auditable", async () => {
+    await writeTaskStatus([
+      {
+        id: "completed-top-task",
+        status: "completed",
+        updatedAt: "2026-04-24T10:43:20.000Z",
+        evidence: ["https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7"],
+        note: "Merged through PR #7"
+      }
+    ]);
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "completed-top-task",
+              title: "Completed top task",
+              productReason: "Already shipped",
+              evidence: ["evidence/task.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 10,
+                conversion: 10,
+                polish: 10,
+                engineeringHealth: 10,
+                strategicFit: 10,
+                risk: 0,
+                effort: 0
+              },
+              requiresApproval: []
+            },
+            {
+              id: "ready-next-task",
+              title: "Ready next task",
+              productReason: "Should be selected",
+              evidence: ["evidence/task.md"],
+              category: "trust",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 8,
+                strategicFit: 8,
+                risk: 2,
+                effort: 3
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = selectNextTask({
+      currentRepoRoot: tempDir,
+      mode: "executor",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+    const completed = result.blockedCandidates.find(
+      (candidate) => candidate.id === "completed-top-task"
+    );
+
+    expect(result.selected?.id).toBe("ready-next-task");
+    expect(completed?.taskStatus).toBe("completed");
+    expect(completed?.blockedLifecycleStatus).toBe("completed");
+  });
+
+  it("fails fast when task status references an unknown candidate", async () => {
+    await writeTaskStatus([
+      {
+        id: "missing-candidate",
+        status: "completed",
+        updatedAt: "2026-04-24T10:43:20.000Z",
+        evidence: ["https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7"],
+        note: "Should not silently drift"
+      }
+    ]);
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "known-candidate",
+              title: "Known candidate",
+              productReason: "Valid task",
+              evidence: ["evidence/task.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 8,
+                strategicFit: 8,
+                risk: 2,
+                effort: 3
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    expect(() =>
+      selectNextTask({
+        currentRepoRoot: tempDir,
+        mode: "executor",
+        gitStatus: [],
+        trackedGitStatus: []
+      })
+    ).toThrow(/unknown candidate/i);
+  });
+
   it("uses repo-owned scoring weights instead of hardcoded constants", async () => {
     await writeScoringModel({
       impactWeights: {

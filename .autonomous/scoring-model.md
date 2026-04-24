@@ -73,6 +73,7 @@ Expected implementation cost for a small, reviewable increment.
 The next task is the highest `balanced_score` candidate that:
 
 - does not require a blocked approval gate
+- is not marked `completed` or `paused` in `.autonomous/task-status.json`
 - can be verified locally
 - has a clear product reason
 - can be implemented in one reviewable branch
