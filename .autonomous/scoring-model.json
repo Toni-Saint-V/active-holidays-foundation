@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "impactWeights": {
+    "trust": 0.26,
+    "conversion": 0.2,
+    "polish": 0.18,
+    "engineeringHealth": 0.22,
+    "strategicFit": 0.14
+  },
+  "costWeights": {
+    "risk": 0.18,
+    "effort": 0.12
+  },
+  "tieBreakers": [
+    {
+      "field": "balancedScore",
+      "direction": "desc"
+    },
+    {
+      "field": "impact",
+      "direction": "desc"
+    },
+    {
+      "field": "cost",
+      "direction": "asc"
+    },
+    {
+      "field": "scores.strategicFit",
+      "direction": "desc"
+    },
+    {
+      "field": "scores.engineeringHealth",
+      "direction": "desc"
+    },
+    {
+      "field": "id",
+      "direction": "asc"
+    }
+  ]
+}

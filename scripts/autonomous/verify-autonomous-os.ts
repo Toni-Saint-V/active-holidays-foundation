@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { approvalGates } from "./runtime";
+import { approvalGates, readScoringModel } from "./runtime";
 
 type Candidate = {
   id: string;
@@ -23,6 +23,7 @@ const repoRoot = process.cwd();
 const requiredFiles = [
   ".autonomous/operating-system.md",
   ".autonomous/scoring-model.md",
+  ".autonomous/scoring-model.json",
   ".autonomous/safety-gates.md",
   ".autonomous/workflows.md",
   ".autonomous/founder-report-template.md",
@@ -42,6 +43,14 @@ const requiredPackageScripts = [
   "autonomous:verify"
 ];
 const knownApprovalGates = new Set<string>(approvalGates);
+const requiredTieBreakers = [
+  "balancedScore:desc",
+  "impact:desc",
+  "cost:asc",
+  "scores.strategicFit:desc",
+  "scores.engineeringHealth:desc",
+  "id:asc"
+];
 
 const requiredSafetyPhrases = [
   "merge into `main`",
@@ -138,6 +147,16 @@ function assertCandidates() {
   }
 }
 
+function assertScoringModel() {
+  const scoringModel = readScoringModel(repoRoot);
+  const summary = scoringModel.tieBreakers.map(
+    (tieBreaker) => `${tieBreaker.field}:${tieBreaker.direction}`
+  );
+  if (summary.join("|") !== requiredTieBreakers.join("|")) {
+    fail(`scoring model tieBreakers drifted: ${summary.join(", ")}`);
+  }
+}
+
 function assertNextLoopRuns() {
   const output = execFileSync(
     "npx",
@@ -147,7 +166,19 @@ function assertNextLoopRuns() {
       encoding: "utf8"
     }
   );
-  const parsed = JSON.parse(output) as { selected?: { id?: string } };
+  const parsed = JSON.parse(output) as {
+    selected?: { id?: string };
+    scoringModel?: { schemaVersion?: number; tieBreakers?: string[] };
+  };
+  if (parsed.selected?.id !== "autonomy-runtime-scoring") {
+    fail(`next-best-task-loop selected unexpected task: ${parsed.selected?.id ?? "none"}`);
+  }
+  if (parsed.scoringModel?.schemaVersion !== 1) {
+    fail("next-best-task-loop did not expose scoring model schemaVersion");
+  }
+  if (parsed.scoringModel?.tieBreakers?.join("|") !== requiredTieBreakers.join("|")) {
+    fail("next-best-task-loop did not expose the expected scoring tieBreakers");
+  }
   if (!parsed.selected?.id) {
     fail("next-best-task-loop did not select an eligible task");
   }
@@ -235,6 +266,7 @@ function main() {
   }
   assertPackageScripts();
   assertSafetyGates();
+  assertScoringModel();
   assertCandidates();
   assertNextLoopRuns();
   assertExecutorDryRunRuns();

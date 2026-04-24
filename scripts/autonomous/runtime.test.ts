@@ -16,8 +16,44 @@ async function writeRepoFile(relativePath: string, content: string) {
   await writeFile(targetPath, content, "utf8");
 }
 
+async function writeScoringModel(
+  overrides: Record<string, unknown> = {}
+) {
+  await writeRepoFile(
+    ".autonomous/scoring-model.json",
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        impactWeights: {
+          trust: 0.26,
+          conversion: 0.2,
+          polish: 0.18,
+          engineeringHealth: 0.22,
+          strategicFit: 0.14
+        },
+        costWeights: {
+          risk: 0.18,
+          effort: 0.12
+        },
+        tieBreakers: [
+          { field: "balancedScore", direction: "desc" },
+          { field: "impact", direction: "desc" },
+          { field: "cost", direction: "asc" },
+          { field: "scores.strategicFit", direction: "desc" },
+          { field: "scores.engineeringHealth", direction: "desc" },
+          { field: "id", direction: "asc" }
+        ],
+        ...overrides
+      },
+      null,
+      2
+    )
+  );
+}
+
 beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), "autonomous-runtime-"));
+  await writeScoringModel();
 });
 
 afterEach(async () => {
@@ -28,6 +64,256 @@ afterEach(async () => {
 });
 
 describe("autonomous runtime", () => {
+  it("uses repo-owned scoring weights instead of hardcoded constants", async () => {
+    await writeScoringModel({
+      impactWeights: {
+        trust: 0,
+        conversion: 1,
+        polish: 0,
+        engineeringHealth: 0,
+        strategicFit: 0
+      },
+      costWeights: {
+        risk: 0,
+        effort: 0
+      }
+    });
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "trust-heavy",
+              title: "Trust heavy",
+              productReason: "Would win with old hardcoded trust weight",
+              evidence: ["evidence/task.md"],
+              category: "trust",
+              scores: {
+                trust: 10,
+                conversion: 0,
+                polish: 0,
+                engineeringHealth: 0,
+                strategicFit: 0,
+                risk: 0,
+                effort: 0
+              },
+              requiresApproval: []
+            },
+            {
+              id: "conversion-heavy",
+              title: "Conversion heavy",
+              productReason: "Should win with JSON conversion weight",
+              evidence: ["evidence/task.md"],
+              category: "conversion",
+              scores: {
+                trust: 0,
+                conversion: 9,
+                polish: 0,
+                engineeringHealth: 0,
+                strategicFit: 0,
+                risk: 0,
+                effort: 0
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = selectNextTask({
+      currentRepoRoot: tempDir,
+      mode: "executor",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(result.selected?.id).toBe("conversion-heavy");
+  });
+
+  it("sorts equal balanced scores with explicit deterministic tie-breakers", async () => {
+    await writeScoringModel({
+      impactWeights: {
+        trust: 1,
+        conversion: 0,
+        polish: 0,
+        engineeringHealth: 0,
+        strategicFit: 0
+      },
+      costWeights: {
+        risk: 1,
+        effort: 0
+      }
+    });
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "efficient-first-in-file",
+              title: "Efficient first in file",
+              productReason: "Same balanced score but lower impact",
+              evidence: ["evidence/task.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 5,
+                conversion: 0,
+                polish: 0,
+                engineeringHealth: 5,
+                strategicFit: 5,
+                risk: 0,
+                effort: 0
+              },
+              requiresApproval: []
+            },
+            {
+              id: "higher-impact-second-in-file",
+              title: "Higher impact second in file",
+              productReason: "Same balanced score but higher impact",
+              evidence: ["evidence/task.md"],
+              category: "trust",
+              scores: {
+                trust: 8,
+                conversion: 0,
+                polish: 0,
+                engineeringHealth: 5,
+                strategicFit: 5,
+                risk: 3,
+                effort: 0
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = selectNextTask({
+      currentRepoRoot: tempDir,
+      mode: "executor",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(result.selected?.id).toBe("higher-impact-second-in-file");
+    expect(result.topCandidates.map((candidate) => candidate.id)).toEqual([
+      "higher-impact-second-in-file",
+      "efficient-first-in-file"
+    ]);
+  });
+
+  it("fails fast when the scoring model is malformed", async () => {
+    await writeScoringModel({
+      impactWeights: {
+        trust: 1,
+        conversion: 1,
+        polish: 1,
+        strategicFit: 1
+      }
+    });
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "safe-task",
+              title: "Safe task",
+              productReason: "No gates",
+              evidence: ["evidence/task.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    expect(() =>
+      selectNextTask({
+        currentRepoRoot: tempDir,
+        mode: "executor",
+        gitStatus: [],
+        trackedGitStatus: []
+      })
+    ).toThrow(/scoring model/i);
+  });
+
+  it("includes a compact scoring model summary in next task output", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = selectNextTask({
+      currentRepoRoot: tempDir,
+      mode: "executor",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(result.scoringModel).toEqual({
+      schemaVersion: 1,
+      tieBreakers: [
+        "balancedScore:desc",
+        "impact:desc",
+        "cost:asc",
+        "scores.strategicFit:desc",
+        "scores.engineeringHealth:desc",
+        "id:asc"
+      ]
+    });
+  });
+
   it("blocks ui approval candidates in executor mode but not in planning mode", async () => {
     await writeRepoFile("evidence/ui.md", "# ui");
     await writeRepoFile("evidence/backend.md", "# backend");
