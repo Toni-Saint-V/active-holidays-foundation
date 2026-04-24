@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://active-holidays.local/yepcode/orchestrator/task.schema.json",
+  "title": "Active Holidays Normalized Task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "summary",
+    "type",
+    "priority",
+    "status",
+    "product_area",
+    "user_problem",
+    "business_value",
+    "technical_scope",
+    "design_scope",
+    "acceptance_criteria",
+    "test_plan",
+    "risks",
+    "dependencies",
+    "requires_design_approval",
+    "requires_github_issue",
+    "requires_codex_execution",
+    "dedupe_key",
+    "codex_brief",
+    "notion_page_id",
+    "github_issue_url",
+    "github_pr_url"
+  ],
+  "properties": {
+    "title": { "type": "string", "minLength": 3 },
+    "summary": { "type": "string", "minLength": 3 },
+    "type": {
+      "type": "string",
+      "enum": [
+        "feature",
+        "bug",
+        "ux",
+        "design",
+        "tech_debt",
+        "research",
+        "growth",
+        "seo",
+        "monetization",
+        "ops"
+      ]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2", "P3"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Inbox",
+        "Needs Clarification",
+        "Ready",
+        "In Progress",
+        "In Review",
+        "Done",
+        "Blocked"
+      ]
+    },
+    "product_area": { "type": "string", "minLength": 1 },
+    "user_problem": { "type": "string" },
+    "business_value": { "type": "string" },
+    "technical_scope": { "type": "string" },
+    "design_scope": { "type": "string" },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "test_plan": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requires_design_approval": { "type": "boolean" },
+    "requires_github_issue": { "type": "boolean" },
+    "requires_codex_execution": { "type": "boolean" },
+    "dedupe_key": { "type": "string", "minLength": 3 },
+    "codex_brief": { "type": "string" },
+    "notion_page_id": { "type": "string" },
+    "github_issue_url": { "type": "string" },
+    "github_pr_url": { "type": "string" },
+    "source": { "type": "string" },
+    "raw_input": { "type": "string" }
+  }
+}

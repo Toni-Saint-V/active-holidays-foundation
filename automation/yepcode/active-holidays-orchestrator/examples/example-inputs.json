@@ -1,0 +1,32 @@
+[
+  {
+    "id": "feature-idea",
+    "raw_input": "Feature idea: add a guided result flow that explains why the trip decision is safe and what the user should do next.",
+    "source": "founder_note"
+  },
+  {
+    "id": "bug-report",
+    "raw_input": "Bug: human review form can be submitted twice after a network retry and creates confusing follow-up state.",
+    "source": "qa"
+  },
+  {
+    "id": "ux-improvement",
+    "raw_input": "UX improvement: the result page should make the primary action and fallback path obvious without technical terms.",
+    "source": "product_review"
+  },
+  {
+    "id": "design-task",
+    "raw_input": "Design task: prepare a Lovable-ready mobile screen for the result decision page and approval state.",
+    "source": "design_planning"
+  },
+  {
+    "id": "technical-debt",
+    "raw_input": "Tech debt: consolidate automation status logic so Notion sync, release gate, and executor eligibility use one projection.",
+    "source": "engineering_review"
+  },
+  {
+    "id": "growth-idea",
+    "raw_input": "Growth idea: create an SEO content path around Schengen decision readiness and collect leads for complex cases.",
+    "source": "founder_note"
+  }
+]

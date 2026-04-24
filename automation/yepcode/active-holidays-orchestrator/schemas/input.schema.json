@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://active-holidays.local/yepcode/orchestrator/input.schema.json",
+  "title": "Active Holidays Orchestrator Raw Input",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["raw_input"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Optional local example or source id."
+    },
+    "raw_input": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Messy founder note, transcript, bug report, idea, or task fragment."
+    },
+    "source": {
+      "type": "string",
+      "default": "founder_input"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["dry-run", "production"],
+      "default": "dry-run"
+    },
+    "allow_external_writes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Must be true together with mode=production before Notion or GitHub writes run."
+    },
+    "hints": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "feature",
+            "bug",
+            "ux",
+            "design",
+            "tech_debt",
+            "research",
+            "growth",
+            "seo",
+            "monetization",
+            "ops"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Inbox",
+            "Needs Clarification",
+            "Ready",
+            "In Progress",
+            "In Review",
+            "Done",
+            "Blocked"
+          ]
+        },
+        "product_area": { "type": "string" },
+        "user_problem": { "type": "string" },
+        "business_value": { "type": "string" },
+        "technical_scope": { "type": "string" },
+        "design_scope": { "type": "string" },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "test_plan": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requires_design_approval": { "type": "boolean" },
+        "requires_github_issue": { "type": "boolean" },
+        "requires_codex_execution": { "type": "boolean" },
+        "dedupe_key": { "type": "string" },
+        "notion_page_id": { "type": "string" },
+        "github_issue_url": { "type": "string" },
+        "github_pr_url": { "type": "string" }
+      }
+    },
+    "existing_tasks": {
+      "type": "array",
+      "description": "Optional Notion/GitHub task snapshots for dedupe.",
+      "items": { "type": "object" }
+    },
+    "github_event": {
+      "type": "object",
+      "description": "Optional GitHub event projection for Notion status sync."
+    }
+  }
+}
