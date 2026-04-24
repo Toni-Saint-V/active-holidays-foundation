@@ -23,6 +23,30 @@
 ```bash
 npm run automations:verify
 npm run automations:check:all
+npm run skills:verify
+npm run autonomous:verify
+npm run yepcode:orchestrator:test
+npm run yepcode:orchestrator:dry-run
+```
+
+## Autonomous Stage A
+
+Inspect the current safe task selection:
+
+```bash
+npm run autonomous:next
+```
+
+Prepare an executor packet without mutating git. This is still a preflight gate and expects clean tracked state:
+
+```bash
+npm run autonomous:execute -- --json
+```
+
+Create the local executor branch and run the baseline verification stack:
+
+```bash
+npm run autonomous:execute -- --write
 ```
 
 ## Dry-Run Sync Into Codex Home

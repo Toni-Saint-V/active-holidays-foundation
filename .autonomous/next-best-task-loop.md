@@ -44,4 +44,8 @@ The loop returns:
 
 ## Activation Boundary
 
-The current loop is deterministic and local. It does not create branches, edit code, push PRs, or write Notion. Those steps are downstream executor permissions and must be enabled separately.
+The current loop is deterministic and local.
+
+- `npm run autonomous:next` selects and reports the next safe task.
+- `npm run autonomous:execute` prepares an executor packet and may create a local `codex/*` branch only when explicitly run with `--write`.
+- The system still does not autonomously edit product code, push PRs, merge into `main`, or perform live Notion writeback.

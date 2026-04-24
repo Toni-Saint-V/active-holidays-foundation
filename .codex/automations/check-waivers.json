@@ -1,4 +1,17 @@
 {
   "schemaVersion": 1,
-  "waivers": []
+  "waivers": [
+    {
+      "waiverId": "wv-src-russia-mfa-tr-2026-04-24",
+      "appliesTo": "src_russia_mfa_tr",
+      "affectedChecks": ["freshness:ah-truth-freshness-watch"],
+      "affectedAutomationIds": ["ah-truth-freshness-watch"],
+      "affectedSurfaces": ["Execution"],
+      "reason": "Official MID Russia Turkey source returned an empty response during the merge gate; keep the blocker visible as a time-boxed waiver instead of falsifying lastCheckedAt.",
+      "severity": "medium",
+      "owner": "operator",
+      "approvedAt": "2026-04-24T10:06:27.000Z",
+      "expiresAt": "2026-04-26T10:06:27.000Z"
+    }
+  ]
 }

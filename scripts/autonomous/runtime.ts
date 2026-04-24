@@ -1,0 +1,530 @@
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+export type ApprovalGate =
+  | "merge_main"
+  | "production_deploy"
+  | "live_notion_strategic_writeback"
+  | "paid_api_action"
+  | "legal_commercial_claim"
+  | "secrets_billing_credentials"
+  | "destructive_database_or_production_action"
+  | "ui_design_approval";
+
+export const approvalGates = [
+  "merge_main",
+  "production_deploy",
+  "live_notion_strategic_writeback",
+  "paid_api_action",
+  "legal_commercial_claim",
+  "secrets_billing_credentials",
+  "destructive_database_or_production_action",
+  "ui_design_approval"
+] as const satisfies readonly ApprovalGate[];
+
+export type Scores = {
+  trust: number;
+  conversion: number;
+  polish: number;
+  engineeringHealth: number;
+  strategicFit: number;
+  risk: number;
+  effort: number;
+};
+
+export type Candidate = {
+  id: string;
+  title: string;
+  productReason: string;
+  evidence: string[];
+  category: string;
+  scores: Scores;
+  requiresApproval: string[];
+};
+
+export type CandidateFile = {
+  schemaVersion: number;
+  candidates: Candidate[];
+};
+
+export type NextTaskMode = "planning" | "executor";
+
+export type ScoredCandidate = Candidate & {
+  impact: number;
+  cost: number;
+  balancedScore: number;
+  blockedGates: string[];
+  unknownApprovalGates: string[];
+  missingEvidence: string[];
+  eligible: boolean;
+};
+
+export type NextTaskResult = {
+  schemaVersion: 1;
+  generatedAt: string;
+  mode: NextTaskMode;
+  selected: ScoredCandidate | null;
+  topCandidates: ScoredCandidate[];
+  blockedCandidates: ScoredCandidate[];
+  gitStatus: string[];
+  trackedGitStatus: string[];
+  founderReport: string;
+};
+
+export type VerificationCommandResult = {
+  command: string;
+  ok: boolean;
+  exitCode: number;
+  stdoutTail: string;
+  stderrTail: string;
+};
+
+export type ExecutionPacket = {
+  schemaVersion: 1;
+  generatedAt: string;
+  mode: "dry-run" | "write";
+  baseBranch: string;
+  currentBranch: string;
+  branchName: string | null;
+  blocked: boolean;
+  blockedReasons: string[];
+  selected: ScoredCandidate | null;
+  gitStatus: string[];
+  trackedGitStatus: string[];
+  verificationCommands: string[];
+  verificationResults: VerificationCommandResult[];
+  externalWriteState: {
+    writePerformed: false;
+    reason: string;
+  };
+  reviewStatus: {
+    localSelfReview: string;
+    externalReview: string;
+  };
+  founderReport: string;
+  executionBrief: string;
+};
+
+export const repoRoot = process.cwd();
+export const candidatesPath = path.join(repoRoot, ".autonomous", "task-candidates.json");
+export const outputDir = path.join(repoRoot, "reports", "autonomous");
+
+const planningBlockedApprovalGates = new Set<ApprovalGate>([
+  "merge_main",
+  "production_deploy",
+  "live_notion_strategic_writeback",
+  "paid_api_action",
+  "legal_commercial_claim",
+  "secrets_billing_credentials",
+  "destructive_database_or_production_action"
+]);
+
+const executorBlockedApprovalGates = new Set<ApprovalGate>([
+  ...planningBlockedApprovalGates,
+  "ui_design_approval"
+]);
+const knownApprovalGates = new Set<string>(approvalGates);
+
+const weights = {
+  trust: 0.26,
+  conversion: 0.2,
+  polish: 0.18,
+  engineeringHealth: 0.22,
+  strategicFit: 0.14,
+  risk: 0.18,
+  effort: 0.12
+} as const;
+
+export const defaultVerificationCommands = [
+  "npm run autonomous:verify",
+  "npm run typecheck",
+  "npm run test",
+  "npm run build",
+  "npm run automations:check:all",
+  "npm run skills:verify",
+  "npm run yepcode:orchestrator:test",
+  "npm run yepcode:orchestrator:dry-run"
+] as const;
+
+export const verificationCommandTimeoutMs = 120_000;
+export const verificationCommandMaxBuffer = 1024 * 1024;
+
+function read(filePath: string): string {
+  return readFileSync(filePath, "utf8");
+}
+
+export function readJson<T>(filePath: string): T {
+  return JSON.parse(read(filePath)) as T;
+}
+
+export function getGitStatus(options?: { repoRoot?: string; trackedOnly?: boolean }): string[] {
+  try {
+    return execFileSync(
+      "git",
+      ["status", "--short", ...(options?.trackedOnly ? ["--untracked-files=no"] : [])],
+      {
+        cwd: options?.repoRoot ?? repoRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"]
+      }
+    )
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function getCurrentBranch(currentRepoRoot = repoRoot): string {
+  return execFileSync("git", ["branch", "--show-current"], {
+    cwd: currentRepoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"]
+  }).trim();
+}
+
+export function branchExists(branchName: string, currentRepoRoot = repoRoot): boolean {
+  try {
+    const output = execFileSync("git", ["branch", "--list", branchName], {
+      cwd: currentRepoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return output.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(10, value));
+}
+
+function getBlockedApprovalGates(mode: NextTaskMode): Set<ApprovalGate> {
+  return mode === "executor" ? executorBlockedApprovalGates : planningBlockedApprovalGates;
+}
+
+export function scoreCandidate(
+  candidate: Candidate,
+  options?: { currentRepoRoot?: string; mode?: NextTaskMode }
+): ScoredCandidate {
+  const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
+  const mode = options?.mode ?? "planning";
+  const scores = {
+    trust: clampScore(candidate.scores.trust),
+    conversion: clampScore(candidate.scores.conversion),
+    polish: clampScore(candidate.scores.polish),
+    engineeringHealth: clampScore(candidate.scores.engineeringHealth),
+    strategicFit: clampScore(candidate.scores.strategicFit),
+    risk: clampScore(candidate.scores.risk),
+    effort: clampScore(candidate.scores.effort)
+  };
+
+  const impact =
+    scores.trust * weights.trust +
+    scores.conversion * weights.conversion +
+    scores.polish * weights.polish +
+    scores.engineeringHealth * weights.engineeringHealth +
+    scores.strategicFit * weights.strategicFit;
+  const cost = scores.risk * weights.risk + scores.effort * weights.effort;
+  const balancedScore = Math.round((impact - cost) * 10) / 10;
+  const unknownApprovalGates = candidate.requiresApproval.filter(
+    (gate) => !knownApprovalGates.has(gate)
+  );
+  const blockedGates = candidate.requiresApproval.filter(
+    (gate) => unknownApprovalGates.includes(gate) || getBlockedApprovalGates(mode).has(gate as ApprovalGate)
+  );
+  const missingEvidence = candidate.evidence.filter(
+    (evidencePath) => !existsSync(path.join(currentRepoRoot, evidencePath))
+  );
+
+  return {
+    ...candidate,
+    scores,
+    impact: Math.round(impact * 10) / 10,
+    cost: Math.round(cost * 10) / 10,
+    balancedScore,
+    blockedGates,
+    unknownApprovalGates,
+    missingEvidence,
+    eligible: blockedGates.length === 0 && missingEvidence.length === 0
+  };
+}
+
+export function buildFounderReport(
+  selected: ScoredCandidate | null,
+  gitStatus: string[],
+  mode: NextTaskMode
+): string {
+  if (!selected) {
+    return [
+      "# Founder Report",
+      "",
+      "No safe autonomous task is currently eligible.",
+      "",
+      "## Why",
+      "",
+      "All candidates are blocked by approval gates or missing evidence.",
+      "",
+      "## Required Action",
+      "",
+      mode === "executor"
+        ? "Review blocked gates, tracked tree cleanliness, or missing evidence before local executor mode proceeds."
+        : "Review blocked gates or add missing repo evidence before executor mode proceeds."
+    ].join("\n");
+  }
+
+  const statusLine =
+    gitStatus.length === 0
+      ? "Working tree has no local status warnings."
+      : `Working tree has ${gitStatus.length} local status entries; executor must avoid unrelated untracked artifacts.`;
+
+  const nextAction =
+    mode === "executor"
+      ? "Prepare a focused `codex/*` branch, run the readiness stack, and hand off the scoped execution packet."
+      : "Create a focused branch for the selected task and keep implementation scoped to its evidence paths.";
+
+  return [
+    "# Founder Report",
+    "",
+    "## Selected Task",
+    "",
+    `- ${selected.title}`,
+    `- Task id: ${selected.id}`,
+    `- Balanced score: ${selected.balancedScore}`,
+    "",
+    "## Why It Matters",
+    "",
+    selected.productReason,
+    "",
+    "## Product Impact",
+    "",
+    `Improves ${selected.category} with the current balanced model.`,
+    "",
+    "## Technical Impact",
+    "",
+    `Evidence: ${selected.evidence.join(", ")}`,
+    "",
+    "## Verification",
+    "",
+    "- npm run autonomous:verify",
+    "- npm run typecheck",
+    "- npm run test",
+    "- npm run build",
+    "- npm run automations:check:all",
+    "- npm run skills:verify",
+    "- npm run yepcode:orchestrator:test",
+    "- npm run yepcode:orchestrator:dry-run",
+    "",
+    "## Risks",
+    "",
+    selected.blockedGates.length === 0
+      ? "- No blocked irreversible, external, or UI gate on this selected task."
+      : `- Blocked gates: ${selected.blockedGates.join(", ")}`,
+    `- ${statusLine}`,
+    "",
+    "## Next Best Action",
+    "",
+    nextAction
+  ].join("\n");
+}
+
+export function selectNextTask(options?: {
+  currentRepoRoot?: string;
+  mode?: NextTaskMode;
+  gitStatus?: string[];
+  trackedGitStatus?: string[];
+}): NextTaskResult {
+  const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
+  const mode = options?.mode ?? "planning";
+  const candidateFile = readJson<CandidateFile>(path.join(currentRepoRoot, ".autonomous", "task-candidates.json"));
+  const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatus =
+    options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const scored = candidateFile.candidates
+    .map((candidate) => scoreCandidate(candidate, { currentRepoRoot, mode }))
+    .sort((left, right) => right.balancedScore - left.balancedScore);
+  const eligible = scored.filter((candidate) => candidate.eligible);
+  const selected = eligible[0] ?? null;
+  const founderReport = buildFounderReport(selected, gitStatus, mode);
+
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    mode,
+    selected,
+    topCandidates: scored.slice(0, 5),
+    blockedCandidates: scored.filter((candidate) => !candidate.eligible),
+    gitStatus,
+    trackedGitStatus,
+    founderReport
+  };
+}
+
+export function buildAutonomousBranchName(candidateId: string): string {
+  const normalized = candidateId
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return `codex/autonomous-${normalized}`.slice(0, 72);
+}
+
+export function buildExecutionBrief(packet: ExecutionPacket): string {
+  const blockedSection =
+    packet.blockedReasons.length === 0
+      ? "- none"
+      : packet.blockedReasons.map((reason) => `- ${reason}`).join("\n");
+  const verificationSection =
+    packet.verificationResults.length === 0
+      ? "- not run in this mode"
+      : packet.verificationResults
+          .map((result) => `- ${result.ok ? "OK" : "FAIL"} · ${result.command}`)
+          .join("\n");
+
+  return [
+    "# Autonomous Execution Brief",
+    "",
+    `- Mode: ${packet.mode}`,
+    `- Base branch: ${packet.baseBranch}`,
+    `- Current branch: ${packet.currentBranch}`,
+    `- Target branch: ${packet.branchName ?? "blocked"}`,
+    `- Selected task: ${packet.selected?.id ?? "none"}`,
+    "",
+    "## Blockers",
+    "",
+    blockedSection,
+    "",
+    "## Verification Stack",
+    "",
+    ...packet.verificationCommands.map((command) => `- ${command}`),
+    "",
+    "## Verification Results",
+    "",
+    verificationSection,
+    "",
+    "## Review Status",
+    "",
+    `- Local self-review: ${packet.reviewStatus.localSelfReview}`,
+    `- External review: ${packet.reviewStatus.externalReview}`,
+    "",
+    "## Founder Report",
+    "",
+    packet.founderReport
+  ].join("\n");
+}
+
+export function prepareExecutionPacket(options?: {
+  currentRepoRoot?: string;
+  baseBranch?: string;
+  write?: boolean;
+  allowDirtyTracked?: boolean;
+  allowNonBaseBranch?: boolean;
+  currentBranch?: string;
+  gitStatus?: string[];
+  trackedGitStatus?: string[];
+}): ExecutionPacket {
+  const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
+  const baseBranch = options?.baseBranch ?? "main";
+  const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatus =
+    options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const selection = selectNextTask({
+    currentRepoRoot,
+    mode: "executor",
+    gitStatus,
+    trackedGitStatus
+  });
+  const currentBranch = options?.currentBranch ?? getCurrentBranch(currentRepoRoot);
+  const selected = selection.selected;
+  const branchName = selected ? buildAutonomousBranchName(selected.id) : null;
+  const blockedReasons: string[] = [];
+  const nonIgnoredGitStatus = gitStatus.filter((entry) => !entry.startsWith("?? reports/autonomous/"));
+
+  if (!selected) {
+    blockedReasons.push("Нет executor-safe кандидата без approval gate или missing evidence.");
+  }
+
+  if (nonIgnoredGitStatus.length > 0 && !options?.allowDirtyTracked) {
+    blockedReasons.push("Working tree не чистый; local executor fail-closed.");
+  }
+
+  if (options?.write && currentBranch !== baseBranch && !options?.allowNonBaseBranch) {
+    blockedReasons.push(`Local executor может стартовать только из \`${baseBranch}\`, сейчас \`${currentBranch}\`.`);
+  }
+
+  if (options?.write && branchName && branchExists(branchName, currentRepoRoot)) {
+    blockedReasons.push(`Ветка \`${branchName}\` уже существует; cleanup или reuse нужно решить явно.`);
+  }
+
+  const packet: ExecutionPacket = {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    mode: options?.write ? "write" : "dry-run",
+    baseBranch,
+    currentBranch,
+    branchName,
+    blocked: blockedReasons.length > 0,
+    blockedReasons,
+    selected,
+    gitStatus,
+    trackedGitStatus,
+    verificationCommands: [...defaultVerificationCommands],
+    verificationResults: [],
+    externalWriteState: {
+      writePerformed: false,
+      reason: "Live external writes stay fail-closed in Stage A."
+    },
+    reviewStatus: {
+      localSelfReview: "required after implementation diff exists",
+      externalReview: "CodeRabbit optional; record exact blocker if unavailable"
+    },
+    founderReport: selection.founderReport,
+    executionBrief: ""
+  };
+
+  packet.executionBrief = buildExecutionBrief(packet);
+  return packet;
+}
+
+export function writeExecutionArtifacts(
+  packet: ExecutionPacket,
+  currentRepoRoot = repoRoot
+): void {
+  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
+  mkdirSync(currentOutputDir, { recursive: true });
+  writeFileSync(
+    path.join(currentOutputDir, "executor-packet-latest.json"),
+    `${JSON.stringify(packet, null, 2)}\n`
+  );
+  writeFileSync(path.join(currentOutputDir, "executor-brief-latest.md"), `${packet.executionBrief}\n`);
+}
+
+export function runVerificationStack(
+  commands: readonly string[],
+  currentRepoRoot = repoRoot
+): VerificationCommandResult[] {
+  return commands.map((command) => {
+    const result = spawnSync(command, {
+      cwd: currentRepoRoot,
+      encoding: "utf8",
+      shell: true,
+      timeout: verificationCommandTimeoutMs,
+      maxBuffer: verificationCommandMaxBuffer
+    });
+    const stdout = result.stdout ?? "";
+    const stderr = result.stderr ?? "";
+
+    return {
+      command,
+      ok: result.status === 0,
+      exitCode: result.status ?? 1,
+      stdoutTail: stdout.trim().split("\n").slice(-12).join("\n"),
+      stderrTail: stderr.trim().split("\n").slice(-12).join("\n")
+    };
+  });
+}

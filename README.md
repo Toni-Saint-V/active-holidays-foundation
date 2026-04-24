@@ -23,6 +23,9 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run test` — unit tests
 - `npm run typecheck` — TypeScript check
 - `npm run verify:engine` — deterministic scenario drift gate
+- `npm run autonomous:next` — select the current safe autonomous task
+- `npm run autonomous:execute` — prepare or run the local Stage A executor
+- `npm run autonomous:verify` — autonomous runtime readiness gate
 - `npm run skills:verify` — repo-local Codex skill system check
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
@@ -141,6 +144,9 @@ Key entrypoints:
 - `AUTOMATIONS_ROADMAP.md`
 - `AUTOMATIONS_OPERATING_MODEL.md`
 - `RUNBOOK.md`
+- `npm run autonomous:next`
+- `npm run autonomous:execute`
+- `npm run autonomous:verify`
 - `npm run automations:verify`
 - `npm run automations:sync -- --dry-run`
 
@@ -158,3 +164,4 @@ Key entrypoints:
 - run `npm run typecheck`, `npm run test`, and `npm run build` before closing substantial work
 - run `npm run verify:engine` for engine/rule/result-contract changes
 - run `npm run skills:verify` plus the existing Codex checks after changing `.codex/skills`
+- run `npm run autonomous:verify` after changing `.autonomous/*`, `scripts/autonomous/*`, or readiness workflow gates

@@ -9,6 +9,7 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,4 +36,13 @@ jobs:
         run: npm run build
 
       - name: Verify repo automations
-        run: npm run automations:verify
+        run: npm run automations:check:all
+
+      - name: Verify repo skills
+        run: npm run skills:verify
+
+      - name: Verify YepCode orchestrator tests
+        run: npm run yepcode:orchestrator:test
+
+      - name: Verify YepCode orchestrator dry-run
+        run: npm run yepcode:orchestrator:dry-run
