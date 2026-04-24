@@ -10,9 +10,9 @@ import { VolatilityRadar } from "@/ui/VolatilityRadar";
 import { FractalConfidence } from "@/ui/FractalConfidence";
 import { EmptyState } from "@/ui/EmptyState";
 import { staggerChild, staggerParent } from "@/animations/variants";
-import { useScreenView } from "@/instrumentation/screenView";
-import { formatPercent } from "@/lib/format";
 import { defaultCaseIdForProduct } from "@/lib/caseDefaults";
+import { useScreenView } from "@/instrumentation/screenView";
+import { buildTrustScreenModel } from "@/presentation/activeHolidays";
 
 export function TrustScreen() {
   useScreenView("trust");
@@ -66,16 +66,21 @@ export function TrustScreen() {
     );
   }
 
+  const screenModel = buildTrustScreenModel({ result: activeResult });
+
   if (activeResult.verdict === "HUMAN_REVIEW") {
     return (
       <EmptyState
-        title="Доверие уточнит оператор"
-        description="Для этого кейса мы не показываем детальную оценку уверенности до завершения ручной проверки."
+        title={screenModel.gate?.title ?? "Доверие уточнит оператор"}
+        description={
+          screenModel.gate?.description ??
+          "Для этого кейса мы не показываем детальную оценку уверенности до завершения ручной проверки."
+        }
       />
     );
   }
 
-  const { confidenceBreakdown, sources, volatilityScore, confidence } = activeResult.trust;
+  const { confidenceBreakdown } = activeResult.trust;
 
   return (
     <motion.div
@@ -88,14 +93,12 @@ export function TrustScreen() {
         <Card className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">Доверие</p>
-              <h2 className="text-2xl font-semibold text-textPrimary">
-                Почему движку можно верить
-              </h2>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">
+                {screenModel.hero.eyebrow}
+              </p>
+              <h2 className="text-2xl font-semibold text-textPrimary">{screenModel.hero.heading}</h2>
             </div>
-            <Badge tone={confidence >= 0.8 ? "positive" : confidence >= 0.5 ? "warning" : "negative"}>
-              {formatPercent(confidence)}
-            </Badge>
+            <Badge tone={screenModel.hero.badgeTone}>{screenModel.hero.badgeLabel}</Badge>
           </div>
           <ConfidenceGauge
             breakdown={confidenceBreakdown}
@@ -110,19 +113,17 @@ export function TrustScreen() {
       <motion.section variants={staggerChild}>
         <Card className="grid gap-3">
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-textMuted">Цепочка объяснения</p>
-            <p className="text-sm text-textPrimary">Сигналы → правила → выводы</p>
+            <p className="text-[11px] uppercase tracking-wide text-textMuted">
+              {screenModel.explanation.eyebrow}
+            </p>
+            <p className="text-sm text-textPrimary">{screenModel.explanation.heading}</p>
           </div>
           <NodeGraph ruleResults={activeResult.ruleResults} />
         </Card>
       </motion.section>
 
       <motion.section variants={staggerChild}>
-        <VolatilityRadar sources={sources.map((source) => ({
-          ...source,
-          summary: "",
-          url: source.url
-        }))} />
+        <VolatilityRadar sources={screenModel.sourcesSection.items} />
       </motion.section>
 
       <motion.section variants={staggerChild}>
@@ -132,24 +133,14 @@ export function TrustScreen() {
       <motion.section variants={staggerChild}>
         <Card className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium text-textPrimary">Источники</p>
-            <span className="text-xs text-textSecondary">
-              Средняя волатильность {formatPercent(volatilityScore, 0)}
-            </span>
+            <p className="text-sm font-medium text-textPrimary">{screenModel.sourcesSection.heading}</p>
+            <span className="text-xs text-textSecondary">{screenModel.sourcesSection.volatilityLabel}</span>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
-            {sources.map((source) => (
+            {screenModel.sourcesSection.items.map((source) => (
               <SourceBadge
                 key={source.id}
-                source={{
-                  ...source,
-                  summary:
-                    source.tier === "official"
-                      ? "Официальный источник — учитываем с минимальной волатильностью."
-                      : source.tier === "operator"
-                        ? "Оператор: актуальные слоты и цены."
-                        : "Краудсорс: учитываем как вторичный сигнал."
-                }}
+                source={source}
               />
             ))}
           </div>

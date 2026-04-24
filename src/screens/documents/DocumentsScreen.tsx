@@ -12,6 +12,7 @@ import { useScreenView } from "@/instrumentation/screenView";
 import { useToast } from "@/ui/Toast";
 import { track } from "@/instrumentation/events";
 import { defaultCaseIdForProduct } from "@/lib/caseDefaults";
+import { buildDocumentsScreenModel } from "@/presentation/activeHolidays";
 
 export function DocumentsScreen() {
   useScreenView("documents");
@@ -62,21 +63,25 @@ export function DocumentsScreen() {
     );
   }
 
+  const readiness = activeResult.documents;
+  const screenModel = buildDocumentsScreenModel({ result: activeResult });
+
   if (activeResult.verdict === "HUMAN_REVIEW") {
     return (
       <EmptyState
-        title="Документный трек откроет оператор"
-        description="Пока кейс на ручной проверке, мы не показываем пакет документов и шаги подачи."
+        title={screenModel.gate?.title ?? "Документный трек откроет оператор"}
+        description={
+          screenModel.gate?.description ??
+          "Пока кейс на ручной проверке, мы не показываем пакет документов и шаги подачи."
+        }
         action={
           <Button variant="secondary" onClick={() => navigate("/human-review")}>
-            Вернуться к ручной проверке
+            {screenModel.gate?.actionLabel ?? "Вернуться к ручной проверке"}
           </Button>
         }
       />
     );
   }
-
-  const readiness = activeResult.documents;
 
   async function markReady() {
     if (!activeCase) return;
@@ -97,20 +102,16 @@ export function DocumentsScreen() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">Документы</p>
-              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">
-                Индекс готовности
-              </h2>
-              <p className="mt-2 text-sm text-textSecondary">
-                {readiness.score >= 0.99
-                  ? "Пакет собран — можно подавать."
-                  : readiness.score >= 0.5
-                    ? "Базовая часть готова, осталось добрать несколько документов."
-                    : "Рано подавать: нужно готовить ключевые документы."}
+              <p className="text-[11px] uppercase tracking-[0.28em] text-textMuted">
+                {screenModel.readiness.eyebrow}
               </p>
+              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">
+                {screenModel.readiness.heading}
+              </h2>
+              <p className="mt-2 text-sm text-textSecondary">{screenModel.readiness.summary}</p>
             </div>
-            <Badge tone={readiness.score >= 0.8 ? "positive" : readiness.score >= 0.5 ? "warning" : "negative"}>
-              {Math.round(readiness.score * 100)}%
+            <Badge tone={screenModel.readiness.badgeTone}>
+              {screenModel.readiness.badgeLabel}
             </Badge>
           </div>
           <div className="mt-4">
@@ -118,11 +119,11 @@ export function DocumentsScreen() {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button size="sm" onClick={markReady}>
-              <FileText className="h-3 w-3" /> Отметить документ как готовый
+              <FileText className="h-3 w-3" /> {screenModel.readiness.primaryActionLabel}
             </Button>
             <Link to={`/result?case=${encodeURIComponent(activeCase.id)}`}>
               <Button variant="secondary" size="sm">
-                Вернуться к вердикту
+                {screenModel.readiness.secondaryActionLabel}
               </Button>
             </Link>
           </div>
@@ -131,16 +132,14 @@ export function DocumentsScreen() {
 
       <motion.section variants={staggerChild}>
         <Card>
-          <p className="mb-3 text-sm font-medium text-textPrimary">
-            Требования основного маршрута
-          </p>
-          {readiness.items.length === 0 ? (
+          <p className="mb-3 text-sm font-medium text-textPrimary">{screenModel.requirements.heading}</p>
+          {screenModel.requirements.items.length === 0 ? (
             <p className="text-sm text-textSecondary">
-              Список появится, когда движок найдёт основной маршрут.
+              {screenModel.requirements.emptyMessage}
             </p>
           ) : (
             <div className="grid gap-2">
-              {readiness.items.map((item) => (
+              {screenModel.requirements.items.map((item) => (
                 <DocumentCard
                   key={item.id}
                   item={{ id: item.id, label: item.label, status: item.status, detail: item.detail }}
@@ -153,13 +152,11 @@ export function DocumentsScreen() {
 
       <motion.section variants={staggerChild}>
         <Card>
-          <p className="mb-2 text-sm font-medium text-textPrimary">
-            Следующий шаг от движка
-          </p>
-          <p className="text-sm text-textSecondary">{activeResult.nextAction.detail}</p>
+          <p className="mb-2 text-sm font-medium text-textPrimary">{screenModel.nextStep.heading}</p>
+          <p className="text-sm text-textSecondary">{screenModel.nextStep.description}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button onClick={() => navigate(`/${activeResult.nextAction.targetScreen}?case=${encodeURIComponent(activeCase.id)}`)}>
-              {activeResult.nextAction.label}
+            <Button onClick={() => navigate(`/${screenModel.nextStep.targetScreen}?case=${encodeURIComponent(activeCase.id)}`)}>
+              {screenModel.nextStep.ctaLabel}
             </Button>
           </div>
         </Card>

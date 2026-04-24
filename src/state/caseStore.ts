@@ -12,7 +12,9 @@ import type {
   CaseSignals,
   CaseOverride,
   SignalId,
-  ScenarioLabPayload
+  ScenarioLabPayload,
+  HumanReviewChannel,
+  HumanReviewRequest
 } from "@shared/contracts";
 import { apiClient, type ScenarioCard } from "@/lib/apiClient";
 
@@ -36,10 +38,15 @@ type CaseStoreState = {
   intakeQueue: IntakeQueue | null;
   intakePreview: IntakePreview | null;
   audit: AuditSnapshot | null;
+  activeHumanReview: HumanReviewRequest | null;
+  humanReviewCaseId: string | null;
+  humanReviewRequestToken: number;
   sources: Source[];
   decisions: DecisionLogEntry[];
   scenarioLabStatus: Status;
   scenarioLabError: string | null;
+  humanReviewStatus: Status;
+  humanReviewError: string | null;
   bootstrap: () => Promise<void>;
   loadCase: (id: string) => Promise<void>;
   patchSignal: (id: string, signalId: SignalId, value: unknown) => Promise<void>;
@@ -50,6 +57,11 @@ type CaseStoreState = {
   fork: (id: string, title?: string) => Promise<string | null>;
   refreshIntake: (id: string) => Promise<void>;
   loadAudit: (id: string) => Promise<void>;
+  loadHumanReview: (id: string) => Promise<void>;
+  submitHumanReview: (
+    id: string,
+    payload: { channel: HumanReviewChannel; contact: string; message: string }
+  ) => Promise<{ reused: boolean }>;
 };
 
 function nowIso(): string {
@@ -90,10 +102,15 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
   intakeQueue: null,
   intakePreview: null,
   audit: null,
+  activeHumanReview: null,
+  humanReviewCaseId: null,
+  humanReviewRequestToken: 0,
   sources: [],
   decisions: [],
   scenarioLabStatus: "idle",
   scenarioLabError: null,
+  humanReviewStatus: "idle",
+  humanReviewError: null,
 
   async bootstrap() {
     set({ status: "loading", errorMessage: null });
@@ -115,12 +132,19 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
 
   async loadCase(id) {
     const currentLab = get().activeScenarioLab;
+    const currentReview = get().activeHumanReview;
+    const nextHumanReviewToken = get().humanReviewRequestToken + 1;
     set({
       status: "loading",
       errorMessage: null,
       scenarioLabStatus: "loading",
       scenarioLabError: null,
-      activeScenarioLab: currentLab?.caseId === id ? currentLab : null
+      activeScenarioLab: currentLab?.caseId === id ? currentLab : null,
+      activeHumanReview: currentReview?.caseId === id ? currentReview : null,
+      humanReviewCaseId: id,
+      humanReviewRequestToken: nextHumanReviewToken,
+      humanReviewStatus: currentReview?.caseId === id ? get().humanReviewStatus : "idle",
+      humanReviewError: null
     });
     try {
       const [caseData, result, paths, intakeQueue, preview, scenarioLabResult] = await Promise.all([
@@ -141,7 +165,9 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
         intakePreview: preview,
         status: "ready",
         scenarioLabStatus: scenarioLabResult.ok ? "ready" : "error",
-        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage
+        scenarioLabError: scenarioLabResult.ok ? null : scenarioLabResult.errorMessage,
+        humanReviewCaseId: id,
+        humanReviewError: null
       });
     } catch (error) {
       set({
@@ -308,6 +334,73 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
         errorMessage:
           error instanceof Error ? error.message : "Не удалось загрузить аудит."
       });
+    }
+  },
+
+  async loadHumanReview(id) {
+    const requestToken = get().humanReviewRequestToken + 1;
+    set({
+      humanReviewStatus: "loading",
+      humanReviewError: null,
+      humanReviewCaseId: id,
+      humanReviewRequestToken: requestToken
+    });
+    try {
+      const request = await apiClient.humanReview(id);
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              activeHumanReview: request,
+              humanReviewStatus: "ready",
+              humanReviewError: null
+            }
+          : {}
+      );
+    } catch (error) {
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              humanReviewStatus: "error",
+              humanReviewError:
+                error instanceof Error ? error.message : "Не удалось загрузить ручную проверку."
+            }
+          : {}
+      );
+    }
+  },
+
+  async submitHumanReview(id, payload) {
+    const requestToken = get().humanReviewRequestToken + 1;
+    set({
+      humanReviewStatus: "loading",
+      humanReviewError: null,
+      humanReviewCaseId: id,
+      humanReviewRequestToken: requestToken
+    });
+    try {
+      const response = await apiClient.submitHumanReview(id, payload);
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              activeHumanReview: response.request,
+              humanReviewStatus: "ready",
+              humanReviewError: null
+            }
+          : {}
+      );
+      return { reused: response.reused };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось отправить ручную проверку.";
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              humanReviewStatus: "error",
+              humanReviewError: message
+            }
+          : {}
+      );
+      throw error instanceof Error ? error : new Error(message);
     }
   }
 }));

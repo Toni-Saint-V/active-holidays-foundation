@@ -9,6 +9,7 @@ export default {
         surface: "var(--color-surface)",
         surface2: "var(--color-surface-2)",
         surface3: "var(--color-surface-3)",
+        surface4: "var(--color-surface-4)",
         border: "var(--color-border)",
         borderStrong: "var(--color-border-strong)",
         textPrimary: "var(--color-text-primary)",
@@ -19,7 +20,10 @@ export default {
         danger: "var(--color-danger)",
         success: "var(--color-success)",
         warning: "var(--color-warning)",
-        info: "var(--color-info)"
+        info: "var(--color-info)",
+        ai: "var(--color-ai)",
+        route: "var(--color-route)",
+        manual: "var(--color-manual)"
       },
       borderRadius: {
         sm: "8px",
@@ -29,7 +33,7 @@ export default {
         "2xl": "28px"
       },
       boxShadow: {
-        soft: "0 1px 2px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2)"
+        soft: "0 20px 50px -30px rgba(0,0,0,0.7)"
       },
       transitionTimingFunction: {
         premium: "cubic-bezier(0.16, 1, 0.3, 1)"
