@@ -10,8 +10,10 @@ prompt = """
 
 Обязательно:
 - сначала используй `scripts/automations/check-source-freshness.ts`
+- если нужно machine-readable evidence, используй `npm --silent run automations:check:truth -- --json`
 - затем интерпретируй output с product точки зрения: какие stale or broken source mappings реально подрывают доверие
 - приоритет: official/operator freshness, missing mappings, risky crowdsourced dependencies
+- если report содержит `nextTasks[]`, перенеси highest-severity item в REQUIRED ACTION с owner/manual-review boundary
 
 Жёсткие правила:
 - не обновляй product truth автоматически
