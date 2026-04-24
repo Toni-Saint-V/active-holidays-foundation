@@ -566,7 +566,7 @@ describe("autonomous runtime", () => {
     expect(packet.blocked).toBe(true);
     expect(packet.blockedReasons).toEqual(
       expect.arrayContaining([
-        "Working tree не чистый; local executor fail-closed.",
+        "Tracked working tree не чистый; local executor fail-closed.",
         "Local executor может стартовать только из `main`, сейчас `feature/test`."
       ])
     );
@@ -634,7 +634,7 @@ describe("autonomous runtime", () => {
     expect(blocked?.blockedGates).toEqual(["live_notion_writebak"]);
   });
 
-  it("blocks untracked working-tree entries in write mode", async () => {
+  it("reports untracked working-tree entries without blocking write mode", async () => {
     await writeRepoFile("evidence/backend.md", "# backend");
     await writeRepoFile(
       ".autonomous/task-candidates.json",
@@ -674,8 +674,55 @@ describe("autonomous runtime", () => {
       trackedGitStatus: []
     });
 
+    expect(packet.blocked).toBe(false);
+    expect(packet.blockedReasons).not.toContain("Tracked working tree не чистый; local executor fail-closed.");
+    expect(packet.gitStatus).toContain("?? src/new-test.ts");
+  });
+
+  it("blocks untracked entries that collide with selected task evidence", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main",
+      gitStatus: ["?? evidence/backend.md"],
+      trackedGitStatus: []
+    });
+
     expect(packet.blocked).toBe(true);
-    expect(packet.blockedReasons).toContain("Working tree не чистый; local executor fail-closed.");
+    expect(packet.blockedReasons).toContain(
+      "Untracked files collide with selected task scope: evidence/backend.md."
+    );
   });
 
   it("builds a stable codex branch name", () => {

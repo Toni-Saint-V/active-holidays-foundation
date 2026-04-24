@@ -235,8 +235,8 @@ function assertExecutorDryRunRuns() {
   }
 }
 
-function assertExecutorFailsClosedOnCurrentDirtyTree() {
-  const gitStatus = execFileSync("git", ["status", "--short"], {
+function assertExecutorFailsClosedOnCurrentTrackedDirtyTree() {
+  const trackedGitStatus = execFileSync("git", ["status", "--short", "--untracked-files=no"], {
     cwd: repoRoot,
     encoding: "utf8"
   })
@@ -244,7 +244,7 @@ function assertExecutorFailsClosedOnCurrentDirtyTree() {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  if (gitStatus.length === 0) return;
+  if (trackedGitStatus.length === 0) return;
 
   let output = "";
   try {
@@ -257,7 +257,7 @@ function assertExecutorFailsClosedOnCurrentDirtyTree() {
         stdio: ["ignore", "pipe", "pipe"]
       }
     );
-    fail("executor dry-run must be blocked when current working tree is dirty");
+    fail("executor dry-run must be blocked when current tracked working tree is dirty");
   } catch (error) {
     const execError = error as { stdout?: string };
     output = execError.stdout ?? "";
@@ -267,8 +267,8 @@ function assertExecutorFailsClosedOnCurrentDirtyTree() {
   if (!parsed.blocked) {
     fail("executor dirty-tree dry-run did not report blocked:true");
   }
-  if (!parsed.blockedReasons?.some((reason) => reason.includes("Working tree не чистый"))) {
-    fail("executor dirty-tree dry-run did not report the working tree blocker");
+  if (!parsed.blockedReasons?.some((reason) => reason.includes("Tracked working tree не чистый"))) {
+    fail("executor dirty-tree dry-run did not report the tracked working tree blocker");
   }
 }
 
@@ -299,7 +299,7 @@ function main() {
   assertTaskStatus(new Set(candidateFile.candidates.map((candidate) => candidate.id)));
   assertNextLoopRuns();
   assertExecutorDryRunRuns();
-  assertExecutorFailsClosedOnCurrentDirtyTree();
+  assertExecutorFailsClosedOnCurrentTrackedDirtyTree();
   assertWorkflowCoverage();
   console.log("[OK] autonomous product operating system verified");
 }

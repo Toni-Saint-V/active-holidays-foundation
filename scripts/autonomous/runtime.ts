@@ -547,6 +547,12 @@ export function buildFounderReport(
     mode === "executor"
       ? "Prepare a focused `codex/*` branch, run the readiness stack, and hand off the scoped execution packet."
       : "Create a focused branch for the selected task and keep implementation scoped to its evidence paths.";
+  const approvalRisk =
+    selected.blockedGates.length > 0
+      ? `- Blocked gates: ${selected.blockedGates.join(", ")}`
+      : selected.requiresApproval.length > 0
+        ? `- Approval required before execution: ${selected.requiresApproval.join(", ")}`
+        : "- No blocked irreversible, external, or UI gate on this selected task.";
 
   return [
     "# Founder Report",
@@ -582,9 +588,7 @@ export function buildFounderReport(
     "",
     "## Risks",
     "",
-    selected.blockedGates.length === 0
-      ? "- No blocked irreversible, external, or UI gate on this selected task."
-      : `- Blocked gates: ${selected.blockedGates.join(", ")}`,
+    approvalRisk,
     `- ${statusLine}`,
     "",
     "## Next Best Action",
@@ -644,6 +648,23 @@ export function buildAutonomousBranchName(candidateId: string): string {
     .replace(/^-|-$/g, "");
 
   return `codex/autonomous-${normalized}`.slice(0, 72);
+}
+
+function untrackedPathFromStatus(entry: string): string | null {
+  return entry.startsWith("?? ") ? entry.slice(3).trim() : null;
+}
+
+function pathsOverlap(left: string, right: string): boolean {
+  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
+}
+
+function findUntrackedScopeCollisions(gitStatus: string[], selected: ScoredCandidate | null): string[] {
+  if (!selected) return [];
+  const evidencePaths = selected.evidence.filter((entry) => !entry.startsWith("http"));
+  return gitStatus
+    .map(untrackedPathFromStatus)
+    .filter((entry): entry is string => Boolean(entry))
+    .filter((entry) => evidencePaths.some((evidencePath) => pathsOverlap(entry, evidencePath)));
 }
 
 export function buildExecutionBrief(packet: ExecutionPacket): string {
@@ -715,14 +736,23 @@ export function prepareExecutionPacket(options?: {
   const selected = selection.selected;
   const branchName = selected ? buildAutonomousBranchName(selected.id) : null;
   const blockedReasons: string[] = [];
-  const nonIgnoredGitStatus = gitStatus.filter((entry) => !entry.startsWith("?? reports/autonomous/"));
+  const blockingTrackedGitStatus = trackedGitStatus.filter(
+    (entry) => !entry.startsWith("?? reports/autonomous/")
+  );
+  const untrackedScopeCollisions = findUntrackedScopeCollisions(gitStatus, selected);
 
   if (!selected) {
     blockedReasons.push("Нет executor-safe кандидата без approval gate или missing evidence.");
   }
 
-  if (nonIgnoredGitStatus.length > 0 && !options?.allowDirtyTracked) {
-    blockedReasons.push("Working tree не чистый; local executor fail-closed.");
+  if (blockingTrackedGitStatus.length > 0 && !options?.allowDirtyTracked) {
+    blockedReasons.push("Tracked working tree не чистый; local executor fail-closed.");
+  }
+
+  if (untrackedScopeCollisions.length > 0) {
+    blockedReasons.push(
+      `Untracked files collide with selected task scope: ${untrackedScopeCollisions.join(", ")}.`
+    );
   }
 
   if (options?.write && currentBranch !== baseBranch && !options?.allowNonBaseBranch) {

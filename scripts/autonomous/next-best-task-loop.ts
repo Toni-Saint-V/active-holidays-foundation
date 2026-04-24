@@ -5,7 +5,7 @@ import { outputDir, repoRoot, selectNextTask } from "./runtime";
 function main() {
   const shouldWrite = process.argv.includes("--write");
   const asJson = process.argv.includes("--json");
-  const mode = process.argv.includes("--mode=executor") ? "executor" : "planning";
+  const mode = process.argv.includes("--mode=planning") ? "planning" : "executor";
   const result = selectNextTask({ currentRepoRoot: repoRoot, mode });
 
   if (shouldWrite) {
