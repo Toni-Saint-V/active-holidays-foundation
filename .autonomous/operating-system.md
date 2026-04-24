@@ -107,6 +107,7 @@ This branch implements the repo-owned Stage A control layer:
 
 - `.autonomous/*` operating docs
 - deterministic scoring candidates
+- repo-owned task lifecycle status
 - `scripts/autonomous/runtime.ts`
 - `scripts/autonomous/next-best-task-loop.ts`
 - `scripts/autonomous/execute-autonomous-task.ts`
@@ -118,6 +119,6 @@ This branch implements the repo-owned Stage A control layer:
 
 Stage A now supports executor-safe task selection, dry-run execution packets, local `codex/*` branch preparation, and baseline verification without enabling live external writes.
 
-The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, validates evidence and approval gates, scores candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
+The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, applies `.autonomous/task-status.json`, validates evidence and approval gates, scores candidates, blocks completed or paused candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
 
 It still does not autonomously edit product code, push branches, open PRs, merge into `main`, or perform live Notion/GitHub writeback by itself. Those remain explicitly gated.

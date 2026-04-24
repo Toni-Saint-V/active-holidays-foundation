@@ -79,6 +79,21 @@ export type CandidateFile = {
   candidates: Candidate[];
 };
 
+export type TaskLifecycleStatus = "ready" | "completed" | "paused";
+
+export type TaskStatusRecord = {
+  id: string;
+  status: TaskLifecycleStatus;
+  updatedAt: string;
+  evidence: string[];
+  note: string;
+};
+
+export type TaskStatusFile = {
+  schemaVersion: 1;
+  tasks: TaskStatusRecord[];
+};
+
 export type NextTaskMode = "planning" | "executor";
 
 export type ScoredCandidate = Candidate & {
@@ -88,6 +103,8 @@ export type ScoredCandidate = Candidate & {
   blockedGates: string[];
   unknownApprovalGates: string[];
   missingEvidence: string[];
+  taskStatus: TaskLifecycleStatus;
+  blockedLifecycleStatus: TaskLifecycleStatus | null;
   eligible: boolean;
 };
 
@@ -141,6 +158,7 @@ export type ExecutionPacket = {
 export const repoRoot = process.cwd();
 export const candidatesPath = path.join(repoRoot, ".autonomous", "task-candidates.json");
 export const scoringModelPath = path.join(repoRoot, ".autonomous", "scoring-model.json");
+export const taskStatusPath = path.join(repoRoot, ".autonomous", "task-status.json");
 export const outputDir = path.join(repoRoot, "reports", "autonomous");
 
 const planningBlockedApprovalGates = new Set<ApprovalGate>([
@@ -198,6 +216,7 @@ const tieBreakerFields = new Set<TieBreakerField>([
   "id"
 ]);
 const tieBreakerDirections = new Set<TieBreakerDirection>(["asc", "desc"]);
+const taskLifecycleStatuses = new Set<TaskLifecycleStatus>(["ready", "completed", "paused"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -276,6 +295,79 @@ function summarizeScoringModel(model: ScoringModel): ScoringModelSummary {
   };
 }
 
+function isBlockingTaskStatus(status: TaskLifecycleStatus): boolean {
+  return status === "completed" || status === "paused";
+}
+
+function assertString(value: unknown, fieldName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Invalid task status: ${fieldName} must be a non-empty string.`);
+  }
+  return value;
+}
+
+export function readTaskStatusRecords(
+  currentRepoRoot = repoRoot,
+  candidateIds?: Set<string>
+): TaskStatusRecord[] {
+  const filePath = path.join(currentRepoRoot, ".autonomous", "task-status.json");
+  if (!existsSync(filePath)) return [];
+
+  const raw = readJson<unknown>(filePath);
+  if (!isRecord(raw)) {
+    throw new Error("Invalid task status: root must be an object.");
+  }
+  if (raw.schemaVersion !== 1) {
+    throw new Error("Invalid task status: schemaVersion must be 1.");
+  }
+  if (!Array.isArray(raw.tasks)) {
+    throw new Error("Invalid task status: tasks must be an array.");
+  }
+
+  const seen = new Set<string>();
+  return raw.tasks.map((entry) => {
+    if (!isRecord(entry)) {
+      throw new Error("Invalid task status: each task must be an object.");
+    }
+    const id = assertString(entry.id, "id");
+    if (seen.has(id)) {
+      throw new Error(`Invalid task status: duplicate task id ${id}.`);
+    }
+    seen.add(id);
+    if (candidateIds && !candidateIds.has(id)) {
+      throw new Error(`Invalid task status: unknown candidate id ${id}.`);
+    }
+    if (!taskLifecycleStatuses.has(entry.status as TaskLifecycleStatus)) {
+      throw new Error(`Invalid task status: unsupported status for ${id}.`);
+    }
+    const updatedAt = assertString(entry.updatedAt, "updatedAt");
+    if (Number.isNaN(Date.parse(updatedAt))) {
+      throw new Error(`Invalid task status: updatedAt for ${id} must be ISO-like date.`);
+    }
+    if (
+      !Array.isArray(entry.evidence) ||
+      entry.evidence.length === 0 ||
+      entry.evidence.some((item) => typeof item !== "string" || item.length === 0)
+    ) {
+      throw new Error(`Invalid task status: evidence for ${id} must be a non-empty string array.`);
+    }
+    const note = assertString(entry.note, "note");
+
+    return {
+      id,
+      status: entry.status as TaskLifecycleStatus,
+      updatedAt,
+      evidence: entry.evidence as string[],
+      note
+    };
+  });
+}
+
+function readTaskStatusMap(currentRepoRoot: string, candidateIds: Set<string>): Map<string, TaskStatusRecord> {
+  const records = readTaskStatusRecords(currentRepoRoot, candidateIds);
+  return new Map(records.map((record) => [record.id, record]));
+}
+
 export function getGitStatus(options?: { repoRoot?: string; trackedOnly?: boolean }): string[] {
   try {
     return execFileSync(
@@ -327,11 +419,17 @@ function getBlockedApprovalGates(mode: NextTaskMode): Set<ApprovalGate> {
 
 export function scoreCandidate(
   candidate: Candidate,
-  options?: { currentRepoRoot?: string; mode?: NextTaskMode; scoringModel?: ScoringModel }
+  options?: {
+    currentRepoRoot?: string;
+    mode?: NextTaskMode;
+    scoringModel?: ScoringModel;
+    taskStatus?: TaskLifecycleStatus;
+  }
 ): ScoredCandidate {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const mode = options?.mode ?? "planning";
   const scoringModel = options?.scoringModel ?? readScoringModel(currentRepoRoot);
+  const taskStatus = options?.taskStatus ?? "ready";
   const scores = {
     trust: clampScore(candidate.scores.trust),
     conversion: clampScore(candidate.scores.conversion),
@@ -360,6 +458,7 @@ export function scoreCandidate(
   const missingEvidence = candidate.evidence.filter(
     (evidencePath) => !existsSync(path.join(currentRepoRoot, evidencePath))
   );
+  const blockedLifecycleStatus = isBlockingTaskStatus(taskStatus) ? taskStatus : null;
 
   return {
     ...candidate,
@@ -370,7 +469,12 @@ export function scoreCandidate(
     blockedGates,
     unknownApprovalGates,
     missingEvidence,
-    eligible: blockedGates.length === 0 && missingEvidence.length === 0
+    taskStatus,
+    blockedLifecycleStatus,
+    eligible:
+      blockedGates.length === 0 &&
+      missingEvidence.length === 0 &&
+      blockedLifecycleStatus === null
   };
 }
 
@@ -499,11 +603,20 @@ export function selectNextTask(options?: {
   const mode = options?.mode ?? "planning";
   const scoringModel = readScoringModel(currentRepoRoot);
   const candidateFile = readJson<CandidateFile>(path.join(currentRepoRoot, ".autonomous", "task-candidates.json"));
+  const candidateIds = new Set(candidateFile.candidates.map((candidate) => candidate.id));
+  const taskStatuses = readTaskStatusMap(currentRepoRoot, candidateIds);
   const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
   const trackedGitStatus =
     options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
   const scored = candidateFile.candidates
-    .map((candidate) => scoreCandidate(candidate, { currentRepoRoot, mode, scoringModel }))
+    .map((candidate) =>
+      scoreCandidate(candidate, {
+        currentRepoRoot,
+        mode,
+        scoringModel,
+        taskStatus: taskStatuses.get(candidate.id)?.status
+      })
+    )
     .sort((left, right) => compareScoredCandidates(left, right, scoringModel));
   const eligible = scored.filter((candidate) => candidate.eligible);
   const selected = eligible[0] ?? null;

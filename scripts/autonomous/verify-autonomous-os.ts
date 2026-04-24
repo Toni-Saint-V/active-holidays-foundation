@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { approvalGates, readScoringModel } from "./runtime";
+import { approvalGates, readScoringModel, readTaskStatusRecords } from "./runtime";
 
 type Candidate = {
   id: string;
@@ -24,6 +24,7 @@ const requiredFiles = [
   ".autonomous/operating-system.md",
   ".autonomous/scoring-model.md",
   ".autonomous/scoring-model.json",
+  ".autonomous/task-status.json",
   ".autonomous/safety-gates.md",
   ".autonomous/workflows.md",
   ".autonomous/founder-report-template.md",
@@ -157,6 +158,16 @@ function assertScoringModel() {
   }
 }
 
+function assertTaskStatus(candidateIds: Set<string>) {
+  const records = readTaskStatusRecords(repoRoot, candidateIds);
+  const completedIds = records
+    .filter((record) => record.status === "completed")
+    .map((record) => record.id);
+  if (!completedIds.includes("autonomy-runtime-scoring")) {
+    fail("task-status.json must mark autonomy-runtime-scoring as completed after PR #7");
+  }
+}
+
 function assertNextLoopRuns() {
   const output = execFileSync(
     "npx",
@@ -167,20 +178,27 @@ function assertNextLoopRuns() {
     }
   );
   const parsed = JSON.parse(output) as {
-    selected?: { id?: string };
+    selected?: { id?: string; taskStatus?: string };
+    blockedCandidates?: Array<{ id?: string; taskStatus?: string; blockedLifecycleStatus?: string | null }>;
     scoringModel?: { schemaVersion?: number; tieBreakers?: string[] };
   };
-  if (parsed.selected?.id !== "autonomy-runtime-scoring") {
-    fail(`next-best-task-loop selected unexpected task: ${parsed.selected?.id ?? "none"}`);
+  if (!parsed.selected?.id) {
+    fail("next-best-task-loop did not select an eligible task");
+  }
+  if (parsed.selected.taskStatus !== "ready") {
+    fail(`next-best-task-loop selected non-ready task: ${parsed.selected.id}`);
+  }
+  const completedScoringCandidate = parsed.blockedCandidates?.find(
+    (candidate) => candidate.id === "autonomy-runtime-scoring"
+  );
+  if (completedScoringCandidate?.blockedLifecycleStatus !== "completed") {
+    fail("next-best-task-loop did not block completed autonomy-runtime-scoring candidate");
   }
   if (parsed.scoringModel?.schemaVersion !== 1) {
     fail("next-best-task-loop did not expose scoring model schemaVersion");
   }
   if (parsed.scoringModel?.tieBreakers?.join("|") !== requiredTieBreakers.join("|")) {
     fail("next-best-task-loop did not expose the expected scoring tieBreakers");
-  }
-  if (!parsed.selected?.id) {
-    fail("next-best-task-loop did not select an eligible task");
   }
 }
 
@@ -199,12 +217,21 @@ function assertExecutorDryRunRuns() {
       encoding: "utf8"
     }
   );
-  const parsed = JSON.parse(output) as { selected?: { id?: string }; blocked?: boolean };
+  const parsed = JSON.parse(output) as {
+    selected?: { id?: string; taskStatus?: string; blockedGates?: string[] };
+    blocked?: boolean;
+  };
   if (parsed.blocked) {
     fail("executor dry-run must not be blocked in a clean repository");
   }
   if (!parsed.selected?.id) {
     fail("executor dry-run did not select an executor-safe task");
+  }
+  if (parsed.selected.taskStatus !== "ready") {
+    fail(`executor dry-run selected non-ready task: ${parsed.selected.id}`);
+  }
+  if (parsed.selected.blockedGates && parsed.selected.blockedGates.length > 0) {
+    fail(`executor dry-run selected gated task: ${parsed.selected.id}`);
   }
 }
 
@@ -268,6 +295,8 @@ function main() {
   assertSafetyGates();
   assertScoringModel();
   assertCandidates();
+  const candidateFile = JSON.parse(read(".autonomous/task-candidates.json")) as CandidateFile;
+  assertTaskStatus(new Set(candidateFile.candidates.map((candidate) => candidate.id)));
   assertNextLoopRuns();
   assertExecutorDryRunRuns();
   assertExecutorFailsClosedOnCurrentDirtyTree();
