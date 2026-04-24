@@ -651,11 +651,21 @@ export function buildAutonomousBranchName(candidateId: string): string {
 }
 
 function untrackedPathFromStatus(entry: string): string | null {
-  return entry.startsWith("?? ") ? entry.slice(3).trim() : null;
+  return entry.startsWith("?? ") ? normalizeGitStatusPath(entry.slice(3).trim()) : null;
+}
+
+function normalizeGitStatusPath(entry: string): string {
+  return entry.replace(/\/+$/g, "");
 }
 
 function pathsOverlap(left: string, right: string): boolean {
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
+  const normalizedLeft = normalizeGitStatusPath(left);
+  const normalizedRight = normalizeGitStatusPath(right);
+  return (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.startsWith(`${normalizedRight}/`) ||
+    normalizedRight.startsWith(`${normalizedLeft}/`)
+  );
 }
 
 function findUntrackedScopeCollisions(gitStatus: string[], selected: ScoredCandidate | null): string[] {

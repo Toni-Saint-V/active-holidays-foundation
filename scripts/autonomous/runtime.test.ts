@@ -725,6 +725,50 @@ describe("autonomous runtime", () => {
     );
   });
 
+  it("blocks untracked directories that contain selected task evidence", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main",
+      gitStatus: ["?? evidence/"],
+      trackedGitStatus: []
+    });
+
+    expect(packet.blocked).toBe(true);
+    expect(packet.blockedReasons).toContain("Untracked files collide with selected task scope: evidence.");
+  });
+
   it("builds a stable codex branch name", () => {
     expect(buildAutonomousBranchName("Conversion CTA instrumentation!")).toBe(
       "codex/autonomous-conversion-cta-instrumentation"
