@@ -64,10 +64,24 @@ export type GeneratedFreshnessTask = {
   id: string;
   title: string;
   severity: SourceFreshnessSeverity;
+  sourceId: string;
+  productArea: "truth_trust";
   productReason: string;
+  actionNeeded: string;
   evidence: string[];
   blockedByManualReview: boolean;
+  acceptanceCriteria: string[];
   verification: string[];
+  codexBrief: string;
+  notionSync: {
+    surface: "Automation Inbox";
+    syncKey: string;
+    status: "Ready";
+    severity: SourceFreshnessSeverity;
+    confidence: "high" | "medium";
+    actionNeeded: string;
+    evidence: string[];
+  };
 };
 
 export type SourceFreshnessReport = {
@@ -156,6 +170,63 @@ function taskIdSuffix(sourceId: string): string {
   return sourceId.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function buildTaskArtifacts(input: {
+  id: string;
+  title: string;
+  severity: SourceFreshnessSeverity;
+  sourceId: string;
+  productReason: string;
+  actionNeeded: string;
+  evidence: string[];
+  blockedByManualReview: boolean;
+}): GeneratedFreshnessTask {
+  const acceptanceCriteria = [
+    "Freshness issue is represented as a concrete product task with source id, product reason, evidence, and owner boundary.",
+    "Manual review boundary is explicit before any truth catalog timestamp or content update.",
+    "Verification command is listed and can be run without external writes."
+  ];
+  const codexBrief = [
+    `# Truth freshness task: ${input.title}`,
+    "",
+    "## Objective",
+    input.actionNeeded,
+    "",
+    "## Product reason",
+    input.productReason,
+    "",
+    "## Evidence",
+    ...input.evidence.map((item) => `- ${item}`),
+    "",
+    "## Acceptance criteria",
+    ...acceptanceCriteria.map((item) => `- ${item}`),
+    "",
+    "## Verification",
+    ...verificationCommands.map((item) => `- ${item}`),
+    "",
+    "## Boundary",
+    input.blockedByManualReview
+      ? "- Do not update source freshness timestamps or product truth until a human/manual source review confirms the source."
+      : "- Safe metadata repair can proceed if the patch only restores source catalog integrity."
+  ].join("\n");
+
+  return {
+    ...input,
+    productArea: "truth_trust",
+    acceptanceCriteria,
+    verification: verificationCommands,
+    codexBrief,
+    notionSync: {
+      surface: "Automation Inbox",
+      syncKey: `automation:${automationId}:${input.id}`,
+      status: "Ready",
+      severity: input.severity,
+      confidence: input.blockedByManualReview ? "medium" : "high",
+      actionNeeded: input.actionNeeded,
+      evidence: input.evidence
+    }
+  };
+}
+
 function staleProductImpact(source: Source, waived: boolean): string {
   if (waived) {
     return `${source.tier} source is stale under a time-boxed waiver; recommendations remain usable only while the waiver is visible and manually owned.`;
@@ -185,45 +256,48 @@ function buildNextTasks(issues: SourceFreshnessIssue[], sourceById: Map<string, 
       const source = sourceById.get(issue.sourceId);
       const sourceLabel = source?.label ?? issue.sourceId;
       const id = `truth-refresh-${taskIdSuffix(issue.sourceId)}`;
-      tasks.set(id, {
+      tasks.set(id, buildTaskArtifacts({
         id,
         title: `Refresh stale ${issue.tier ?? "source"} source: ${sourceLabel}`,
         severity: issue.severity,
+        sourceId: issue.sourceId,
         productReason: issue.waived
           ? `${sourceLabel} is stale under a time-boxed waiver; keep it actionable until manually re-verified.`
           : `${sourceLabel} is referenced by product rules and can make customer-facing guidance stale.`,
+        actionNeeded: `Manually re-check ${sourceLabel}, then update the source catalog only if the live source still supports the current product rule.`,
         evidence: issue.evidence,
-        blockedByManualReview: true,
-        verification: verificationCommands
-      });
+        blockedByManualReview: true
+      }));
       continue;
     }
 
     if (issue.kind === "missing_source_reference") {
       const id = `truth-fix-missing-source-${taskIdSuffix(issue.sourceId)}`;
-      tasks.set(id, {
+      tasks.set(id, buildTaskArtifacts({
         id,
         title: `Fix missing source mapping: ${issue.sourceId}`,
         severity: issue.severity,
+        sourceId: issue.sourceId,
         productReason: `Product rules reference ${issue.sourceId}, but the source catalog is missing it, so the system cannot show reliable evidence.`,
+        actionNeeded: `Add or correct the source catalog mapping for ${issue.sourceId} without changing product claims.`,
         evidence: issue.evidence,
-        blockedByManualReview: false,
-        verification: verificationCommands
-      });
+        blockedByManualReview: false
+      }));
       continue;
     }
 
     if (issue.kind === "invalid_last_checked_at" || issue.kind === "duplicate_source_id") {
       const id = `truth-fix-source-catalog-${taskIdSuffix(issue.sourceId)}`;
-      tasks.set(id, {
+      tasks.set(id, buildTaskArtifacts({
         id,
         title: `Repair source catalog integrity: ${issue.sourceId}`,
         severity: issue.severity,
+        sourceId: issue.sourceId,
         productReason: issue.productImpact,
+        actionNeeded: `Repair source catalog integrity for ${issue.sourceId} so freshness and evidence checks remain deterministic.`,
         evidence: issue.evidence,
-        blockedByManualReview: false,
-        verification: verificationCommands
-      });
+        blockedByManualReview: false
+      }));
     }
   }
 
@@ -412,7 +486,7 @@ export function buildSourceFreshnessReport(
   };
 }
 
-function renderMarkdownReport(report: SourceFreshnessReport): string {
+export function renderMarkdownReport(report: SourceFreshnessReport): string {
   const warnings = report.warnings.length > 0
     ? report.warnings.map((warning) => `- ${warning}`).join("\n")
     : "- none";
@@ -431,6 +505,10 @@ function renderMarkdownReport(report: SourceFreshnessReport): string {
     : "- none";
 
   return [
+    "---",
+    `lastVerifiedAt: ${report.generatedAt}`,
+    "---",
+    "",
     "# Truth + Freshness Watch",
     "",
     "## SOURCE HEALTH",
@@ -500,9 +578,20 @@ async function loadRuntimeInput(): Promise<BuildSourceFreshnessReportInput> {
 
 async function writeReports(report: SourceFreshnessReport) {
   const outputDir = path.join("reports", "automations", "runs", automationId);
+  const markdownReport = `${renderMarkdownReport(report)}\n`;
+  const datedReportName = `${report.generatedAt.slice(0, 10)}.md`;
   await mkdir(outputDir, { recursive: true });
   await writeFile(path.join(outputDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
-  await writeFile(path.join(outputDir, "latest.md"), `${renderMarkdownReport(report)}\n`);
+  await writeFile(path.join(outputDir, "latest.md"), markdownReport);
+  await writeFile(path.join(outputDir, datedReportName), markdownReport);
+  const topTask = report.nextTasks[0] ?? null;
+  await writeFile(path.join(outputDir, "task-packet-latest.json"), `${JSON.stringify(topTask, null, 2)}\n`);
+  await writeFile(
+    path.join(outputDir, "task-packet-latest.md"),
+    topTask
+      ? `${topTask.codexBrief}\n\n## Notion sync\n\n\`\`\`json\n${JSON.stringify(topTask.notionSync, null, 2)}\n\`\`\`\n`
+      : "No actionable freshness task.\n"
+  );
 }
 
 async function main() {

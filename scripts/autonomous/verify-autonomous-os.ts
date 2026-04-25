@@ -33,6 +33,7 @@ const requiredFiles = [
   "scripts/autonomous/runtime.ts",
   "scripts/autonomous/execute-autonomous-task.ts",
   "scripts/autonomous/next-best-task-loop.ts",
+  "scripts/autonomous/run-autonomous-cycle.ts",
   "scripts/autonomous/verify-autonomous-os.ts",
   ".github/workflows/autonomous-checks.yml"
 ];
@@ -40,6 +41,7 @@ const requiredFiles = [
 const requiredPackageScripts = [
   "autonomous:next",
   "autonomous:next:write",
+  "autonomous:cycle",
   "autonomous:execute",
   "autonomous:verify"
 ];

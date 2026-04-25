@@ -7,12 +7,17 @@
 - Main input source: repo runtime analysis.
 - Decision model: balanced score across trust, conversion, market-grade polish, and engineering health.
 - Approval gates: explicit founder approval only for irreversible or external actions.
+- UI generator boundary: Lovable may be used only as a temporary UI-layer handoff tool; it is not a core dependency for domain logic, task selection, verification, sync, or long-term product architecture.
 
 ## System Goal
 
 Continuously improve Active Holidays toward market-grade product quality by selecting small, high-value, safe tasks and driving them to a merge-ready branch with evidence.
 
 The system must not behave like a broad backlog generator. It must create one clear next task from current repo reality, execute only safe increments, verify the result, self-review the diff, and produce a concise founder report.
+
+At this stage, the system must keep profit, brand, service quality, and competitive advantage in the strategic lens without prematurely making revenue the dominant scoring axis. Early tasks should first raise decision quality, trust, product clarity, operability, and speed of learning, because those are the foundation for later monetization and brand strength.
+
+The autonomous core must stay independent from any UI generator. Lovable can accelerate screen composition while the project is early, but the durable system of record remains repo contracts, domain logic, API behavior, verification evidence, Notion/GitHub sync plans, and founder decisions.
 
 ## Architecture
 
@@ -42,6 +47,8 @@ Reads repo-local evidence:
 - `reports/automations/state/gate-eligibility-snapshot.json`
 - `automation/yepcode/active-holidays-orchestrator/`
 - current git status
+
+Lovable output is treated as optional UI evidence only when a UI task has passed the PNG approval gate. It must not replace repo contracts or become the source of truth for non-UI decisions.
 
 ### Candidate Generator
 
@@ -113,11 +120,12 @@ This branch implements the repo-owned Stage A control layer:
 - `scripts/autonomous/execute-autonomous-task.ts`
 - `scripts/autonomous/verify-autonomous-os.ts`
 - `npm run autonomous:next`
+- `npm run autonomous:cycle`
 - `npm run autonomous:execute`
 - `npm run autonomous:verify`
 - GitHub Actions check workflow
 
-Stage A now supports executor-safe task selection, dry-run execution packets, local `codex/*` branch preparation, and baseline verification without enabling live external writes.
+Stage A now supports executor-safe task selection, persisted dry-run cycle reports, dry-run execution packets, local `codex/*` branch preparation, and baseline verification without enabling live external writes.
 
 The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, applies `.autonomous/task-status.json`, validates evidence and approval gates, scores candidates, blocks completed or paused candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
 

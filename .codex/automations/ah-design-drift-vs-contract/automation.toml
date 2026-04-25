@@ -12,7 +12,7 @@ prompt = """
 Обязательно:
 - начни с repo reality: router, screens, state surfaces
 - если доступен Notion, сверяйся с canonical anchors `P0`, `P1`, `P2`, `04 · Roadmap`, а operational DB используй только как supporting execution context
-- сохраняй совместимость с upcoming Lovable integration и не строй выводы на legacy UI assumptions
+- сохраняй совместимость с возможным UI-layer handoff через Lovable, но не делай Lovable источником истины для домена, контрактов или задач
 - если нужен operational context, сначала проверь `.codex/automations/notion-surface-lock.json`
 - title/name only for read-only discovery before lock
 - если binding missing или ambiguous, фиксируй `blocked_by_target_binding`

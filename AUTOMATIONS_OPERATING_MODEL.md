@@ -45,7 +45,7 @@
 - trigger / schedule: Mon/Thu `12:00` Europe/Moscow.
 - inputs: Product OS radar, AGENTS, repo structure, Notion execution docs.
 - tools / integrations: local docs, optional Notion read.
-- exact behavior: writes a concise next-brief artifact, prompt fragments, and execution notes for Codex/Lovable/human owner.
+- exact behavior: writes a concise next-brief artifact, prompt fragments, and execution notes for Codex/human owner; Lovable handoff is included only for approved UI-layer work and never as a dependency for domain, API, or verification tasks.
 - memory requirements: last brief sync report.
 - guardrails: no speculative tasks; only executable next steps.
 - artifacts produced: `reports/automations/runs/ah-execution-brief-sync/latest.md`.

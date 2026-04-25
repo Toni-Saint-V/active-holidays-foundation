@@ -58,7 +58,7 @@ How much the task reduces fragility, improves tests, simplifies contracts, remov
 
 ### Strategic Fit
 
-How tightly the task maps to the current Active Holidays direction and the near-term Lovable/Codex/GitHub/Notion workflow.
+How tightly the task maps to the current Active Holidays direction, repo-owned domain/contracts, verification stack, and Notion/GitHub execution workflow. Lovable alignment matters only for approved UI-layer work and must not outweigh core product timing, trust, or architecture.
 
 ### Risk
 
@@ -79,3 +79,16 @@ The next task is the highest `balanced_score` candidate that:
 - can be implemented in one reviewable branch
 
 If no candidate passes safety gates, the run becomes report-first and produces a founder decision request.
+
+## Whole-Project Strategic Lens
+
+The current product is still early and should not over-optimize for immediate revenue machinery.
+Before accepting or executing a task, the operator still checks whether it improves the whole project:
+
+- своевременность решений and speed of learning
+- trust and service quality
+- brand quality and premium perception
+- competitive edge against alternatives users already compare with
+- future monetization readiness without premature complexity
+
+This lens informs candidate writing and self-review. It does not replace the machine score until the product has stronger market and revenue evidence.

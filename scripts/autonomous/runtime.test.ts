@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildAutonomousBranchName,
   prepareExecutionPacket,
+  runAutonomousCycle,
   selectNextTask
 } from "./runtime";
 
@@ -453,6 +454,7 @@ describe("autonomous runtime", () => {
         "id:asc"
       ]
     });
+    expect(result.eligibleCandidates.map((candidate) => candidate.id)).toEqual(["backend-hardening"]);
   });
 
   it("blocks ui approval candidates in executor mode but not in planning mode", async () => {
@@ -767,6 +769,60 @@ describe("autonomous runtime", () => {
 
     expect(packet.blocked).toBe(true);
     expect(packet.blockedReasons).toContain("Untracked files collide with selected task scope: evidence.");
+  });
+
+  it("writes a complete dry-run cycle artifact set without external writes", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = runAutonomousCycle({
+      currentRepoRoot: tempDir,
+      verify: false,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+    const cycleJson = await readFile(path.join(tempDir, "reports/autonomous/cycle-latest.json"), "utf8");
+    const cycleReport = await readFile(path.join(tempDir, "reports/autonomous/cycle-report-latest.md"), "utf8");
+    const nextTaskJson = await readFile(
+      path.join(tempDir, "reports/autonomous/next-best-task-latest.json"),
+      "utf8"
+    );
+
+    expect(result.selectedTaskId).toBe("backend-hardening");
+    expect(result.blocked).toBe(false);
+    expect(result.executionPacket.externalWriteState.writePerformed).toBe(false);
+    expect(JSON.parse(cycleJson).selectedTaskId).toBe("backend-hardening");
+    expect(JSON.parse(nextTaskJson).eligibleCandidates).toHaveLength(1);
+    expect(cycleReport).toContain("Autonomous Cycle Report");
   });
 
   it("builds a stable codex branch name", () => {

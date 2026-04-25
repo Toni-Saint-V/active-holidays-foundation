@@ -22,6 +22,7 @@
     "skills:telemetry:report": "node --experimental-strip-types scripts/codex/skill-mode-telemetry.ts --report",
     "automations:sync": "node --experimental-strip-types scripts/codex/sync-automations.ts",
     "automations:verify": "node --experimental-strip-types scripts/codex/verify-automations.ts",
+    "automations:snapshot:write": "node --experimental-strip-types scripts/codex/write-gate-eligibility-snapshot.ts",
     "automations:verify:negative": "node --experimental-strip-types scripts/codex/verify-automations-negative-fixtures.ts",
     "automations:check:truth": "node --experimental-strip-types scripts/automations/check-source-freshness.ts",
     "automations:check:screens": "node --experimental-strip-types scripts/automations/check-screen-surface.ts",
@@ -33,6 +34,7 @@
     "yepcode:orchestrator:test": "node automation/yepcode/active-holidays-orchestrator/tests/orchestrator.check.cjs",
     "autonomous:next": "tsx scripts/autonomous/next-best-task-loop.ts",
     "autonomous:next:write": "tsx scripts/autonomous/next-best-task-loop.ts --write",
+    "autonomous:cycle": "tsx scripts/autonomous/run-autonomous-cycle.ts",
     "autonomous:execute": "tsx scripts/autonomous/execute-autonomous-task.ts",
     "autonomous:verify": "tsx scripts/autonomous/verify-autonomous-os.ts"
   },

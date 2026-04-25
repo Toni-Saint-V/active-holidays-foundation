@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSourceFreshnessReport, type Source } from "./check-source-freshness";
+import { buildSourceFreshnessReport, renderMarkdownReport, type Source } from "./check-source-freshness";
 
 const now = new Date("2026-04-24T12:00:00.000Z");
 
@@ -59,8 +59,21 @@ describe("buildSourceFreshnessReport", () => {
       expect.objectContaining({
         id: "truth-refresh-src_operator_stale",
         title: "Refresh stale operator source: Operator stale source",
+        sourceId: "src_operator_stale",
+        productArea: "truth_trust",
         evidence: ["data/db/sources.json", "data/db/visa_rules.json"],
         blockedByManualReview: true,
+        actionNeeded: expect.stringContaining("Manually re-check Operator stale source"),
+        acceptanceCriteria: expect.arrayContaining([
+          expect.stringContaining("Manual review boundary is explicit")
+        ]),
+        codexBrief: expect.stringContaining("Truth freshness task"),
+        notionSync: expect.objectContaining({
+          surface: "Automation Inbox",
+          syncKey: "automation:ah-truth-freshness-watch:truth-refresh-src_operator_stale",
+          status: "Ready",
+          severity: "blocker"
+        }),
         verification: ["npm run automations:check:truth"]
       })
     );
@@ -101,7 +114,11 @@ describe("buildSourceFreshnessReport", () => {
       expect.objectContaining({
         id: "truth-refresh-src_official_waived",
         severity: "warning",
-        productReason: expect.stringContaining("time-boxed waiver")
+        productReason: expect.stringContaining("time-boxed waiver"),
+        blockedByManualReview: true,
+        notionSync: expect.objectContaining({
+          confidence: "medium"
+        })
       })
     );
   });
@@ -119,8 +136,20 @@ describe("buildSourceFreshnessReport", () => {
         id: "truth-fix-missing-source-src_missing_source",
         title: "Fix missing source mapping: src_missing_source",
         evidence: ["data/db/sources.json", "data/db/visa_rules.json"],
-        productReason: expect.stringContaining("cannot show reliable evidence")
+        productReason: expect.stringContaining("cannot show reliable evidence"),
+        blockedByManualReview: false,
+        notionSync: expect.objectContaining({
+          confidence: "high"
+        })
       })
+    );
+  });
+
+  it("renders deterministic report frontmatter for gate freshness projection", () => {
+    const report = buildReport({ sources: [freshOfficial] });
+
+    expect(renderMarkdownReport(report)).toMatch(
+      /^---\nlastVerifiedAt: 2026-04-24T12:00:00\.000Z\n---\n\n# Truth \+ Freshness Watch/
     );
   });
 });

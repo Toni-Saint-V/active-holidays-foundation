@@ -40,11 +40,27 @@ Planning mode can surface a high-value task that still needs an approval gate be
 npm run autonomous:verify
 ```
 
+## Full Local Cycle Command
+
+```bash
+npm run autonomous:cycle
+```
+
+This runs the local report-first loop:
+
+1. select the next executor-safe task
+2. save the founder report
+3. save the executor packet
+4. run the verification stack
+5. save the cycle report
+6. keep external writes disabled
+
 ## Output Contract
 
 The loop returns:
 
 - selected task id
+- eligible executor-safe candidates
 - score
 - score breakdown
 - product reason
@@ -59,6 +75,7 @@ The loop returns:
 The current loop is deterministic and local.
 
 - `npm run autonomous:next` selects and reports the next executor-safe task.
+- `npm run autonomous:cycle` persists the next-task artifacts, executor packet, verification results, and cycle report in `reports/autonomous/`.
 - `npm run autonomous:next -- --mode=planning` selects and reports the next planning task, including tasks that may require approval before execution.
 - `.autonomous/task-status.json` marks completed or paused candidates so the static selector does not keep re-selecting shipped work.
 - `npm run autonomous:execute` prepares an executor packet and may create a local `codex/*` branch only when explicitly run with `--write`.

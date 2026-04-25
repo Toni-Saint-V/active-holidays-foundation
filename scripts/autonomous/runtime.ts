@@ -113,6 +113,7 @@ export type NextTaskResult = {
   generatedAt: string;
   mode: NextTaskMode;
   selected: ScoredCandidate | null;
+  eligibleCandidates: ScoredCandidate[];
   topCandidates: ScoredCandidate[];
   blockedCandidates: ScoredCandidate[];
   gitStatus: string[];
@@ -153,6 +154,25 @@ export type ExecutionPacket = {
   };
   founderReport: string;
   executionBrief: string;
+};
+
+export type AutonomousCycleResult = {
+  schemaVersion: 1;
+  generatedAt: string;
+  mode: "dry-run-cycle";
+  selectedTaskId: string | null;
+  blocked: boolean;
+  blockedReasons: string[];
+  nextTask: NextTaskResult;
+  executionPacket: ExecutionPacket;
+  artifacts: {
+    nextTaskJson: string;
+    founderReport: string;
+    executorPacketJson: string;
+    executorBrief: string;
+    cycleJson: string;
+    cycleReport: string;
+  };
 };
 
 export const repoRoot = process.cwd();
@@ -569,7 +589,13 @@ export function buildFounderReport(
     "",
     "## Product Impact",
     "",
-    `Improves ${selected.category} with the current balanced model.`,
+    `Improves ${selected.category} with the current early-stage balanced model.`,
+    "",
+    "## Strategic Lens",
+    "",
+    "- Optimize for timely decisions now, not premature monetization machinery.",
+    "- Keep brand quality, service quality, competitive edge, and future monetization in view before accepting or executing the task.",
+    "- Prefer tasks that make the product more trusted, cleaner, easier to ship, and harder to copy over generic backlog movement.",
     "",
     "## Technical Impact",
     "",
@@ -631,6 +657,7 @@ export function selectNextTask(options?: {
     generatedAt: new Date().toISOString(),
     mode,
     selected,
+    eligibleCandidates: eligible.slice(0, 5),
     topCandidates: scored.slice(0, 5),
     blockedCandidates: scored.filter((candidate) => !candidate.eligible),
     gitStatus,
@@ -638,6 +665,19 @@ export function selectNextTask(options?: {
     scoringModel: summarizeScoringModel(scoringModel),
     founderReport
   };
+}
+
+export function writeNextTaskArtifacts(
+  result: NextTaskResult,
+  currentRepoRoot = repoRoot
+): void {
+  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
+  mkdirSync(currentOutputDir, { recursive: true });
+  writeFileSync(
+    path.join(currentOutputDir, "next-best-task-latest.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
+  writeFileSync(path.join(currentOutputDir, "founder-report-latest.md"), `${result.founderReport}\n`);
 }
 
 export function buildAutonomousBranchName(candidateId: string): string {
@@ -839,4 +879,119 @@ export function runVerificationStack(
       stderrTail: stderr.trim().split("\n").slice(-12).join("\n")
     };
   });
+}
+
+function buildCycleReport(result: AutonomousCycleResult): string {
+  const verificationResults = result.executionPacket.verificationResults;
+  const verificationSection =
+    verificationResults.length === 0
+      ? "- not run"
+      : verificationResults
+          .map((entry) => `- ${entry.ok ? "OK" : "FAIL"} · ${entry.command}`)
+          .join("\n");
+  const blockerSection =
+    result.blockedReasons.length === 0
+      ? "- none"
+      : result.blockedReasons.map((reason) => `- ${reason}`).join("\n");
+
+  return [
+    "# Autonomous Cycle Report",
+    "",
+    `- Generated at: ${result.generatedAt}`,
+    `- Selected task: ${result.selectedTaskId ?? "none"}`,
+    `- Blocked: ${result.blocked ? "yes" : "no"}`,
+    "",
+    "## Blockers",
+    "",
+    blockerSection,
+    "",
+    "## Verification",
+    "",
+    verificationSection,
+    "",
+    "## External Writes",
+    "",
+    `- Performed: ${result.executionPacket.externalWriteState.writePerformed ? "yes" : "no"}`,
+    `- Reason: ${result.executionPacket.externalWriteState.reason}`,
+    "",
+    "## Next Best Action",
+    "",
+    result.nextTask.founderReport
+  ].join("\n");
+}
+
+export function writeCycleArtifacts(
+  result: AutonomousCycleResult,
+  currentRepoRoot = repoRoot
+): void {
+  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
+  mkdirSync(currentOutputDir, { recursive: true });
+  writeFileSync(
+    path.join(currentOutputDir, "cycle-latest.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
+  writeFileSync(path.join(currentOutputDir, "cycle-report-latest.md"), `${buildCycleReport(result)}\n`);
+}
+
+export function runAutonomousCycle(options?: {
+  currentRepoRoot?: string;
+  verify?: boolean;
+  currentBranch?: string;
+  gitStatus?: string[];
+  trackedGitStatus?: string[];
+}): AutonomousCycleResult {
+  const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
+  const generatedAt = new Date().toISOString();
+  const nextTask = selectNextTask({
+    currentRepoRoot,
+    mode: "executor",
+    gitStatus: options?.gitStatus,
+    trackedGitStatus: options?.trackedGitStatus
+  });
+  writeNextTaskArtifacts(nextTask, currentRepoRoot);
+
+  const executionPacket = prepareExecutionPacket({
+    currentRepoRoot,
+    currentBranch: options?.currentBranch,
+    gitStatus: options?.gitStatus,
+    trackedGitStatus: options?.trackedGitStatus
+  });
+  if (options?.verify !== false) {
+    executionPacket.verificationResults = runVerificationStack(
+      executionPacket.verificationCommands,
+      currentRepoRoot
+    );
+    const failedChecks = executionPacket.verificationResults.filter((result) => !result.ok);
+    if (failedChecks.length > 0) {
+      executionPacket.blocked = true;
+      executionPacket.blockedReasons.push(
+        `Verification failed: ${failedChecks.map((result) => result.command).join(", ")}`
+      );
+    }
+    executionPacket.executionBrief = buildExecutionBrief(executionPacket);
+  }
+
+  writeExecutionArtifacts(executionPacket, currentRepoRoot);
+
+  const result: AutonomousCycleResult = {
+    schemaVersion: 1,
+    generatedAt,
+    mode: "dry-run-cycle",
+    selectedTaskId: nextTask.selected?.id ?? null,
+    blocked: executionPacket.blocked,
+    blockedReasons: executionPacket.blockedReasons,
+    nextTask,
+    executionPacket,
+    artifacts: {
+      nextTaskJson: "reports/autonomous/next-best-task-latest.json",
+      founderReport: "reports/autonomous/founder-report-latest.md",
+      executorPacketJson: "reports/autonomous/executor-packet-latest.json",
+      executorBrief: "reports/autonomous/executor-brief-latest.md",
+      cycleJson: "reports/autonomous/cycle-latest.json",
+      cycleReport: "reports/autonomous/cycle-report-latest.md"
+    }
+  };
+
+  writeCycleArtifacts(result, currentRepoRoot);
+  return result;
 }
