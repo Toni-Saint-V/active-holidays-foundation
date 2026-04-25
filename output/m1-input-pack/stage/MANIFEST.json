@@ -1,0 +1,112 @@
+{
+  "package": "active-holidays-m1-input-pack",
+  "created_at": "2026-04-25",
+  "project": "active-holidays-foundation",
+  "purpose": "Input package for assembling M1 screens: Landing, Visa Intake, Visa Verdict, HR Form, HR Sent.",
+  "design_concepts": {
+    "concept_a": {
+      "name": "Aura Landing Poster",
+      "role": "Landing / hero direction",
+      "file": "01_reference_design/concepts/concept-a-landing-poster.png",
+      "notes": "Separate landing concept. Do not merge its marketing-poster composition into internal product screens without explicit design decision."
+    },
+    "concept_b": {
+      "name": "Ticket / Digital Travel Pass System",
+      "role": "Primary internal product/pass direction for Visa Intake, Visa Verdict, HR Form, HR Sent",
+      "files": [
+        "01_reference_design/concepts/concept-b-ticket-status.png",
+        "01_reference_design/concepts/concept-b-minimal-map-pass.png"
+      ],
+      "notes": "Both files belong to the same second concept. The ticket-status variant carries detailed mechanics; the minimal-map variant is the cleaner base visual language."
+    }
+  },
+  "included_groups": [
+    {
+      "id": "01_reference_design",
+      "status": "partial",
+      "paths": [
+        "01_reference_design/aura-pass-reference/",
+        "01_reference_design/concepts/"
+      ],
+      "notes": "Includes local aura-pass-reference HTML/SVG/GeoJSON and three supplied PNG references classified into two concepts."
+    },
+    {
+      "id": "02_contracts",
+      "status": "included",
+      "paths": [
+        "02_contracts/shared-contracts/"
+      ],
+      "notes": "Copied from shared/contracts."
+    },
+    {
+      "id": "03_screen_models",
+      "status": "included",
+      "paths": [
+        "03_screen_models/activeHolidays/"
+      ],
+      "notes": "Copied from src/presentation/activeHolidays."
+    },
+    {
+      "id": "04_screens",
+      "status": "included",
+      "paths": [
+        "04_screens/src-screens/"
+      ],
+      "notes": "Copied from src/screens."
+    },
+    {
+      "id": "05_data",
+      "status": "included",
+      "paths": [
+        "05_data/data/",
+        "05_data/codex-fixtures/"
+      ],
+      "notes": "Includes data/db, data/scenarios, and scripts/codex/fixtures."
+    },
+    {
+      "id": "06_copy",
+      "status": "partial",
+      "paths": [
+        "06_copy/copy-pack.md"
+      ],
+      "notes": "Copied existing copy pack if present. Final per-screen RU copy, legal texts, FAQ, and HR notification copy still need confirmation."
+    },
+    {
+      "id": "07_existing_design_artifacts",
+      "status": "included",
+      "paths": [
+        "07_existing_design_artifacts/flow-pack/"
+      ],
+      "notes": "Includes existing output/png-design/flow-pack artifacts as supporting references, not as the new approved visual source."
+    }
+  ],
+  "known_gaps": [
+    {
+      "group": "design_tokens_brandbook",
+      "gap": "No separate tokens.json, brandbook, logo pack, font files, or explicit icon-system file was found in this packaging pass."
+    },
+    {
+      "group": "state_taxonomy",
+      "gap": "No single authoritative file listing default/loading/error/empty/partial/offline/submitting/submitted/disabled/success states per M1 screen was found."
+    },
+    {
+      "group": "error_taxonomy",
+      "gap": "No dedicated code-to-RU-message-to-user-action taxonomy file was found."
+    },
+    {
+      "group": "notion_sources",
+      "gap": "Live Notion links/pages were not exported into this archive. Add links for Screen Map, Screen Contracts, Decisions Live, Briefs Pipeline, P1 UX Architecture, and RDC v3.0 Companion before handing this off as final Definition of Ready."
+    },
+    {
+      "group": "legal_copy",
+      "gap": "Consent, offer, refund policy, privacy policy, and HR email/UI notification copy were not confirmed as final legal text."
+    }
+  ],
+  "handoff_recommendation": {
+    "landing": "Use Concept A as the landing/hero visual track.",
+    "visa_intake": "Use Concept B minimal-map/pass language; borrow mechanics only where the screen needs progress or document-state detail.",
+    "visa_verdict": "Use Concept B as the primary pass/verdict system.",
+    "hr_form": "Use Concept B ticket-status mechanics for blockers, document scan, SLA, and review submission states.",
+    "hr_sent": "Use Concept B with calmer confirmation/sent state and explicit next-step/SLA copy."
+  }
+}

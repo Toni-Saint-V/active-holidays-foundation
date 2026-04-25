@@ -1,0 +1,146 @@
+[
+  {
+    "id": "src_italy_consulate_spb",
+    "label": "Генконсульство Италии в Санкт-Петербурге",
+    "url": "https://conssanpietroburgo.esteri.it/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.15,
+    "summary": "Консульская страница со сроками подачи и составом документов по типу С (туризм)."
+  },
+  {
+    "id": "src_vfs_italy",
+    "label": "Визовый центр VFS Italy Санкт-Петербург",
+    "url": "https://visa.vfsglobal.com/rus/ru/ita",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-12T09:00:00.000Z",
+    "volatilityScore": 0.25,
+    "summary": "Оператор визового центра, свежие слоты и актуальные сборы."
+  },
+  {
+    "id": "src_russia_mfa_tr",
+    "label": "МИД России: безвизовый режим с Турцией",
+    "url": "https://www.mid.ru/ru/countries/turkey",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-16T09:00:00.000Z",
+    "volatilityScore": 0.1,
+    "summary": "Официальная памятка о порядке пребывания граждан Турции до 60 дней."
+  },
+  {
+    "id": "src_russia_mfa_us",
+    "label": "МИД России: порядок въезда для граждан США",
+    "url": "https://www.mid.ru/ru/countries/usa",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Общие правила въезда для граждан США, включая бизнес-цели."
+  },
+  {
+    "id": "src_sanctions_watch",
+    "label": "Санкционный мониторинг ЕС",
+    "url": "https://sanctionsmap.eu/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Обзор действующих санкционных мер по странам и отраслям."
+  },
+  {
+    "id": "src_visa_forum_spb",
+    "label": "Форум визовых историй Санкт-Петербурга",
+    "url": "https://visa-history.spb",
+    "tier": "crowdsourced",
+    "lastCheckedAt": "2026-04-08T09:00:00.000Z",
+    "volatilityScore": 0.6,
+    "summary": "Краудсорсинговые отзывы — только как вторичный сигнал."
+  },
+  {
+    "id": "src_spain_consulate",
+    "label": "Консульство Испании в Алматы / Ереване",
+    "url": "https://www.exteriores.gob.es/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.15,
+    "summary": "Актуальные сроки и состав документов по NLV и студенческой визе."
+  },
+  {
+    "id": "src_spain_uge",
+    "label": "UGE — управление по крупным проектам (DNV)",
+    "url": "https://extranjeros.inclusion.gob.es/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Обзор требований DNV по закону о стартапах 28/2022."
+  },
+  {
+    "id": "src_spain_legal_2025",
+    "label": "BOE — отмена Golden Visa 2025",
+    "url": "https://www.boe.es/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.15,
+    "summary": "Закон 14/2024 от 3 апреля 2025 — Golden Visa приостановлена."
+  },
+  {
+    "id": "src_spain_extranjeria",
+    "label": "Oficina de Extranjería",
+    "url": "https://www.inclusion.gob.es/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Правила Arraigo Social: срок, подтверждения, форма 790."
+  },
+  {
+    "id": "src_spain_ministry_edu",
+    "label": "Министерство образования Испании",
+    "url": "https://www.educacionyfp.gob.es/",
+    "tier": "official",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Требования к студенческой визе и переходу в резиденс."
+  },
+  {
+    "id": "src_alfa_insurance",
+    "label": "АльфаСтрахование — страховка для выезжающих",
+    "url": "https://www.alfastrah.ru/",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Шенгенские продукты АльфаСтрахование с лимитами 30 000 и 50 000€."
+  },
+  {
+    "id": "src_ingos",
+    "label": "Ингосстрах — Шенген Актив",
+    "url": "https://www.ingos.ru/",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.25,
+    "summary": "Полис для путешествующих с активным отдыхом."
+  },
+  {
+    "id": "src_sogaz",
+    "label": "СОГАЗ Путешественник Премиум",
+    "url": "https://www.sogaz.ru/",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Полис с максимальным покрытием и быстрым выплатным циклом."
+  },
+  {
+    "id": "src_tinkoff",
+    "label": "Т-Банк Страхование — Базовый",
+    "url": "https://www.tbank.ru/",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.3,
+    "summary": "Базовый продукт без Schengen-сертификации."
+  },
+  {
+    "id": "src_rosgosstrakh",
+    "label": "Росгосстрах — Семейный Шенген",
+    "url": "https://www.rgs.ru/",
+    "tier": "operator",
+    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "volatilityScore": 0.2,
+    "summary": "Семейный шенгенский полис с хрониками и беременностью."
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "log_s1_init",
+    "caseId": "s1-rf-italy",
+    "verdict": "GO_WITH_CONDITIONS",
+    "confidence": 0.62,
+    "summary": "Исходный пересчёт: шенген C возможен, но нужна страховка и проверка дат.",
+    "kind": "recompute",
+    "changedSignalIds": [],
+    "recordedAt": "2026-04-15T10:00:00.000Z"
+  },
+  {
+    "id": "log_s2_init",
+    "caseId": "s2-tr-spb",
+    "verdict": "GO",
+    "confidence": 0.84,
+    "summary": "Турция: безвизовый режим подтверждён, регистрация в 7 дней возможна.",
+    "kind": "recompute",
+    "changedSignalIds": [],
+    "recordedAt": "2026-04-16T10:00:00.000Z"
+  },
+  {
+    "id": "log_s3_init",
+    "caseId": "s3-us-spb-business",
+    "verdict": "HUMAN_REVIEW",
+    "confidence": 0.38,
+    "summary": "Санкционный контекст и платёжные ограничения — заявка передана менеджеру.",
+    "kind": "recompute",
+    "changedSignalIds": [],
+    "recordedAt": "2026-04-13T10:00:00.000Z"
+  },
+  {
+    "id": "log_src_update",
+    "caseId": "s1-rf-italy",
+    "verdict": "GO_WITH_CONDITIONS",
+    "confidence": 0.66,
+    "summary": "Источник обновлён: новые сроки VFS Italy.",
+    "kind": "source_update",
+    "changedSignalIds": [],
+    "recordedAt": "2026-04-16T12:00:00.000Z"
+  }
+]

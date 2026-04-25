@@ -1,0 +1,11 @@
+{
+  "caseId": "s5-rf-italy-insurance",
+  "engineVersion": "rdc.v1",
+  "engineRevision": "2026.04.18",
+  "resultFingerprint": "86610bd10f976929a204742f3c401e8957115ea3f24641c036a12ab01b5a2d97",
+  "catalogFingerprint": "0ec5b3179da255f64cea54403d4cac2de2d7b8675ade889b85c7346c52853455",
+  "verdict": "GO_WITH_CONDITIONS",
+  "nextActionType": "request_medical_questionnaire",
+  "primaryPathId": "alfa_plus",
+  "confidence": 0.73
+}

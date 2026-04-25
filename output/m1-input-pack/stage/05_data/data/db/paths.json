@@ -1,0 +1,95 @@
+[
+  {
+    "id": "italy_c_tourism",
+    "title": "Италия C — туристическая виза",
+    "kind": "consular_visa",
+    "citizenship": "RU",
+    "destination": "IT",
+    "processingWeeks": 4,
+    "estCostRub": 22000,
+    "description": "Классический Шенген C через VFS Italy: бронь отеля, страховка 30000€, выписка и маршрут.",
+    "requirements": [
+      { "id": "passport", "label": "Заграничный паспорт с запасом 6 месяцев", "mandatory": true },
+      { "id": "photos", "label": "Две цветные визовые фотографии", "mandatory": true },
+      { "id": "insurance", "label": "Страховка на весь срок поездки, 30000€", "mandatory": true },
+      { "id": "hotel", "label": "Бронь отелей на весь маршрут", "mandatory": true },
+      { "id": "flight", "label": "Бронь обратного билета", "mandatory": true },
+      { "id": "finance", "label": "Выписка со счёта или спонсорское письмо", "mandatory": true },
+      { "id": "application", "label": "Заполненная анкета VFS", "mandatory": true }
+    ]
+  },
+  {
+    "id": "serbia_visa_free",
+    "title": "Сербия — безвизовый маршрут",
+    "kind": "visa_free",
+    "citizenship": "RU",
+    "destination": "RS",
+    "processingWeeks": 0,
+    "estCostRub": 0,
+    "description": "До 30 дней без визы, минимальный документный пакет.",
+    "requirements": [
+      { "id": "passport", "label": "Заграничный паспорт, действующий на время поездки", "mandatory": true },
+      { "id": "return_ticket", "label": "Обратный билет", "mandatory": true }
+    ]
+  },
+  {
+    "id": "uae_visa_on_arrival",
+    "title": "ОАЭ — виза по прибытии",
+    "kind": "visa_on_arrival",
+    "citizenship": "RU",
+    "destination": "AE",
+    "processingWeeks": 0,
+    "estCostRub": 0,
+    "description": "Бесплатная виза по прибытии до 90 дней, стандартный пакет на въезде.",
+    "requirements": [
+      { "id": "passport", "label": "Заграничный паспорт, действующий 6+ месяцев", "mandatory": true },
+      { "id": "return_ticket", "label": "Обратный билет", "mandatory": true }
+    ]
+  },
+  {
+    "id": "saint_petersburg_domestic",
+    "title": "Санкт-Петербург — внутренний маршрут",
+    "kind": "domestic",
+    "citizenship": "RU",
+    "destination": "RU",
+    "processingWeeks": 0,
+    "estCostRub": 0,
+    "description": "Поездка по России без визы и регистрации для граждан РФ.",
+    "requirements": [
+      { "id": "passport_ru", "label": "Паспорт гражданина РФ", "mandatory": true }
+    ]
+  },
+  {
+    "id": "turkey_visa_free_spb",
+    "title": "Турция → Санкт-Петербург — безвизовый маршрут",
+    "kind": "visa_free",
+    "citizenship": "TR",
+    "destination": "RU",
+    "processingWeeks": 0,
+    "estCostRub": 0,
+    "description": "До 60 дней без визы, регистрация в течение 7 дней по прибытии.",
+    "requirements": [
+      { "id": "passport", "label": "Заграничный паспорт, действующий 6+ месяцев", "mandatory": true },
+      { "id": "registration", "label": "Регистрация по месту пребывания в 7 дней", "mandatory": true },
+      { "id": "insurance", "label": "Медицинская страховка на весь срок", "mandatory": false }
+    ]
+  },
+  {
+    "id": "us_business_spb",
+    "title": "США → Санкт-Петербург — бизнес-виза",
+    "kind": "consular_visa",
+    "citizenship": "US",
+    "destination": "RU",
+    "processingWeeks": 8,
+    "estCostRub": 45000,
+    "description": "Консульская деловая виза с приглашением и подтверждением санкционного комплаенса.",
+    "requirements": [
+      { "id": "passport_us", "label": "Паспорт США со сроком 6+ месяцев", "mandatory": true },
+      { "id": "invitation", "label": "Официальное приглашение от российской компании", "mandatory": true },
+      { "id": "sanctions_clearance", "label": "Проверка санкционного комплаенса партнёра", "mandatory": true },
+      { "id": "payment_backup", "label": "Альтернативный способ оплаты на территории РФ", "mandatory": true },
+      { "id": "insurance", "label": "Страховка на весь срок поездки", "mandatory": true },
+      { "id": "registration", "label": "Регистрация по месту пребывания", "mandatory": true }
+    ]
+  }
+]
