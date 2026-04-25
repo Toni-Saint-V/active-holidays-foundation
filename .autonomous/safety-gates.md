@@ -70,6 +70,7 @@ Stage A local executor may proceed only when:
 Branch policy:
 
 - branch name format: `codex/autonomous-<candidate-id>`
+- untracked local files are reported as warnings, but they do not block branch preparation unless they collide with the selected task scope
 - push is not automatic
 - PR publish is not automatic
 - merge into `main` remains founder-approved only

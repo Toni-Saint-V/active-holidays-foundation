@@ -79,7 +79,7 @@ export type CandidateFile = {
   candidates: Candidate[];
 };
 
-export type TaskLifecycleStatus = "ready" | "completed" | "paused";
+export type TaskLifecycleStatus = "ready" | "in_review" | "completed" | "paused";
 
 export type TaskStatusRecord = {
   id: string;
@@ -113,6 +113,7 @@ export type NextTaskResult = {
   generatedAt: string;
   mode: NextTaskMode;
   selected: ScoredCandidate | null;
+  eligibleCandidates: ScoredCandidate[];
   topCandidates: ScoredCandidate[];
   blockedCandidates: ScoredCandidate[];
   gitStatus: string[];
@@ -153,6 +154,25 @@ export type ExecutionPacket = {
   };
   founderReport: string;
   executionBrief: string;
+};
+
+export type AutonomousCycleResult = {
+  schemaVersion: 1;
+  generatedAt: string;
+  mode: "dry-run-cycle";
+  selectedTaskId: string | null;
+  blocked: boolean;
+  blockedReasons: string[];
+  nextTask: NextTaskResult;
+  executionPacket: ExecutionPacket;
+  artifacts: {
+    nextTaskJson: string;
+    founderReport: string;
+    executorPacketJson: string;
+    executorBrief: string;
+    cycleJson: string;
+    cycleReport: string;
+  };
 };
 
 export const repoRoot = process.cwd();
@@ -216,7 +236,12 @@ const tieBreakerFields = new Set<TieBreakerField>([
   "id"
 ]);
 const tieBreakerDirections = new Set<TieBreakerDirection>(["asc", "desc"]);
-const taskLifecycleStatuses = new Set<TaskLifecycleStatus>(["ready", "completed", "paused"]);
+const taskLifecycleStatuses = new Set<TaskLifecycleStatus>([
+  "ready",
+  "in_review",
+  "completed",
+  "paused"
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -296,7 +321,15 @@ function summarizeScoringModel(model: ScoringModel): ScoringModelSummary {
 }
 
 function isBlockingTaskStatus(status: TaskLifecycleStatus): boolean {
-  return status === "completed" || status === "paused";
+  return status === "completed" || status === "in_review" || status === "paused";
+}
+
+function hasImmutableMergeEvidence(evidence: string[]): boolean {
+  const hasPullRequest = evidence.some((item) =>
+    /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(item)
+  );
+  const hasFullCommitSha = evidence.some((item) => /^[a-f0-9]{40}$/i.test(item));
+  return hasPullRequest && hasFullCommitSha;
 }
 
 function assertString(value: unknown, fieldName: string): string {
@@ -350,6 +383,11 @@ export function readTaskStatusRecords(
       entry.evidence.some((item) => typeof item !== "string" || item.length === 0)
     ) {
       throw new Error(`Invalid task status: evidence for ${id} must be a non-empty string array.`);
+    }
+    if (entry.status === "completed" && !hasImmutableMergeEvidence(entry.evidence as string[])) {
+      throw new Error(
+        `Invalid task status: completed task ${id} must include merged PR URL and full commit SHA evidence.`
+      );
     }
     const note = assertString(entry.note, "note");
 
@@ -547,6 +585,12 @@ export function buildFounderReport(
     mode === "executor"
       ? "Prepare a focused `codex/*` branch, run the readiness stack, and hand off the scoped execution packet."
       : "Create a focused branch for the selected task and keep implementation scoped to its evidence paths.";
+  const approvalRisk =
+    selected.blockedGates.length > 0
+      ? `- Blocked gates: ${selected.blockedGates.join(", ")}`
+      : selected.requiresApproval.length > 0
+        ? `- Approval required before execution: ${selected.requiresApproval.join(", ")}`
+        : "- No blocked irreversible, external, or UI gate on this selected task.";
 
   return [
     "# Founder Report",
@@ -563,7 +607,13 @@ export function buildFounderReport(
     "",
     "## Product Impact",
     "",
-    `Improves ${selected.category} with the current balanced model.`,
+    `Improves ${selected.category} with the current early-stage balanced model.`,
+    "",
+    "## Strategic Lens",
+    "",
+    "- Optimize for timely decisions now, not premature monetization machinery.",
+    "- Keep brand quality, service quality, competitive edge, and future monetization in view before accepting or executing the task.",
+    "- Prefer tasks that make the product more trusted, cleaner, easier to ship, and harder to copy over generic backlog movement.",
     "",
     "## Technical Impact",
     "",
@@ -582,9 +632,7 @@ export function buildFounderReport(
     "",
     "## Risks",
     "",
-    selected.blockedGates.length === 0
-      ? "- No blocked irreversible, external, or UI gate on this selected task."
-      : `- Blocked gates: ${selected.blockedGates.join(", ")}`,
+    approvalRisk,
     `- ${statusLine}`,
     "",
     "## Next Best Action",
@@ -627,6 +675,7 @@ export function selectNextTask(options?: {
     generatedAt: new Date().toISOString(),
     mode,
     selected,
+    eligibleCandidates: eligible.slice(0, 5),
     topCandidates: scored.slice(0, 5),
     blockedCandidates: scored.filter((candidate) => !candidate.eligible),
     gitStatus,
@@ -634,6 +683,19 @@ export function selectNextTask(options?: {
     scoringModel: summarizeScoringModel(scoringModel),
     founderReport
   };
+}
+
+export function writeNextTaskArtifacts(
+  result: NextTaskResult,
+  currentRepoRoot = repoRoot
+): void {
+  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
+  mkdirSync(currentOutputDir, { recursive: true });
+  writeFileSync(
+    path.join(currentOutputDir, "next-best-task-latest.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
+  writeFileSync(path.join(currentOutputDir, "founder-report-latest.md"), `${result.founderReport}\n`);
 }
 
 export function buildAutonomousBranchName(candidateId: string): string {
@@ -644,6 +706,33 @@ export function buildAutonomousBranchName(candidateId: string): string {
     .replace(/^-|-$/g, "");
 
   return `codex/autonomous-${normalized}`.slice(0, 72);
+}
+
+function untrackedPathFromStatus(entry: string): string | null {
+  return entry.startsWith("?? ") ? normalizeGitStatusPath(entry.slice(3).trim()) : null;
+}
+
+function normalizeGitStatusPath(entry: string): string {
+  return entry.replace(/\/+$/g, "");
+}
+
+function pathsOverlap(left: string, right: string): boolean {
+  const normalizedLeft = normalizeGitStatusPath(left);
+  const normalizedRight = normalizeGitStatusPath(right);
+  return (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.startsWith(`${normalizedRight}/`) ||
+    normalizedRight.startsWith(`${normalizedLeft}/`)
+  );
+}
+
+function findUntrackedScopeCollisions(gitStatus: string[], selected: ScoredCandidate | null): string[] {
+  if (!selected) return [];
+  const evidencePaths = selected.evidence.filter((entry) => !entry.startsWith("http"));
+  return gitStatus
+    .map(untrackedPathFromStatus)
+    .filter((entry): entry is string => Boolean(entry))
+    .filter((entry) => evidencePaths.some((evidencePath) => pathsOverlap(entry, evidencePath)));
 }
 
 export function buildExecutionBrief(packet: ExecutionPacket): string {
@@ -715,14 +804,23 @@ export function prepareExecutionPacket(options?: {
   const selected = selection.selected;
   const branchName = selected ? buildAutonomousBranchName(selected.id) : null;
   const blockedReasons: string[] = [];
-  const nonIgnoredGitStatus = gitStatus.filter((entry) => !entry.startsWith("?? reports/autonomous/"));
+  const blockingTrackedGitStatus = trackedGitStatus.filter(
+    (entry) => !entry.startsWith("?? reports/autonomous/")
+  );
+  const untrackedScopeCollisions = findUntrackedScopeCollisions(gitStatus, selected);
 
   if (!selected) {
     blockedReasons.push("Нет executor-safe кандидата без approval gate или missing evidence.");
   }
 
-  if (nonIgnoredGitStatus.length > 0 && !options?.allowDirtyTracked) {
-    blockedReasons.push("Working tree не чистый; local executor fail-closed.");
+  if (blockingTrackedGitStatus.length > 0 && !options?.allowDirtyTracked) {
+    blockedReasons.push("Tracked working tree не чистый; local executor fail-closed.");
+  }
+
+  if (untrackedScopeCollisions.length > 0) {
+    blockedReasons.push(
+      `Untracked files collide with selected task scope: ${untrackedScopeCollisions.join(", ")}.`
+    );
   }
 
   if (options?.write && currentBranch !== baseBranch && !options?.allowNonBaseBranch) {
@@ -799,4 +897,119 @@ export function runVerificationStack(
       stderrTail: stderr.trim().split("\n").slice(-12).join("\n")
     };
   });
+}
+
+function buildCycleReport(result: AutonomousCycleResult): string {
+  const verificationResults = result.executionPacket.verificationResults;
+  const verificationSection =
+    verificationResults.length === 0
+      ? "- not run"
+      : verificationResults
+          .map((entry) => `- ${entry.ok ? "OK" : "FAIL"} · ${entry.command}`)
+          .join("\n");
+  const blockerSection =
+    result.blockedReasons.length === 0
+      ? "- none"
+      : result.blockedReasons.map((reason) => `- ${reason}`).join("\n");
+
+  return [
+    "# Autonomous Cycle Report",
+    "",
+    `- Generated at: ${result.generatedAt}`,
+    `- Selected task: ${result.selectedTaskId ?? "none"}`,
+    `- Blocked: ${result.blocked ? "yes" : "no"}`,
+    "",
+    "## Blockers",
+    "",
+    blockerSection,
+    "",
+    "## Verification",
+    "",
+    verificationSection,
+    "",
+    "## External Writes",
+    "",
+    `- Performed: ${result.executionPacket.externalWriteState.writePerformed ? "yes" : "no"}`,
+    `- Reason: ${result.executionPacket.externalWriteState.reason}`,
+    "",
+    "## Next Best Action",
+    "",
+    result.nextTask.founderReport
+  ].join("\n");
+}
+
+export function writeCycleArtifacts(
+  result: AutonomousCycleResult,
+  currentRepoRoot = repoRoot
+): void {
+  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
+  mkdirSync(currentOutputDir, { recursive: true });
+  writeFileSync(
+    path.join(currentOutputDir, "cycle-latest.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
+  writeFileSync(path.join(currentOutputDir, "cycle-report-latest.md"), `${buildCycleReport(result)}\n`);
+}
+
+export function runAutonomousCycle(options?: {
+  currentRepoRoot?: string;
+  verify?: boolean;
+  currentBranch?: string;
+  gitStatus?: string[];
+  trackedGitStatus?: string[];
+}): AutonomousCycleResult {
+  const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
+  const generatedAt = new Date().toISOString();
+  const nextTask = selectNextTask({
+    currentRepoRoot,
+    mode: "executor",
+    gitStatus: options?.gitStatus,
+    trackedGitStatus: options?.trackedGitStatus
+  });
+  writeNextTaskArtifacts(nextTask, currentRepoRoot);
+
+  const executionPacket = prepareExecutionPacket({
+    currentRepoRoot,
+    currentBranch: options?.currentBranch,
+    gitStatus: options?.gitStatus,
+    trackedGitStatus: options?.trackedGitStatus
+  });
+  if (options?.verify !== false) {
+    executionPacket.verificationResults = runVerificationStack(
+      executionPacket.verificationCommands,
+      currentRepoRoot
+    );
+    const failedChecks = executionPacket.verificationResults.filter((result) => !result.ok);
+    if (failedChecks.length > 0) {
+      executionPacket.blocked = true;
+      executionPacket.blockedReasons.push(
+        `Verification failed: ${failedChecks.map((result) => result.command).join(", ")}`
+      );
+    }
+    executionPacket.executionBrief = buildExecutionBrief(executionPacket);
+  }
+
+  writeExecutionArtifacts(executionPacket, currentRepoRoot);
+
+  const result: AutonomousCycleResult = {
+    schemaVersion: 1,
+    generatedAt,
+    mode: "dry-run-cycle",
+    selectedTaskId: nextTask.selected?.id ?? null,
+    blocked: executionPacket.blocked,
+    blockedReasons: executionPacket.blockedReasons,
+    nextTask,
+    executionPacket,
+    artifacts: {
+      nextTaskJson: "reports/autonomous/next-best-task-latest.json",
+      founderReport: "reports/autonomous/founder-report-latest.md",
+      executorPacketJson: "reports/autonomous/executor-packet-latest.json",
+      executorBrief: "reports/autonomous/executor-brief-latest.md",
+      cycleJson: "reports/autonomous/cycle-latest.json",
+      cycleReport: "reports/autonomous/cycle-report-latest.md"
+    }
+  };
+
+  writeCycleArtifacts(result, currentRepoRoot);
+  return result;
 }

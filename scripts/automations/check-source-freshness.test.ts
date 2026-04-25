@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSourceFreshnessReport, type Source } from "./check-source-freshness";
+import { buildSourceFreshnessReport, renderMarkdownReport, type Source } from "./check-source-freshness";
 
 const now = new Date("2026-04-24T12:00:00.000Z");
 
@@ -59,8 +59,23 @@ describe("buildSourceFreshnessReport", () => {
       expect.objectContaining({
         id: "truth-refresh-src_operator_stale",
         title: "Refresh stale operator source: Operator stale source",
+        sourceId: "src_operator_stale",
+        productArea: "truth_trust",
         evidence: ["data/db/sources.json", "data/db/visa_rules.json"],
         blockedByManualReview: true,
+        actionNeeded: expect.stringContaining("Manually re-check Operator stale source"),
+        acceptanceCriteria: expect.arrayContaining([
+          expect.stringContaining("Manual review boundary is explicit")
+        ]),
+        codexBrief: expect.stringContaining("Truth freshness task"),
+        downstreamSyncDraft: expect.objectContaining({
+          canonicalEnvelopeStatus: "draft_requires_adapter",
+          writeMode: "report_only",
+          targetSurface: "Automation Inbox",
+          syncKey: "automation:ah-truth-freshness-watch:truth-refresh-src_operator_stale",
+          draftStatus: "Ready",
+          severity: "blocker"
+        }),
         verification: ["npm run automations:check:truth"]
       })
     );
@@ -101,7 +116,11 @@ describe("buildSourceFreshnessReport", () => {
       expect.objectContaining({
         id: "truth-refresh-src_official_waived",
         severity: "warning",
-        productReason: expect.stringContaining("time-boxed waiver")
+        productReason: expect.stringContaining("time-boxed waiver"),
+        blockedByManualReview: true,
+        downstreamSyncDraft: expect.objectContaining({
+          confidence: "medium"
+        })
       })
     );
   });
@@ -119,8 +138,51 @@ describe("buildSourceFreshnessReport", () => {
         id: "truth-fix-missing-source-src_missing_source",
         title: "Fix missing source mapping: src_missing_source",
         evidence: ["data/db/sources.json", "data/db/visa_rules.json"],
-        productReason: expect.stringContaining("cannot show reliable evidence")
+        productReason: expect.stringContaining("cannot show reliable evidence"),
+        blockedByManualReview: false,
+        downstreamSyncDraft: expect.objectContaining({
+          confidence: "high"
+        })
       })
+    );
+  });
+
+  it("keeps invalid source freshness timestamps behind manual review", () => {
+    const invalidTimestampSource: Source = {
+      id: "src_invalid_timestamp",
+      label: "Invalid timestamp source",
+      url: "https://example.com/invalid",
+      tier: "official",
+      lastCheckedAt: "not-a-date",
+      volatilityScore: 0.2
+    };
+
+    const report = buildReport({
+      sources: [invalidTimestampSource],
+      records: [{ sourceId: "src_invalid_timestamp" }]
+    });
+
+    expect(report.status).toBe("blocked");
+    expect(report.nextTasks).toContainEqual(
+      expect.objectContaining({
+        id: "truth-fix-source-timestamp-src_invalid_timestamp",
+        blockedByManualReview: true,
+        actionNeeded: expect.stringContaining("Manually re-check src_invalid_timestamp"),
+        codexBrief: expect.stringContaining(
+          "Do not update source freshness timestamps or product truth until a human/manual source review confirms the source."
+        ),
+        downstreamSyncDraft: expect.objectContaining({
+          confidence: "medium"
+        })
+      })
+    );
+  });
+
+  it("renders deterministic report frontmatter for gate freshness projection", () => {
+    const report = buildReport({ sources: [freshOfficial] });
+
+    expect(renderMarkdownReport(report)).toMatch(
+      /^---\nlastVerifiedAt: 2026-04-24T12:00:00\.000Z\n---\n\n# Truth \+ Freshness Watch/
     );
   });
 });

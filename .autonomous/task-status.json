@@ -30,6 +30,17 @@
         "e6741423a31a75effe612ffabc07c676138d3b2f"
       ],
       "note": "Stage A executor branch and safety policy documented in PR #6."
+    },
+    {
+      "id": "truth-freshness-product-impact",
+      "status": "in_review",
+      "updatedAt": "2026-04-25T15:55:00.000Z",
+      "evidence": [
+        "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/10",
+        "scripts/automations/check-source-freshness.ts",
+        "scripts/autonomous/run-autonomous-cycle.ts"
+      ],
+      "note": "PR #10 is under review; do not mark completed until merge evidence includes a merged PR and full commit SHA."
     }
   ]
 }

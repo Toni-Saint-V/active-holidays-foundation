@@ -19,6 +19,10 @@ reports/automations/state/execution-runs/
 output/server-state
 output/playwright/
 output/pdf/
+output/figma-make-opus47-pack/
+output/lovable-active-holidays-m1-prompt.md
+output/m1-input-pack*
+output/png-design/
 automation/yepcode/**/runs
 automation/yepcode/**/.env
 automation/yepcode/**/.env.*
@@ -27,3 +31,5 @@ reports/autonomous/
 reports/design/
 .playwright-cli/
 tmp/
+research_*/
+research_*.zip

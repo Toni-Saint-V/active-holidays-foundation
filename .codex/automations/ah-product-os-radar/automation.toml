@@ -23,7 +23,7 @@ prompt = """
 - не выдумывай новый backend, ML-pipeline, API или аналитику
 - не делай broad redesign
 - не предлагай десять идей; выбери 1-3 сильных
-- сохраняй совместимость с upcoming Lovable integration и не строй target logic на exact surface name
+- сохраняй совместимость с возможным UI-layer handoff через Lovable, но не строй target logic на Lovable или exact surface name
 
 Артефакт:
 - обнови `reports/automations/runs/ah-product-os-radar/latest.md` и dated report, если запись файлов уместна

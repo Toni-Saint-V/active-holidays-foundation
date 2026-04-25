@@ -11,12 +11,18 @@
 - `npm --silent run automations:check:truth -- --json` emits `issues[].productImpact`
   and `nextTasks[]` so stale truth can become actionable product work instead of
   staying as terminal-only warning text.
+- `npm run automations:check:truth -- --write` persists `task-packet-latest.json`
+  with a Codex brief, acceptance criteria, and a downstream sync draft.
+- The sync draft is report-only until a separate adapter adds the repo-owned
+  Notion packet envelope fields.
 
 ## REQUIRED ACTION
 
 - Re-check the operator source and refresh `lastCheckedAt` only after manual verification.
 - If the JSON report emits `nextTasks[]`, copy the highest-severity task into the
   next execution packet or mark it with an explicit owner.
+- Prefer `task-packet-latest.json` for downstream sync drafting instead of manually
+  rewriting the terminal warning.
 
 ## SAFE PATCH OR MANUAL REVIEW
 

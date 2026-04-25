@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildAutonomousBranchName,
   prepareExecutionPacket,
+  runAutonomousCycle,
   selectNextTask
 } from "./runtime";
 
@@ -87,7 +88,10 @@ describe("autonomous runtime", () => {
         id: "completed-top-task",
         status: "completed",
         updatedAt: "2026-04-24T10:43:20.000Z",
-        evidence: ["https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7"],
+        evidence: [
+          "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7",
+          "749f0c6cd0c2ffcd829e7aca2241d6d02b4af1f7"
+        ],
         note: "Merged through PR #7"
       }
     ]);
@@ -160,7 +164,10 @@ describe("autonomous runtime", () => {
         id: "missing-candidate",
         status: "completed",
         updatedAt: "2026-04-24T10:43:20.000Z",
-        evidence: ["https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7"],
+        evidence: [
+          "https://github.com/Toni-Saint-V/active-holidays-foundation/pull/7",
+          "749f0c6cd0c2ffcd829e7aca2241d6d02b4af1f7"
+        ],
         note: "Should not silently drift"
       }
     ]);
@@ -203,6 +210,57 @@ describe("autonomous runtime", () => {
         trackedGitStatus: []
       })
     ).toThrow(/unknown candidate/i);
+  });
+
+  it("rejects completed task statuses without immutable merge evidence", async () => {
+    await writeTaskStatus([
+      {
+        id: "review-only-task",
+        status: "completed",
+        updatedAt: "2026-04-24T10:43:20.000Z",
+        evidence: ["codex/review-only-branch", "scripts/autonomous/runtime.ts"],
+        note: "Branch-local evidence must not complete lifecycle state."
+      }
+    ]);
+    await writeRepoFile("evidence/task.md", "# task");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "review-only-task",
+              title: "Review-only task",
+              productReason: "Must remain non-terminal until merged",
+              evidence: ["evidence/task.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 8,
+                strategicFit: 8,
+                risk: 2,
+                effort: 3
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    expect(() =>
+      selectNextTask({
+        currentRepoRoot: tempDir,
+        mode: "executor",
+        gitStatus: [],
+        trackedGitStatus: []
+      })
+    ).toThrow(/completed task review-only-task must include merged PR URL and full commit SHA evidence/i);
   });
 
   it("uses repo-owned scoring weights instead of hardcoded constants", async () => {
@@ -453,6 +511,7 @@ describe("autonomous runtime", () => {
         "id:asc"
       ]
     });
+    expect(result.eligibleCandidates.map((candidate) => candidate.id)).toEqual(["backend-hardening"]);
   });
 
   it("blocks ui approval candidates in executor mode but not in planning mode", async () => {
@@ -566,7 +625,7 @@ describe("autonomous runtime", () => {
     expect(packet.blocked).toBe(true);
     expect(packet.blockedReasons).toEqual(
       expect.arrayContaining([
-        "Working tree не чистый; local executor fail-closed.",
+        "Tracked working tree не чистый; local executor fail-closed.",
         "Local executor может стартовать только из `main`, сейчас `feature/test`."
       ])
     );
@@ -634,7 +693,7 @@ describe("autonomous runtime", () => {
     expect(blocked?.blockedGates).toEqual(["live_notion_writebak"]);
   });
 
-  it("blocks untracked working-tree entries in write mode", async () => {
+  it("reports untracked working-tree entries without blocking write mode", async () => {
     await writeRepoFile("evidence/backend.md", "# backend");
     await writeRepoFile(
       ".autonomous/task-candidates.json",
@@ -674,8 +733,153 @@ describe("autonomous runtime", () => {
       trackedGitStatus: []
     });
 
+    expect(packet.blocked).toBe(false);
+    expect(packet.blockedReasons).not.toContain("Tracked working tree не чистый; local executor fail-closed.");
+    expect(packet.gitStatus).toContain("?? src/new-test.ts");
+  });
+
+  it("blocks untracked entries that collide with selected task evidence", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main",
+      gitStatus: ["?? evidence/backend.md"],
+      trackedGitStatus: []
+    });
+
     expect(packet.blocked).toBe(true);
-    expect(packet.blockedReasons).toContain("Working tree не чистый; local executor fail-closed.");
+    expect(packet.blockedReasons).toContain(
+      "Untracked files collide with selected task scope: evidence/backend.md."
+    );
+  });
+
+  it("blocks untracked directories that contain selected task evidence", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main",
+      gitStatus: ["?? evidence/"],
+      trackedGitStatus: []
+    });
+
+    expect(packet.blocked).toBe(true);
+    expect(packet.blockedReasons).toContain("Untracked files collide with selected task scope: evidence.");
+  });
+
+  it("writes a complete dry-run cycle artifact set without external writes", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const result = runAutonomousCycle({
+      currentRepoRoot: tempDir,
+      verify: false,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+    const cycleJson = await readFile(path.join(tempDir, "reports/autonomous/cycle-latest.json"), "utf8");
+    const cycleReport = await readFile(path.join(tempDir, "reports/autonomous/cycle-report-latest.md"), "utf8");
+    const nextTaskJson = await readFile(
+      path.join(tempDir, "reports/autonomous/next-best-task-latest.json"),
+      "utf8"
+    );
+
+    expect(result.selectedTaskId).toBe("backend-hardening");
+    expect(result.blocked).toBe(false);
+    expect(result.executionPacket.externalWriteState.writePerformed).toBe(false);
+    expect(JSON.parse(cycleJson).selectedTaskId).toBe("backend-hardening");
+    expect(JSON.parse(nextTaskJson).eligibleCandidates).toHaveLength(1);
+    expect(cycleReport).toContain("Autonomous Cycle Report");
   });
 
   it("builds a stable codex branch name", () => {

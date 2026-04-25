@@ -24,15 +24,15 @@ Select one high-value task from current product and repo reality. The loop shoul
 npm run autonomous:next
 ```
 
-This is planning mode: it can surface a high-value task that still needs an approval gate before execution.
+This is executor-safe mode by default: it blocks UI approval, external write, destructive, paid, legal, production, and live Notion gates.
 
-## Executor-Safe Command
+## Planning Command
 
 ```bash
-npm run autonomous:next -- --mode=executor
+npm run autonomous:next -- --mode=planning
 ```
 
-Executor mode blocks UI approval, external write, destructive, paid, legal, production, and live Notion gates.
+Planning mode can surface a high-value task that still needs an approval gate before execution.
 
 ## Verification Command
 
@@ -40,11 +40,27 @@ Executor mode blocks UI approval, external write, destructive, paid, legal, prod
 npm run autonomous:verify
 ```
 
+## Full Local Cycle Command
+
+```bash
+npm run autonomous:cycle
+```
+
+This runs the local report-first loop:
+
+1. select the next executor-safe task
+2. save the founder report
+3. save the executor packet
+4. run the verification stack
+5. save the cycle report
+6. keep external writes disabled
+
 ## Output Contract
 
 The loop returns:
 
 - selected task id
+- eligible executor-safe candidates
 - score
 - score breakdown
 - product reason
@@ -58,8 +74,10 @@ The loop returns:
 
 The current loop is deterministic and local.
 
-- `npm run autonomous:next` selects and reports the next planning task.
-- `npm run autonomous:next -- --mode=executor` selects and reports the next executor-safe task.
+- `npm run autonomous:next` selects and reports the next executor-safe task.
+- `npm run autonomous:cycle` persists the next-task artifacts, executor packet, verification results, and cycle report in `reports/autonomous/`.
+- `npm run autonomous:next -- --mode=planning` selects and reports the next planning task, including tasks that may require approval before execution.
 - `.autonomous/task-status.json` marks completed or paused candidates so the static selector does not keep re-selecting shipped work.
 - `npm run autonomous:execute` prepares an executor packet and may create a local `codex/*` branch only when explicitly run with `--write`.
+- Executor branch preparation fails closed on tracked working-tree changes, but untracked local artifacts are warning-only unless they collide with the selected task scope.
 - The system still does not autonomously edit product code, push PRs, merge into `main`, or perform live Notion writeback.

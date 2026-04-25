@@ -29,6 +29,13 @@
 ## Protocol Rules
 
 - Ordinary discussion and clarification may use normal natural language.
+- Default final answer format for every task must stay short and human-readable:
+  1. what was done
+  2. how it affects the product
+  3. what the user will see or feel
+  4. what to do next
+- Keep detailed prompts, research, screenshots, specs, and long evidence blocks separate after that short core answer.
+- Do not write long recap paragraphs unless the user explicitly asks for detail.
 - Structured formatting is mandatory only for execution-related outputs:
   - specs
   - implementation plans

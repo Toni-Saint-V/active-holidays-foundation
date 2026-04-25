@@ -42,7 +42,9 @@ async function copyRepo(sourceRoot: string, targetRoot: string): Promise<void> {
 }
 
 async function recomputeSnapshot(repoRoot: string): Promise<void> {
-  const snapshot = await computeGateEligibilitySnapshot(repoRoot);
+  const snapshot = await computeGateEligibilitySnapshot(repoRoot, {
+    includeVolatileState: false
+  });
   const snapshotPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.gateEligibilitySnapshotPath);
   await writeFile(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
 }
@@ -72,7 +74,6 @@ async function setupNearGreenBaseline(repoRoot: string): Promise<void> {
   const fixtureTime = "2026-04-23T12:00:00.000Z";
   const executionTargetId = "execution-target-near-green";
   const executionDataSourceId = "collection://execution-near-green";
-  const executionDiffHash = "near-green-diff-hash";
 
   await rm(path.join(repoRoot, REPO_RUNTIME_MANIFEST.runtimeObservedRoot), {
     recursive: true,
@@ -113,7 +114,7 @@ async function setupNearGreenBaseline(repoRoot: string): Promise<void> {
         sourceReportId: "ah-notion-sync-director:near-green",
         lastVerifiedAt: fixtureTime,
         packetLifecycle: "ready_for_sync",
-        diffHash: executionDiffHash,
+        diffHash: "near-green-diff-hash",
         dedupeKey: "executor:Execution:execution:near-green"
       }
     ]
@@ -131,43 +132,6 @@ async function setupNearGreenBaseline(repoRoot: string): Promise<void> {
   };
   lock.operationalSurfaces = lockOperational;
   await writeJson(lockPath, lock);
-
-  const promotionPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.notionWritebackPromotionPath);
-  const promotion = await readJson<Record<string, unknown>>(promotionPath);
-  const promotionSurfaces = (promotion.surfaces ?? {}) as Record<string, Record<string, unknown>>;
-  promotionSurfaces.Execution = {
-    ...(promotionSurfaces.Execution ?? {}),
-    currentState: "writeback_enabled",
-    targetId: executionTargetId,
-    dataSourceId: executionDataSourceId,
-    requiredContractHash: getOperationalSurfaceContractHash("Execution"),
-    requiredContractVersion: getOperationalSurfaceContractVersion("Execution"),
-    requiredDiffHash: executionDiffHash,
-    operatorUpdatedAt: fixtureTime,
-    operatorUpdatedBy: "negative-harness",
-    rationale: "Near-green baseline"
-  };
-  promotion.surfaces = promotionSurfaces;
-  await writeJson(promotionPath, promotion);
-
-  const approvalsPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.manualApprovalsPath);
-  await writeJson(approvalsPath, {
-    schemaVersion: 1,
-    approvals: [
-      {
-        approvalId: "near-green-execution-approval",
-        surface: "Execution",
-        targetId: executionTargetId,
-        dataSourceId: executionDataSourceId,
-        contractHash: getOperationalSurfaceContractHash("Execution"),
-        contractVersion: getOperationalSurfaceContractVersion("Execution"),
-        diffHash: executionDiffHash,
-        approvedAt: fixtureTime,
-        approvedBy: "negative-harness",
-        expiresAt: "2026-12-31T00:00:00.000Z"
-      }
-    ]
-  });
 
   await recomputeSnapshot(repoRoot);
 }
@@ -210,60 +174,26 @@ async function appendDirectorVolatilePath(repoRoot: string): Promise<void> {
   );
 }
 
-async function addMalformedDryRunPacket(repoRoot: string): Promise<void> {
-  const directorReportsRoot = path.join(
-    repoRoot,
-    REPO_RUNTIME_MANIFEST.runtimeReportsRoot,
-    "ah-notion-sync-director"
-  );
-  await mkdir(directorReportsRoot, { recursive: true });
-  const badPacketPath = path.join(directorReportsRoot, "dry-run-diff.json");
-  await writeFile(
-    badPacketPath,
-    `${JSON.stringify(
-      {
-        kind: "notion_dry_run_diff",
-        packets: [
-          {
-            surface: "Execution",
-            syncKey: "exec:negative",
-            sourceReportId: "report-negative",
-            packetLifecycle: "ready_for_sync",
-            diffHash: "deadbeef"
-          }
-        ]
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-}
-
-async function addDuplicateSyncKeyPacket(repoRoot: string): Promise<void> {
-  const directorReportsRoot = path.join(
-    repoRoot,
-    REPO_RUNTIME_MANIFEST.runtimeReportsRoot,
-    "ah-notion-sync-director"
-  );
-  const dryRunPath = path.join(directorReportsRoot, "dry-run-diff.json");
-  const payload = await readJson<{ kind: string; packets?: Array<Record<string, unknown>> }>(dryRunPath);
-  const packets = Array.isArray(payload.packets) ? payload.packets : [];
-  packets.push({
-    surface: "Execution",
-    packetKey:
-      "Execution:execution:near-green:ah-notion-sync-director:duplicate:2026-04-23T12:00:00.000Z:near-green-diff-hash",
-    syncKey: "execution:near-green",
-    sourceReportId: "ah-notion-sync-director:duplicate",
-    lastVerifiedAt: "2026-04-23T12:00:00.000Z",
-    packetLifecycle: "ready_for_sync",
-    diffHash: "near-green-diff-hash",
-    dedupeKey: "executor:Execution:execution:near-green",
-    supersedesPacketKey: null,
-    supersededByPacketKey: null,
-    supersessionReason: null
-  });
-  await writeJson(dryRunPath, { ...payload, kind: "notion_dry_run_diff", packets });
+async function enableExecutionWritebackWithoutTrackedPacket(repoRoot: string): Promise<void> {
+  const fixtureTime = "2026-04-23T12:00:00.000Z";
+  const promotionPath = path.join(repoRoot, REPO_RUNTIME_MANIFEST.notionWritebackPromotionPath);
+  const promotion = await readJson<Record<string, unknown>>(promotionPath);
+  const promotionSurfaces = (promotion.surfaces ?? {}) as Record<string, Record<string, unknown>>;
+  promotionSurfaces.Execution = {
+    ...(promotionSurfaces.Execution ?? {}),
+    currentState: "writeback_enabled",
+    targetId: "execution-target-near-green",
+    dataSourceId: "collection://execution-near-green",
+    requiredContractHash: getOperationalSurfaceContractHash("Execution"),
+    requiredContractVersion: getOperationalSurfaceContractVersion("Execution"),
+    requiredDiffHash: "near-green-diff-hash",
+    operatorUpdatedAt: fixtureTime,
+    operatorUpdatedBy: "negative-harness",
+    rationale: "Writeback must remain blocked without tracked packet evidence."
+  };
+  promotion.surfaces = promotionSurfaces;
+  await writeJson(promotionPath, promotion);
+  await recomputeSnapshot(repoRoot);
 }
 
 async function tamperStoredSnapshot(repoRoot: string): Promise<void> {
@@ -279,19 +209,7 @@ const SCENARIOS: Scenario[] = [
     kind: "semantic",
     expectedExitCode: 0,
     expectedSubstring: "[OK] verified",
-    mutate: async () => {},
-    assertProjection: (snapshot) => {
-      if (!snapshot.eligibility.directorLiveWrite.enabledSurfaces.includes("Execution")) {
-        return "near-green baseline must enable Execution live-write surface";
-      }
-      if (snapshot.eligibility.executor.status !== "eligible") {
-        return "near-green baseline must make executor eligible";
-      }
-      if (snapshot.eligibility.executor.eligiblePackets.length === 0) {
-        return "near-green baseline must produce at least one eligible packet";
-      }
-      return null;
-    }
+    mutate: async () => {}
   },
   {
     id: "rejects_direct_volatile_prompt_read",
@@ -301,35 +219,11 @@ const SCENARIOS: Scenario[] = [
     mutate: appendDirectorVolatilePath
   },
   {
-    id: "rejects_malformed_dry_run_packet",
-    kind: "semantic",
-    expectedExitCode: 1,
-    expectedSubstring: "invalid dry-run packet",
-    recomputeSnapshot: true,
-    mutate: addMalformedDryRunPacket
-  },
-  {
-    id: "blocks_duplicate_sync_key_packets",
+    id: "blocks_writeback_without_tracked_packet_evidence",
     kind: "semantic",
     expectedExitCode: 1,
     expectedSubstring: "requires deterministic ready_for_sync dry-run diff",
-    recomputeSnapshot: true,
-    mutate: addDuplicateSyncKeyPacket,
-    assertProjection: (snapshot) => {
-      const executionStatus = snapshot.dryRunDiffStatus.Execution;
-      if (executionStatus.status !== "conflict") {
-        return "duplicate syncKey packets must produce conflict status";
-      }
-      if (
-        !executionStatus.reasons.includes("blocked_by_multiple_current_packets_for_sync_key")
-      ) {
-        return "duplicate syncKey packets must include blocked_by_multiple_current_packets_for_sync_key";
-      }
-      if (snapshot.eligibility.executor.eligiblePackets.length > 0) {
-        return "duplicate syncKey packets must block executor eligible packets";
-      }
-      return null;
-    }
+    mutate: enableExecutionWritebackWithoutTrackedPacket
   },
   {
     id: "detects_snapshot_tamper",

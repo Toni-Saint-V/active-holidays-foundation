@@ -14,6 +14,8 @@ prompt = """
 - затем интерпретируй output с product точки зрения: какие stale or broken source mappings реально подрывают доверие
 - приоритет: official/operator freshness, missing mappings, risky crowdsourced dependencies
 - если report содержит `nextTasks[]`, перенеси highest-severity item в REQUIRED ACTION с owner/manual-review boundary
+- если нужен downstream sync, используй `task-packet-latest.json`: там есть Codex brief, acceptance criteria и `downstreamSyncDraft`
+- `downstreamSyncDraft` не является canonical Notion packet envelope; live writeback требует отдельного adapter/envelope с packetKey, diffHash, dedupeKey и lifecycle fields
 
 Жёсткие правила:
 - не обновляй product truth автоматически
@@ -22,6 +24,7 @@ prompt = """
 
 Артефакт:
 - обнови `reports/automations/runs/ah-truth-freshness-watch/latest.md`
+- обнови `reports/automations/runs/ah-truth-freshness-watch/task-packet-latest.json`
 
 Output строго:
 1) SOURCE HEALTH

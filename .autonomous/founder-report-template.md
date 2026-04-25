@@ -14,6 +14,11 @@
 - What user/operator behavior becomes better.
 - Which product gap is reduced.
 
+## Strategic Lens
+
+- Why this is timely for the current product stage.
+- How it affects trust, brand quality, service quality, competitive edge, or future monetization readiness without adding premature complexity.
+
 ## Technical Impact
 
 - Files or systems touched.
