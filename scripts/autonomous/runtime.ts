@@ -79,7 +79,7 @@ export type CandidateFile = {
   candidates: Candidate[];
 };
 
-export type TaskLifecycleStatus = "ready" | "completed" | "paused";
+export type TaskLifecycleStatus = "ready" | "in_review" | "completed" | "paused";
 
 export type TaskStatusRecord = {
   id: string;
@@ -236,7 +236,12 @@ const tieBreakerFields = new Set<TieBreakerField>([
   "id"
 ]);
 const tieBreakerDirections = new Set<TieBreakerDirection>(["asc", "desc"]);
-const taskLifecycleStatuses = new Set<TaskLifecycleStatus>(["ready", "completed", "paused"]);
+const taskLifecycleStatuses = new Set<TaskLifecycleStatus>([
+  "ready",
+  "in_review",
+  "completed",
+  "paused"
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -316,7 +321,15 @@ function summarizeScoringModel(model: ScoringModel): ScoringModelSummary {
 }
 
 function isBlockingTaskStatus(status: TaskLifecycleStatus): boolean {
-  return status === "completed" || status === "paused";
+  return status === "completed" || status === "in_review" || status === "paused";
+}
+
+function hasImmutableMergeEvidence(evidence: string[]): boolean {
+  const hasPullRequest = evidence.some((item) =>
+    /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(item)
+  );
+  const hasFullCommitSha = evidence.some((item) => /^[a-f0-9]{40}$/i.test(item));
+  return hasPullRequest && hasFullCommitSha;
 }
 
 function assertString(value: unknown, fieldName: string): string {
@@ -370,6 +383,11 @@ export function readTaskStatusRecords(
       entry.evidence.some((item) => typeof item !== "string" || item.length === 0)
     ) {
       throw new Error(`Invalid task status: evidence for ${id} must be a non-empty string array.`);
+    }
+    if (entry.status === "completed" && !hasImmutableMergeEvidence(entry.evidence as string[])) {
+      throw new Error(
+        `Invalid task status: completed task ${id} must include merged PR URL and full commit SHA evidence.`
+      );
     }
     const note = assertString(entry.note, "note");
 

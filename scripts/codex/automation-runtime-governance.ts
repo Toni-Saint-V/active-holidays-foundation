@@ -927,11 +927,11 @@ async function collectReportInventory(
       automation.id
     );
     const latestPath = path.join(automationRoot, "latest.md");
-    const latestExists = await exists(latestPath);
+    const latestExists = options.includeVolatileState ? await exists(latestPath) : false;
     const datedReports: ReportArtifactStatus[] = [];
     let hasDryRunDiffJson = false;
 
-    if (await exists(automationRoot)) {
+    if (options.includeVolatileState && (await exists(automationRoot))) {
       const entries = await readdir(automationRoot, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isFile()) continue;
@@ -958,16 +958,18 @@ async function collectReportInventory(
     }
 
     datedReports.sort((left, right) => compareStrings(left.path, right.path));
-    const latestMetadata = await getDeterministicMarkdownMetadata(latestPath);
+    const latestMetadata = latestExists
+      ? await getDeterministicMarkdownMetadata(latestPath)
+      : null;
 
     inventory[automation.id] = {
       automationId: automation.id,
       latest: {
         path: path.relative(repoRoot, latestPath),
         exists: latestExists,
-        timestamp: latestExists ? latestMetadata.timestamp : null,
-        timestampSource: latestExists ? latestMetadata.timestampSource : null,
-        contentHash: latestExists ? latestMetadata.contentHash : null
+        timestamp: latestMetadata?.timestamp ?? null,
+        timestampSource: latestMetadata?.timestampSource ?? null,
+        contentHash: latestMetadata?.contentHash ?? null
       },
       datedReports,
       artifactPresence: {
@@ -1254,7 +1256,9 @@ export async function computeGateEligibilitySnapshot(
   const tracked = await loadTrackedRuntimeState(repoRoot);
   const reportInventory = await collectReportInventory(repoRoot, { includeVolatileState });
   const observedEntries = includeVolatileState ? await collectObservedState(repoRoot) : [];
-  const reportDryRunEntries = await collectDirectorDryRunReportEntries(repoRoot);
+  const reportDryRunEntries = includeVolatileState
+    ? await collectDirectorDryRunReportEntries(repoRoot)
+    : [];
   const executionRuns = includeVolatileState ? await collectExecutionRunEntries(repoRoot) : [];
   const dryRunDiffProjection = deriveCurrentDiffProjection(reportDryRunEntries);
   const observedDryRunProjection = deriveCurrentDiffProjection(

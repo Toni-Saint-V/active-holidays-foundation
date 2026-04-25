@@ -73,14 +73,17 @@ export type GeneratedFreshnessTask = {
   acceptanceCriteria: string[];
   verification: string[];
   codexBrief: string;
-  notionSync: {
-    surface: "Automation Inbox";
+  downstreamSyncDraft: {
+    canonicalEnvelopeStatus: "draft_requires_adapter";
+    writeMode: "report_only";
+    targetSurface: "Automation Inbox";
     syncKey: string;
-    status: "Ready";
+    draftStatus: "Ready";
     severity: SourceFreshnessSeverity;
     confidence: "high" | "medium";
     actionNeeded: string;
     evidence: string[];
+    boundary: string;
   };
 };
 
@@ -215,14 +218,18 @@ function buildTaskArtifacts(input: {
     acceptanceCriteria,
     verification: verificationCommands,
     codexBrief,
-    notionSync: {
-      surface: "Automation Inbox",
+    downstreamSyncDraft: {
+      canonicalEnvelopeStatus: "draft_requires_adapter",
+      writeMode: "report_only",
+      targetSurface: "Automation Inbox",
       syncKey: `automation:${automationId}:${input.id}`,
-      status: "Ready",
+      draftStatus: "Ready",
       severity: input.severity,
       confidence: input.blockedByManualReview ? "medium" : "high",
       actionNeeded: input.actionNeeded,
-      evidence: input.evidence
+      evidence: input.evidence,
+      boundary:
+        "This is not the repo-owned Notion packet envelope. A downstream adapter must add packetKey, recordTitle, notionSurface, sourceReportId, lastVerifiedAt, packetLifecycle, diffHash, dedupeKey, and supersession fields before any writeback."
     }
   };
 }
@@ -286,7 +293,22 @@ function buildNextTasks(issues: SourceFreshnessIssue[], sourceById: Map<string, 
       continue;
     }
 
-    if (issue.kind === "invalid_last_checked_at" || issue.kind === "duplicate_source_id") {
+    if (issue.kind === "invalid_last_checked_at") {
+      const id = `truth-fix-source-timestamp-${taskIdSuffix(issue.sourceId)}`;
+      tasks.set(id, buildTaskArtifacts({
+        id,
+        title: `Review invalid source freshness timestamp: ${issue.sourceId}`,
+        severity: issue.severity,
+        sourceId: issue.sourceId,
+        productReason: issue.productImpact,
+        actionNeeded: `Manually re-check ${issue.sourceId}, then repair lastCheckedAt only if the live source confirms the current product rule.`,
+        evidence: issue.evidence,
+        blockedByManualReview: true
+      }));
+      continue;
+    }
+
+    if (issue.kind === "duplicate_source_id") {
       const id = `truth-fix-source-catalog-${taskIdSuffix(issue.sourceId)}`;
       tasks.set(id, buildTaskArtifacts({
         id,
@@ -589,7 +611,7 @@ async function writeReports(report: SourceFreshnessReport) {
   await writeFile(
     path.join(outputDir, "task-packet-latest.md"),
     topTask
-      ? `${topTask.codexBrief}\n\n## Notion sync\n\n\`\`\`json\n${JSON.stringify(topTask.notionSync, null, 2)}\n\`\`\`\n`
+      ? `${topTask.codexBrief}\n\n## Downstream sync draft\n\n\`\`\`json\n${JSON.stringify(topTask.downstreamSyncDraft, null, 2)}\n\`\`\`\n`
       : "No actionable freshness task.\n"
   );
 }

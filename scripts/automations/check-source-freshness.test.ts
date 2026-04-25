@@ -68,10 +68,12 @@ describe("buildSourceFreshnessReport", () => {
           expect.stringContaining("Manual review boundary is explicit")
         ]),
         codexBrief: expect.stringContaining("Truth freshness task"),
-        notionSync: expect.objectContaining({
-          surface: "Automation Inbox",
+        downstreamSyncDraft: expect.objectContaining({
+          canonicalEnvelopeStatus: "draft_requires_adapter",
+          writeMode: "report_only",
+          targetSurface: "Automation Inbox",
           syncKey: "automation:ah-truth-freshness-watch:truth-refresh-src_operator_stale",
-          status: "Ready",
+          draftStatus: "Ready",
           severity: "blocker"
         }),
         verification: ["npm run automations:check:truth"]
@@ -116,7 +118,7 @@ describe("buildSourceFreshnessReport", () => {
         severity: "warning",
         productReason: expect.stringContaining("time-boxed waiver"),
         blockedByManualReview: true,
-        notionSync: expect.objectContaining({
+        downstreamSyncDraft: expect.objectContaining({
           confidence: "medium"
         })
       })
@@ -138,8 +140,39 @@ describe("buildSourceFreshnessReport", () => {
         evidence: ["data/db/sources.json", "data/db/visa_rules.json"],
         productReason: expect.stringContaining("cannot show reliable evidence"),
         blockedByManualReview: false,
-        notionSync: expect.objectContaining({
+        downstreamSyncDraft: expect.objectContaining({
           confidence: "high"
+        })
+      })
+    );
+  });
+
+  it("keeps invalid source freshness timestamps behind manual review", () => {
+    const invalidTimestampSource: Source = {
+      id: "src_invalid_timestamp",
+      label: "Invalid timestamp source",
+      url: "https://example.com/invalid",
+      tier: "official",
+      lastCheckedAt: "not-a-date",
+      volatilityScore: 0.2
+    };
+
+    const report = buildReport({
+      sources: [invalidTimestampSource],
+      records: [{ sourceId: "src_invalid_timestamp" }]
+    });
+
+    expect(report.status).toBe("blocked");
+    expect(report.nextTasks).toContainEqual(
+      expect.objectContaining({
+        id: "truth-fix-source-timestamp-src_invalid_timestamp",
+        blockedByManualReview: true,
+        actionNeeded: expect.stringContaining("Manually re-check src_invalid_timestamp"),
+        codexBrief: expect.stringContaining(
+          "Do not update source freshness timestamps or product truth until a human/manual source review confirms the source."
+        ),
+        downstreamSyncDraft: expect.objectContaining({
+          confidence: "medium"
         })
       })
     );
