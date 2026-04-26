@@ -567,6 +567,10 @@ export function renderMarkdownReport(report: SourceFreshnessReport): string {
   ].join("\n");
 }
 
+export function buildRunArtifactStem(generatedAt: string): string {
+  return generatedAt.replace(/[^A-Za-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+
 async function loadRuntimeInput(): Promise<BuildSourceFreshnessReportInput> {
   const sources = await loadJson<Source[]>(sourcesPath);
   const waiverState = await loadOptionalJson<CheckWaiverState>(
@@ -600,20 +604,25 @@ async function loadRuntimeInput(): Promise<BuildSourceFreshnessReportInput> {
 
 async function writeReports(report: SourceFreshnessReport) {
   const outputDir = path.join("reports", "automations", "runs", automationId);
+  const taskPacketDir = path.join(outputDir, "task-packets");
   const markdownReport = `${renderMarkdownReport(report)}\n`;
-  const datedReportName = `${report.generatedAt.slice(0, 10)}.md`;
+  const runArtifactStem = buildRunArtifactStem(report.generatedAt);
+  const reportJson = `${JSON.stringify(report, null, 2)}\n`;
   await mkdir(outputDir, { recursive: true });
-  await writeFile(path.join(outputDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
+  await mkdir(taskPacketDir, { recursive: true });
+  await writeFile(path.join(outputDir, "latest.json"), reportJson);
   await writeFile(path.join(outputDir, "latest.md"), markdownReport);
-  await writeFile(path.join(outputDir, datedReportName), markdownReport);
+  await writeFile(path.join(outputDir, `${runArtifactStem}.json`), reportJson);
+  await writeFile(path.join(outputDir, `${runArtifactStem}.md`), markdownReport);
   const topTask = report.nextTasks[0] ?? null;
-  await writeFile(path.join(outputDir, "task-packet-latest.json"), `${JSON.stringify(topTask, null, 2)}\n`);
-  await writeFile(
-    path.join(outputDir, "task-packet-latest.md"),
-    topTask
-      ? `${topTask.codexBrief}\n\n## Downstream sync draft\n\n\`\`\`json\n${JSON.stringify(topTask.downstreamSyncDraft, null, 2)}\n\`\`\`\n`
-      : "No actionable freshness task.\n"
-  );
+  const taskPacketJson = `${JSON.stringify(topTask, null, 2)}\n`;
+  const taskPacketMarkdown = topTask
+    ? `${topTask.codexBrief}\n\n## Downstream sync draft\n\n\`\`\`json\n${JSON.stringify(topTask.downstreamSyncDraft, null, 2)}\n\`\`\`\n`
+    : "No actionable freshness task.\n";
+  await writeFile(path.join(outputDir, "task-packet-latest.json"), taskPacketJson);
+  await writeFile(path.join(outputDir, "task-packet-latest.md"), taskPacketMarkdown);
+  await writeFile(path.join(taskPacketDir, `${runArtifactStem}.json`), taskPacketJson);
+  await writeFile(path.join(taskPacketDir, `${runArtifactStem}.md`), taskPacketMarkdown);
 }
 
 async function main() {

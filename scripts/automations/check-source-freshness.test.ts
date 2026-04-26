@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildSourceFreshnessReport, renderMarkdownReport, type Source } from "./check-source-freshness";
+import {
+  buildRunArtifactStem,
+  buildSourceFreshnessReport,
+  renderMarkdownReport,
+  type Source
+} from "./check-source-freshness";
 
 const now = new Date("2026-04-24T12:00:00.000Z");
 
@@ -184,5 +189,10 @@ describe("buildSourceFreshnessReport", () => {
     expect(renderMarkdownReport(report)).toMatch(
       /^---\nlastVerifiedAt: 2026-04-24T12:00:00\.000Z\n---\n\n# Truth \+ Freshness Watch/
     );
+  });
+
+  it("uses timestamp-level artifact names so same-day writes do not overwrite run evidence", () => {
+    expect(buildRunArtifactStem("2026-04-24T12:00:00.000Z")).toBe("2026-04-24T12-00-00-000Z");
+    expect(buildRunArtifactStem("2026-04-24T18:30:12.500Z")).toBe("2026-04-24T18-30-12-500Z");
   });
 });
