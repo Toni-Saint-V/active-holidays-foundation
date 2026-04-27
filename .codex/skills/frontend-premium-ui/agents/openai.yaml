@@ -1,4 +1,0 @@
-interface:
-  display_name: "Frontend Premium UI"
-  short_description: "Премиум UI для экранов Active Holidays"
-  default_prompt: "Use $frontend-premium-ui to refine this Active Holidays screen with premium hierarchy, stronger CTA logic, and trust-safe Russian UI."

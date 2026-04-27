@@ -3,8 +3,10 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addExecutionBlocker,
   buildAutonomousBranchName,
   prepareExecutionPacket,
+  readGateProjection,
   runAutonomousCycle,
   selectNextTask
 } from "./runtime";
@@ -61,6 +63,24 @@ async function writeTaskStatus(
       {
         schemaVersion: 1,
         tasks
+      },
+      null,
+      2
+    )
+  );
+}
+
+async function writeGateEligibilitySnapshot(
+  eligibility: Record<string, unknown> = {}
+) {
+  await writeRepoFile(
+    "reports/automations/state/gate-eligibility-snapshot.json",
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        evaluatedAt: "2026-04-27T03:19:45.000Z",
+        eligibility,
+        projectionHash: "projection-test-hash"
       },
       null,
       2
@@ -511,7 +531,146 @@ describe("autonomous runtime", () => {
         "id:asc"
       ]
     });
+    expect(result.externalGateProjection.available).toBe(false);
+    expect(result.externalGateProjection.executor.status).toBe("unknown");
     expect(result.eligibleCandidates.map((candidate) => candidate.id)).toEqual(["backend-hardening"]);
+  });
+
+  it("projects external gate eligibility into next-task and execution packets", async () => {
+    await writeGateEligibilitySnapshot({
+      directorDryRun: {
+        status: "passed",
+        reasons: []
+      },
+      directorLiveWrite: {
+        status: "blocked",
+        reasons: ["blocked_by_writeback_promotion"]
+      },
+      executor: {
+        status: "blocked",
+        reasons: ["blocked_by_no_ready_packet"]
+      },
+      synthesis: {
+        status: "passed",
+        reasons: []
+      }
+    });
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const projection = readGateProjection(tempDir);
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(projection.available).toBe(true);
+    expect(projection.projectionHash).toBe("projection-test-hash");
+    expect(packet.controlTowerReadiness.localExecutor.status).toBe("passed");
+    expect(packet.controlTowerReadiness.directorDryRun.status).toBe("passed");
+    expect(packet.controlTowerReadiness.notionWriteback).toEqual({
+      status: "blocked",
+      reasons: ["blocked_by_writeback_promotion"]
+    });
+    expect(packet.controlTowerReadiness.externalExecutor).toEqual({
+      status: "blocked",
+      reasons: ["blocked_by_no_ready_packet"]
+    });
+    expect(packet.executionBrief).toContain("## Control Tower Readiness");
+  });
+
+  it("treats malformed gate eligibility snapshots as unknown instead of permission", async () => {
+    await writeRepoFile("reports/automations/state/gate-eligibility-snapshot.json", "{not-json");
+
+    const projection = readGateProjection(tempDir);
+
+    expect(projection.available).toBe(false);
+    expect(projection.executor).toEqual({
+      status: "unknown",
+      reasons: ["gate eligibility snapshot is malformed"]
+    });
+  });
+
+  it("marks parsed snapshots without usable eligibility as unavailable", async () => {
+    await writeRepoFile(
+      "reports/automations/state/gate-eligibility-snapshot.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          evaluatedAt: "2026-04-27T03:19:45.000Z",
+          projectionHash: "projection-test-hash"
+        },
+        null,
+        2
+      )
+    );
+
+    const projection = readGateProjection(tempDir);
+
+    expect(projection.available).toBe(false);
+    expect(projection.executor).toEqual({
+      status: "unknown",
+      reasons: ["gate eligibility snapshot eligibility is missing or malformed"]
+    });
+  });
+
+  it("marks snapshots with missing required gate entries as unavailable", async () => {
+    await writeGateEligibilitySnapshot({
+      directorDryRun: {
+        status: "passed",
+        reasons: []
+      },
+      directorLiveWrite: {
+        status: "blocked",
+        reasons: ["blocked_by_writeback_promotion"]
+      },
+      executor: {
+        status: "waiting",
+        reasons: ["not a supported gate status"]
+      }
+    });
+
+    const projection = readGateProjection(tempDir);
+
+    expect(projection.available).toBe(false);
+    expect(projection.synthesis).toEqual({
+      status: "unknown",
+      reasons: ["synthesis gate is not available in gate snapshot"]
+    });
+    expect(projection.executor).toEqual({
+      status: "unknown",
+      reasons: ["not a supported gate status"]
+    });
   });
 
   it("blocks ui approval candidates in executor mode but not in planning mode", async () => {
@@ -629,6 +788,66 @@ describe("autonomous runtime", () => {
         "Local executor может стартовать только из `main`, сейчас `feature/test`."
       ])
     );
+  });
+
+  it("keeps local readiness blocked after write-mode baseline verification fails", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+    const verificationBlocker = "Baseline verification failed: npm run build";
+
+    expect(packet.blocked).toBe(false);
+    expect(packet.controlTowerReadiness.localExecutor.status).toBe("passed");
+
+    packet.verificationResults = [
+      {
+        command: "npm run build",
+        ok: false,
+        exitCode: 1,
+        stdoutTail: "",
+        stderrTail: "build failed"
+      }
+    ];
+    addExecutionBlocker(packet, verificationBlocker);
+
+    expect(packet.blocked).toBe(true);
+    expect(packet.blockedReasons).toContain(verificationBlocker);
+    expect(packet.controlTowerReadiness.localExecutor.status).toBe("blocked");
+    expect(packet.controlTowerReadiness.localExecutor.reasons).toContain(verificationBlocker);
   });
 
   it("blocks unknown approval gates instead of treating them as safe", async () => {

@@ -124,15 +124,15 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedExecutionLane: "standard-lane",
     requiredAxes: ["governance", "verification", "architecture"],
     preferredEntrySkills: [
-      "protocol-structured-json-and-png-gate",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-review-release"
     ],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "architecture-guardrails",
-      "qa-self-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
@@ -151,13 +151,13 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedRoutingConfidence: "high",
     expectedExecutionLane: "standard-lane",
     requiredAxes: ["governance", "verification"],
-    preferredEntrySkills: ["protocol-structured-json-and-png-gate"],
+    preferredEntrySkills: ["ah-control-protocol"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "architecture-guardrails",
-      "qa-self-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
@@ -176,20 +176,20 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedExecutionLane: "standard-lane",
     requiredAxes: ["governance", "verification"],
     preferredEntrySkills: [
-      "protocol-structured-json-and-png-gate",
-      "multi-lens-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-review-release",
+      "ah-review-release"
     ],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "architecture-guardrails",
-      "qa-self-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
-    id: "plugin-surface-governance",
+    id: "ah-repo-automation",
     title: "Plugin and MCP surface governance",
     prompt:
       "Проверь plugin marketplace, local plugin manifest и Cursor MCP surface перед добавлением нового plugin.",
@@ -204,13 +204,13 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedRoutingConfidence: "high",
     expectedExecutionLane: "standard-lane",
     requiredAxes: ["plugin-governance", "architecture", "verification"],
-    preferredEntrySkills: ["plugin-surface-governance"],
+    preferredEntrySkills: ["ah-repo-automation"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "plugin-surface-governance",
-      "qa-self-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-repo-automation",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
@@ -225,12 +225,12 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedRoutingConfidence: "high",
     expectedExecutionLane: "review-lane",
     requiredAxes: ["review", "verification", "regression"],
-    preferredEntrySkills: ["bank-grade-review", "multi-lens-review"],
+    preferredEntrySkills: ["ah-review-release", "ah-review-release"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "bank-grade-review",
-      "qa-self-review",
-      "multi-lens-review"
+      "ah-review-release",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
@@ -246,12 +246,12 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedExecutionLane: "review-lane",
     expectedCandidateModes: ["skill-system-governance"],
     requiredAxes: ["review", "verification", "governance"],
-    preferredEntrySkills: ["bank-grade-review", "multi-lens-review"],
+    preferredEntrySkills: ["ah-review-release", "ah-review-release"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "bank-grade-review",
-      "qa-self-review",
-      "multi-lens-review"
+      "ah-review-release",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {
@@ -266,15 +266,15 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedExecutionLane: "blocked-png",
     requiredAxes: ["premium-ui", "png-gate", "russian-copy"],
     preferredEntrySkills: [
-      "protocol-structured-json-and-png-gate",
-      "frontend-premium-ui"
+      "ah-control-protocol",
+      "ah-ui-implementation"
     ],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "frontend-premium-ui",
-      "design-system-enforcer",
-      "a11y-trust-usability"
+      "ah-control-protocol",
+      "ah-ui-implementation",
+      "ah-ui-implementation",
+      "ah-ui-implementation"
     ]
   },
   {
@@ -296,11 +296,11 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     requiredAxes: ["trust-boundary", "verification"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "ai-boundary-and-trust",
-      "offer-semantics",
-      "trust-boundary-regression",
-      "golden-evals"
+      "ah-control-protocol",
+      "ah-ai-trust-layer",
+      "ah-ai-trust-layer",
+      "ah-review-release",
+      "ah-visual-qa"
     ]
   },
   {
@@ -320,10 +320,10 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     requiredAxes: ["trust-boundary", "verification"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "ai-boundary-and-trust",
-      "offer-semantics",
-      "golden-evals"
+      "ah-control-protocol",
+      "ah-ai-trust-layer",
+      "ah-ai-trust-layer",
+      "ah-visual-qa"
     ]
   },
   {
@@ -339,10 +339,10 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     requiredAxes: ["trust-boundary", "verification"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "ai-boundary-and-trust",
-      "offer-semantics",
-      "golden-evals"
+      "ah-control-protocol",
+      "ah-ai-trust-layer",
+      "ah-ai-trust-layer",
+      "ah-visual-qa"
     ]
   },
   {
@@ -362,17 +362,17 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedExecutionLane: "standard-lane",
     expectedCandidateModes: ["ai-recommendation-boundary"],
     requiredAxes: ["architecture", "verification"],
-    preferredEntrySkills: ["architecture-guardrails"],
+    preferredEntrySkills: ["ah-backend-contracts"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "architecture-guardrails",
-      "golden-evals",
-      "production-hardening"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-visual-qa",
+      "ah-backend-contracts"
     ]
   },
   {
-    id: "result-flow-integration",
+    id: "ah-result-flow",
     title: "Result flow integration",
     prompt:
       "Нужно усилить result flow: compare, documents и human review states прямо внутри текущего result loop.",
@@ -386,14 +386,13 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedRoutingConfidence: "high",
     expectedExecutionLane: "fast-lane",
     requiredAxes: ["result-flow", "trust-boundary", "russian-copy"],
-    preferredEntrySkills: ["result-flow-integration", "russian-trust-safe-copy"],
+    preferredEntrySkills: ["ah-result-flow", "ah-ui-direction"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "result-flow-integration",
-      "russian-trust-safe-copy",
-      "trust-boundary-regression",
-      "a11y-trust-usability"
+      "ah-control-protocol",
+      "ah-result-flow",
+      "ah-ui-direction",
+      "ah-review-release"
     ]
   },
   {
@@ -414,10 +413,10 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     requiredAxes: ["fallback", "trust-boundary", "verification"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "fallback-safe-behavior",
-      "production-hardening",
-      "trust-boundary-regression"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-backend-contracts",
+      "ah-review-release"
     ]
   },
   {
@@ -435,13 +434,13 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     expectedRoutingConfidence: "high",
     expectedExecutionLane: "fast-lane",
     requiredAxes: ["regression", "verification"],
-    preferredEntrySkills: ["qa-self-review", "release-readiness"],
+    preferredEntrySkills: ["ah-review-release", "ah-review-release"],
     requiredAgentRoles: ["lead", "verifier", "reviewer"],
     expectedAgentPackSkills: [
-      "protocol-structured-json-and-png-gate",
-      "golden-evals",
-      "qa-self-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-visual-qa",
+      "ah-review-release",
+      "ah-review-release"
     ]
   },
   {

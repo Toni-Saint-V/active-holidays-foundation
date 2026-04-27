@@ -83,32 +83,16 @@ export type AgentSystemEvaluationReport = {
 };
 
 const SKILL_QUALITY_AXES: Record<string, QualityAxis[]> = {
-  "protocol-structured-json-and-png-gate": ["governance", "png-gate"],
-  "repo-hygiene-and-structure": ["governance"],
-  "architecture-guardrails": ["architecture", "verification"],
-  "qa-self-review": ["verification", "regression"],
-  "multi-lens-review": ["review", "verification", "regression"],
-  "release-readiness": ["review", "verification", "regression"],
-  "plugin-surface-governance": ["plugin-governance", "verification"],
-  "frontend-premium-ui": ["premium-ui", "russian-copy"],
-  "design-system-enforcer": ["premium-ui"],
-  "product-ux-flow-review": ["result-flow", "premium-ui"],
-  "russian-trust-safe-copy": ["russian-copy", "trust-boundary"],
-  "ai-boundary-and-trust": ["trust-boundary", "verification"],
-  "offer-semantics": ["trust-boundary", "result-flow"],
-  "ai-cache-and-state": ["fallback", "trust-boundary"],
-  "trust-boundary-regression": ["trust-boundary", "regression"],
-  "golden-evals": ["verification", "regression"],
-  "minimal-tool-calling": ["trust-boundary"],
-  "production-hardening": ["fallback", "verification"],
-  "result-flow-integration": ["result-flow", "trust-boundary"],
-  "fallback-safe-behavior": ["fallback", "trust-boundary"],
-  "prompt-hardening": ["trust-boundary", "russian-copy"],
-  "bugfix-root-cause": ["fallback", "verification"],
-  "performance-sanity": ["premium-ui"],
-  "a11y-trust-usability": ["premium-ui", "russian-copy", "trust-boundary"],
-  "docs-and-handoff": ["governance"],
-  "bank-grade-review": ["review", "verification"]
+  "ah-control-protocol": ["governance", "png-gate", "manual-routing"],
+  "ah-product-strategy": ["governance", "result-flow"],
+  "ah-repo-automation": ["governance", "plugin-governance", "verification"],
+  "ah-result-flow": ["result-flow", "trust-boundary", "russian-copy"],
+  "ah-ai-trust-layer": ["trust-boundary", "fallback", "verification"],
+  "ah-backend-contracts": ["architecture", "fallback", "verification"],
+  "ah-ui-direction": ["premium-ui", "png-gate", "russian-copy"],
+  "ah-ui-implementation": ["premium-ui", "russian-copy", "trust-boundary"],
+  "ah-visual-qa": ["verification", "regression", "premium-ui"],
+  "ah-review-release": ["review", "verification", "regression"]
 };
 
 const QUALITY_AXIS_KEYWORDS: Record<QualityAxis, string[]> = {
@@ -141,79 +125,90 @@ const QUALITY_AXIS_KEYWORDS: Record<QualityAxis, string[]> = {
 
 const GLOBAL_AGENT_ROLE_PREFERENCES: Record<AgentPackRole, string[]> = {
   lead: [
-    "architecture-guardrails",
-    "protocol-structured-json-and-png-gate",
-    "frontend-premium-ui",
-    "plugin-surface-governance",
-    "ai-boundary-and-trust",
-    "result-flow-integration",
-    "fallback-safe-behavior",
-    "production-hardening",
-    "bank-grade-review",
-    "qa-self-review"
+    "ah-control-protocol",
+    "ah-backend-contracts",
+    "ah-ui-direction",
+    "ah-ai-trust-layer",
+    "ah-result-flow",
+    "ah-repo-automation",
+    "ah-review-release",
+    "ah-backend-contracts",
+    "ah-control-protocol",
+    "ah-ui-implementation",
+    "ah-repo-automation",
+    "ah-ai-trust-layer",
+    "ah-result-flow",
+    "ah-backend-contracts",
+    "ah-backend-contracts",
+    "ah-review-release",
+    "ah-review-release"
   ],
   verifier: [
-    "qa-self-review",
-    "release-readiness",
-    "production-hardening",
-    "architecture-guardrails",
-    "protocol-structured-json-and-png-gate",
-    "ai-boundary-and-trust",
-    "result-flow-integration",
-    "fallback-safe-behavior"
+    "ah-visual-qa",
+    "ah-review-release",
+    "ah-control-protocol",
+    "ah-backend-contracts",
+    "ah-review-release",
+    "ah-review-release",
+    "ah-backend-contracts",
+    "ah-backend-contracts",
+    "ah-control-protocol",
+    "ah-ai-trust-layer",
+    "ah-result-flow",
+    "ah-backend-contracts"
   ],
-  reviewer: ["bank-grade-review", "multi-lens-review", "release-readiness"]
+  reviewer: ["ah-review-release", "ah-review-release", "ah-review-release", "ah-review-release"]
 };
 
 const MODE_AGENT_ROLE_PREFERENCES: Record<ModeId, Record<AgentPackRole, string[]>> = {
   "skill-system-governance": {
-    lead: ["protocol-structured-json-and-png-gate", "architecture-guardrails"],
-    verifier: ["qa-self-review", "architecture-guardrails", "release-readiness"],
-    reviewer: ["multi-lens-review", "bank-grade-review", "release-readiness"]
+    lead: ["ah-control-protocol", "ah-repo-automation"],
+    verifier: ["ah-review-release", "ah-repo-automation"],
+    reviewer: ["ah-review-release"]
   },
   "plugin-surface": {
-    lead: ["plugin-surface-governance", "architecture-guardrails"],
-    verifier: ["architecture-guardrails", "qa-self-review", "release-readiness"],
-    reviewer: ["multi-lens-review", "bank-grade-review", "release-readiness"]
+    lead: ["ah-repo-automation", "ah-control-protocol"],
+    verifier: ["ah-review-release", "ah-repo-automation"],
+    reviewer: ["ah-review-release"]
   },
   "review-gate": {
-    lead: ["bank-grade-review", "multi-lens-review", "release-readiness"],
-    verifier: ["qa-self-review", "release-readiness"],
-    reviewer: ["multi-lens-review", "release-readiness", "bank-grade-review"]
+    lead: ["ah-review-release"],
+    verifier: ["ah-review-release"],
+    reviewer: ["ah-review-release"]
   },
   "premium-ui": {
-    lead: ["frontend-premium-ui", "russian-trust-safe-copy", "protocol-structured-json-and-png-gate"],
-    verifier: ["protocol-structured-json-and-png-gate", "qa-self-review", "release-readiness"],
-    reviewer: ["multi-lens-review", "bank-grade-review", "release-readiness"]
+    lead: ["ah-ui-direction", "ah-control-protocol"],
+    verifier: ["ah-visual-qa", "ah-review-release"],
+    reviewer: ["ah-review-release"]
   },
   "ai-recommendation-boundary": {
-    lead: ["ai-boundary-and-trust"],
-    verifier: ["qa-self-review", "release-readiness", "production-hardening"],
-    reviewer: ["bank-grade-review", "multi-lens-review", "release-readiness"]
+    lead: ["ah-ai-trust-layer"],
+    verifier: ["ah-review-release", "ah-visual-qa"],
+    reviewer: ["ah-review-release"]
   },
   "contract-boundary": {
-    lead: ["architecture-guardrails", "production-hardening"],
-    verifier: ["production-hardening", "qa-self-review", "release-readiness"],
-    reviewer: ["bank-grade-review", "multi-lens-review", "release-readiness"]
+    lead: ["ah-backend-contracts"],
+    verifier: ["ah-review-release", "ah-visual-qa"],
+    reviewer: ["ah-review-release"]
   },
   "result-flow": {
-    lead: ["result-flow-integration", "russian-trust-safe-copy"],
-    verifier: ["qa-self-review", "release-readiness", "architecture-guardrails"],
-    reviewer: ["multi-lens-review", "bank-grade-review", "release-readiness"]
+    lead: ["ah-result-flow", "ah-ui-direction"],
+    verifier: ["ah-visual-qa", "ah-review-release"],
+    reviewer: ["ah-review-release"]
   },
   "reliability-hardening": {
-    lead: ["fallback-safe-behavior", "production-hardening"],
-    verifier: ["production-hardening", "qa-self-review", "release-readiness"],
-    reviewer: ["bank-grade-review", "multi-lens-review", "release-readiness"]
+    lead: ["ah-backend-contracts", "ah-ai-trust-layer"],
+    verifier: ["ah-review-release", "ah-visual-qa"],
+    reviewer: ["ah-review-release"]
   },
   "regression-proof": {
-    lead: ["qa-self-review", "release-readiness"],
-    verifier: ["release-readiness", "qa-self-review"],
-    reviewer: ["bank-grade-review", "multi-lens-review", "release-readiness"]
+    lead: ["ah-visual-qa"],
+    verifier: ["ah-review-release", "ah-visual-qa"],
+    reviewer: ["ah-review-release"]
   }
 };
 
-const NON_ROLE_BASELINE_SKILLS = new Set(["protocol-structured-json-and-png-gate"]);
+const NON_ROLE_BASELINE_SKILLS = new Set(["ah-control-protocol"]);
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
@@ -279,6 +274,7 @@ export async function loadAgentMetadata(repoRoot: string): Promise<Map<string, A
     if (!entry.isDirectory()) continue;
 
     const skillName = entry.name;
+    if (!(await exists(path.join(skillsRoot, skillName, "SKILL.md")))) continue;
     const metadataPath = path.join(skillsRoot, skillName, "agents", "openai.yaml");
     if (!(await exists(metadataPath))) continue;
 
@@ -323,13 +319,13 @@ function pickAgentSkill(
   ];
 
   for (const skillName of preferences) {
-    if (used.has(skillName) || !directEntrySkills.includes(skillName)) continue;
+    if (!directEntrySkills.includes(skillName)) continue;
     used.add(skillName);
     return { role, skillName, source: "mode-default" };
   }
 
   for (const skillName of preferences) {
-    if (used.has(skillName) || !metadata.has(skillName)) continue;
+    if (!metadata.has(skillName)) continue;
     used.add(skillName);
     return { role, skillName, source: "global-fallback" };
   }

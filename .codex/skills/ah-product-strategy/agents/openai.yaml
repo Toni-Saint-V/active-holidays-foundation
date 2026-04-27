@@ -1,0 +1,3 @@
+display_name: "AH Product Strategy"
+short_description: "Governance gate and result-flow aware product next step, Notion/Lovable/Cursor handoff и phase framing."
+default_prompt: "Use $ah-product-strategy to turn the Active Holidays product question into one gate-aware result-flow action or paste-ready handoff."

@@ -181,7 +181,7 @@ const NO_PRIMARY_REASON = "No primary mode resolved.";
 const PNG_BLOCK_REASON = "UI mode requires PNG approval before code changes.";
 const UNBLOCKED_REASON =
   "No mandatory pre-implementation gate from the selected mode.";
-const MANDATORY_PROTOCOL_SKILL = "protocol-structured-json-and-png-gate";
+const MANDATORY_PROTOCOL_SKILL = "ah-control-protocol";
 
 function triad(
   id: string,
@@ -209,12 +209,11 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Skill-system governance",
     template: "Skill-system governance",
     defaultSkills: [
-      "protocol-structured-json-and-png-gate",
-      "repo-hygiene-and-structure",
-      "architecture-guardrails",
-      "qa-self-review",
-      "multi-lens-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-repo-automation",
+      "ah-product-strategy",
+      "ah-review-release"
     ],
     promptKeywords: [
       "skill",
@@ -273,19 +272,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "runtime-owner",
           objective: "Own the canonical mode runtime and any script-level contract changes.",
-          skills: ["repo-hygiene-and-structure", "architecture-guardrails"],
+          skills: ["ah-repo-automation", "ah-backend-contracts"],
           owns: ["scripts/codex/*", "scripts/automations/*", "package.json", "tsconfig.json"]
         },
         {
           role: "docs-owner",
           objective: "Keep operator docs aligned with the runtime contract and naming.",
-          skills: ["protocol-structured-json-and-png-gate", "docs-and-handoff"],
+          skills: ["ah-control-protocol", "ah-product-strategy"],
           owns: [".codex/skills/*.md", "README.md", "AGENTS.md", "RUNBOOK.md"]
         },
         {
           role: "verification-owner",
           objective: "Pressure-test the new runtime through checks, evaluator coverage, and finish gates.",
-          skills: ["qa-self-review", "multi-lens-review", "release-readiness"],
+          skills: ["ah-review-release"],
           owns: ["verification surface", "fixture coverage", "final gate summary"]
         }
       ],
@@ -303,12 +302,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Plugin / MCP surface governance",
     template: "Plugin / MCP surface governance",
     defaultSkills: [
-      "plugin-surface-governance",
-      "repo-hygiene-and-structure",
-      "architecture-guardrails",
-      "qa-self-review",
-      "multi-lens-review",
-      "release-readiness"
+      "ah-control-protocol",
+      "ah-repo-automation",
+      "ah-backend-contracts",
+      "ah-review-release"
     ],
     promptKeywords: [
       "plugin",
@@ -342,19 +339,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "surface-auditor",
           objective: "Map the live plugin, marketplace, and MCP surface before changing it.",
-          skills: ["plugin-surface-governance", "architecture-guardrails"],
+          skills: ["ah-repo-automation", "ah-backend-contracts"],
           owns: ["plugins/*", ".agents/plugins/marketplace.json", ".cursor/mcp.json"]
         },
         {
           role: "contract-owner",
           objective: "Keep docs, manifests, and repo thresholds aligned in one pass.",
-          skills: ["repo-hygiene-and-structure", "docs-and-handoff"],
+          skills: ["ah-repo-automation", "ah-product-strategy"],
           owns: [".codex/skills/_shared/active-holidays/plugin-surface.md", "README.md"]
         },
         {
           role: "verification-owner",
           objective: "Run context and automation gates before the surface is treated as stable.",
-          skills: ["qa-self-review", "release-readiness"],
+          skills: ["ah-review-release"],
           owns: ["automations:check:context", "automations:verify", "skills:verify"]
         }
       ],
@@ -370,12 +367,7 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     priority: 3,
     bundle: "Final multi-lens review of a moderate change",
     template: "Final multi-lens review of a moderate change",
-    defaultSkills: [
-      "qa-self-review",
-      "multi-lens-review",
-      "release-readiness",
-      "bank-grade-review"
-    ],
+    defaultSkills: ["ah-review-release", "ah-visual-qa"],
     promptKeywords: [
       "code review",
       "diff review",
@@ -390,7 +382,12 @@ export const MODE_REGISTRY: ModeDefinition[] = [
       "findings",
       "pr",
       "pull request",
-      "merge-ready"
+      "merge-ready",
+      "release",
+      "release readiness",
+      "readiness",
+      "релиз",
+      "готовность"
     ],
     filePatterns: [],
     verifyCommands: [
@@ -411,19 +408,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "correctness-reviewer",
           objective: "Look for correctness, lifecycle, and regression failures first.",
-          skills: ["bank-grade-review", "multi-lens-review"],
+          skills: ["ah-review-release"],
           owns: ["bug risk", "behavioral regressions", "proof gaps"]
         },
         {
           role: "maintainability-reviewer",
           objective: "Challenge weak abstractions, ownership leaks, and forward-risk debt.",
-          skills: ["architecture-guardrails", "qa-self-review"],
+          skills: ["ah-backend-contracts", "ah-review-release"],
           owns: ["maintainability", "ownership", "future drift"]
         },
         {
           role: "release-gate",
           objective: "Decide ship or block only after real verification evidence is present.",
-          skills: ["release-readiness", "docs-and-handoff"],
+          skills: ["ah-review-release", "ah-product-strategy"],
           owns: ["command evidence", "ship or block verdict", "rollback awareness"]
         }
       ],
@@ -441,12 +438,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Premium UI or UX refinement",
     template: "Premium UI or UX refinement",
     defaultSkills: [
-      "protocol-structured-json-and-png-gate",
-      "frontend-premium-ui",
-      "design-system-enforcer",
-      "product-ux-flow-review",
-      "russian-trust-safe-copy",
-      "a11y-trust-usability"
+      "ah-control-protocol",
+      "ah-ui-direction",
+      "ah-ui-implementation",
+      "ah-visual-qa"
     ],
     promptKeywords: [
       "ui",
@@ -479,19 +474,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "design-gatekeeper",
           objective: "Own PNG approval and prevent premature code changes.",
-          skills: ["protocol-structured-json-and-png-gate", "frontend-premium-ui"],
+          skills: ["ah-control-protocol", "ah-ui-implementation"],
           owns: ["PNG preview", "approved visual direction", "first viewport contract"]
         },
         {
           role: "ui-implementer",
           objective: "Translate the approved direction into clean premium UI code.",
-          skills: ["frontend-premium-ui", "design-system-enforcer", "russian-trust-safe-copy"],
+          skills: ["ah-ui-implementation", "ah-ui-direction"],
           owns: ["screen code", "layout hierarchy", "Russian UI copy"]
         },
         {
           role: "ux-qa",
           objective: "Check CTA clarity, accessibility, and flow friction before closure.",
-          skills: ["product-ux-flow-review", "a11y-trust-usability", "qa-self-review"],
+          skills: ["ah-ui-direction", "ah-ui-implementation", "ah-review-release"],
           owns: ["state coverage", "tap targets", "CTA clarity"]
         }
       ],
@@ -509,11 +504,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "AI recommendation boundary fix",
     template: "AI recommendation boundary fix",
     defaultSkills: [
-      "ai-boundary-and-trust",
-      "offer-semantics",
-      "ai-cache-and-state",
-      "trust-boundary-regression",
-      "golden-evals"
+      "ah-control-protocol",
+      "ah-ai-trust-layer",
+      "ah-visual-qa",
+      "ah-review-release"
     ],
     promptKeywords: [
       "recommendation",
@@ -547,19 +541,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "boundary-owner",
           objective: "Protect deterministic ownership and remove model overreach.",
-          skills: ["ai-boundary-and-trust", "offer-semantics"],
+          skills: ["ah-ai-trust-layer"],
           owns: ["recommendedOfferId", "fit", "shortlist order", "next steps boundary"]
         },
         {
           role: "state-owner",
           objective: "Keep cache, retry, and stale paths truthful around the AI layer.",
-          skills: ["ai-cache-and-state", "minimal-tool-calling"],
+          skills: ["ah-ai-trust-layer"],
           owns: ["request state", "cache invalidation", "tooling boundaries"]
         },
         {
           role: "regression-owner",
           objective: "Prove the trust boundary with targeted tests and warnings.",
-          skills: ["trust-boundary-regression", "golden-evals"],
+          skills: ["ah-review-release", "ah-visual-qa"],
           owns: ["narrow regression coverage", "compare-only proof", "degraded behavior"]
         }
       ],
@@ -576,9 +570,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Structured contract or schema change",
     template: "Structured contract or schema change",
     defaultSkills: [
-      "architecture-guardrails",
-      "golden-evals",
-      "production-hardening"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-visual-qa",
+      "ah-review-release"
     ],
     promptKeywords: [
       "contract",
@@ -607,19 +602,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "contract-owner",
           objective: "Set the contract shape and preserve client-server ownership.",
-          skills: ["architecture-guardrails", "production-hardening"],
+          skills: ["ah-backend-contracts"],
           owns: ["shared/contracts/*", "route validation", "rollout constraints"]
         },
         {
           role: "caller-owner",
           objective: "Update every real caller and parser that depends on the contract.",
-          skills: ["golden-evals", "bugfix-root-cause"],
+          skills: ["ah-visual-qa", "ah-backend-contracts"],
           owns: ["server callers", "client callers", "compat touchpoints"]
         },
         {
           role: "compat-reviewer",
           objective: "Catch hidden drift before the new contract is treated as final.",
-          skills: ["qa-self-review", "release-readiness"],
+          skills: ["ah-review-release"],
           owns: ["type gates", "targeted tests", "known incompatibilities"]
         }
       ],
@@ -636,11 +631,12 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Result flow integration change",
     template: "Result flow integration change",
     defaultSkills: [
-      "result-flow-integration",
-      "product-ux-flow-review",
-      "russian-trust-safe-copy",
-      "trust-boundary-regression",
-      "a11y-trust-usability"
+      "ah-control-protocol",
+      "ah-result-flow",
+      "ah-ui-direction",
+      "ah-ui-implementation",
+      "ah-visual-qa",
+      "ah-review-release"
     ],
     promptKeywords: [
       "result flow",
@@ -672,19 +668,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "flow-owner",
           objective: "Keep the work inside the current result loop instead of side screens.",
-          skills: ["result-flow-integration", "product-ux-flow-review"],
+          skills: ["ah-result-flow", "ah-ui-direction"],
           owns: ["result flow", "documents", "trust", "human review"]
         },
         {
           role: "copy-owner",
           objective: "Tighten Russian trust-safe wording and interaction clarity.",
-          skills: ["russian-trust-safe-copy", "a11y-trust-usability"],
+          skills: ["ah-ui-direction", "ah-ui-implementation"],
           owns: ["visible copy", "state labels", "accessibility clarity"]
         },
         {
           role: "trust-verifier",
           objective: "Protect deterministic ownership and escalation honesty inside the loop.",
-          skills: ["trust-boundary-regression", "qa-self-review"],
+          skills: ["ah-review-release"],
           owns: ["compare-only rules", "human review path", "truthful states"]
         }
       ],
@@ -701,11 +697,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     bundle: "Reliability or fallback hardening",
     template: "Reliability or fallback hardening",
     defaultSkills: [
-      "fallback-safe-behavior",
-      "ai-cache-and-state",
-      "production-hardening",
-      "trust-boundary-regression",
-      "bugfix-root-cause"
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-ai-trust-layer",
+      "ah-review-release"
     ],
     promptKeywords: [
       "fallback",
@@ -735,19 +730,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "failure-owner",
           objective: "Model the failure path and keep the UX truthful under degradation.",
-          skills: ["fallback-safe-behavior", "bugfix-root-cause"],
+          skills: ["ah-backend-contracts"],
           owns: ["fallback path", "retry behavior", "truthful degraded state"]
         },
         {
           role: "state-owner",
           objective: "Preserve last-good state and cache rules without cross-case bleed.",
-          skills: ["ai-cache-and-state", "production-hardening"],
+          skills: ["ah-ai-trust-layer", "ah-backend-contracts"],
           owns: ["state ownership", "cache invalidation", "runtime hardening"]
         },
         {
           role: "regression-owner",
           objective: "Prove that reliability fixes did not weaken trust boundaries.",
-          skills: ["trust-boundary-regression", "qa-self-review"],
+          skills: ["ah-review-release"],
           owns: ["negative paths", "trust-safe messaging", "regression gate"]
         }
       ],
@@ -763,7 +758,7 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     priority: 9,
     bundle: "Regression-test expansion",
     template: "Regression-test expansion",
-    defaultSkills: ["golden-evals", "qa-self-review", "release-readiness"],
+    defaultSkills: ["ah-control-protocol", "ah-visual-qa", "ah-review-release"],
     promptKeywords: [
       "test",
       "tests",
@@ -793,19 +788,19 @@ export const MODE_REGISTRY: ModeDefinition[] = [
         {
           role: "fixture-owner",
           objective: "Add the narrowest real scenarios that can catch the breakage.",
-          skills: ["golden-evals"],
+          skills: ["ah-visual-qa"],
           owns: ["scenario fixtures", "targeted test cases", "negative paths"]
         },
         {
           role: "coverage-reviewer",
           objective: "Check that the new tests prove behavior instead of structure noise.",
-          skills: ["qa-self-review"],
+          skills: ["ah-review-release"],
           owns: ["assertion quality", "regression focus", "test noise pressure"]
         },
         {
           role: "release-gate",
           objective: "Close the regression pass with runnable proof and clear residual risk.",
-          skills: ["release-readiness", "multi-lens-review"],
+          skills: ["ah-review-release"],
           owns: ["test evidence", "engine verify", "residual risk summary"]
         }
       ],

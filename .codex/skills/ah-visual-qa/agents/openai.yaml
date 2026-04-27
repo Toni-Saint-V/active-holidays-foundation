@@ -1,0 +1,3 @@
+display_name: "AH Visual QA"
+short_description: "Browser proof, screenshots, golden scenarios and regression verification."
+default_prompt: "Use $ah-visual-qa to verify Active Holidays UI or scenario changes with browser proof, screenshots, or targeted tests."

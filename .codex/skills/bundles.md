@@ -13,13 +13,13 @@ Use this file after [index.md](/Users/user/Projects/active-holidays-foundation/.
 
 ## Bundle Rules
 
-- Load `protocol-structured-json-and-png-gate` before every non-trivial task.
+- Load `ah-control-protocol` before every non-trivial task.
 - Start with the `Core` bundle only. Add `Optional` skills only when the touched surface truly needs them.
-- If visible Russian copy changes, add `russian-trust-safe-copy`.
-- If the task is non-trivial, finish with `qa-self-review`, `multi-lens-review`, and `release-readiness`.
-- If the task is a review, PR gate, or merge-readiness check, add `bank-grade-review`.
-- If the task touches result, trust, compare, recommendation, or `human-review`, add `trust-boundary-regression`.
-- If the task touches `.cursor/mcp.json`, `.agents/plugins/marketplace.json`, or `plugins/*/.codex-plugin/plugin.json`, add `plugin-surface-governance`.
+- If visible Russian copy changes, add `ah-ui-direction`.
+- If the task is non-trivial, finish with `ah-review-release`, `ah-review-release`, and `ah-review-release`.
+- If the task is a review, PR gate, or merge-readiness check, add `ah-review-release`.
+- If the task touches result, trust, compare, recommendation, or `human-review`, add `ah-review-release`.
+- If the task touches `.cursor/mcp.json`, `.agents/plugins/marketplace.json`, or `plugins/*/.codex-plugin/plugin.json`, add `ah-repo-automation`.
 - If the task touches UI, the bundle does not authorize code changes until a PNG preview is shown and approved.
 
 ## Task Families
@@ -30,156 +30,156 @@ This is the bundle for maintaining the existing router and repo-local Codex oper
 
 Core:
 
-- `repo-hygiene-and-structure`
-- `architecture-guardrails`
-- `qa-self-review`
+- `ah-repo-automation`
+- `ah-backend-contracts`
+- `ah-review-release`
 
 Optional:
 
-- `plugin-surface-governance` when the `.codex` task includes plugin or MCP boundary work
-- `docs-and-handoff` when the output is mainly routing guidance or operator docs
-- `release-readiness` when validator or repo checks changed
+- `ah-repo-automation` when the `.codex` task includes plugin or MCP boundary work
+- `ah-product-strategy` when the output is mainly routing guidance or operator docs
+- `ah-review-release` when validator or repo checks changed
 
 Finish:
 
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
 
 ### AI recommendation boundary fix
 
 Core:
 
-- `ai-boundary-and-trust`
-- `offer-semantics`
-- `ai-cache-and-state`
-- `trust-boundary-regression`
-- `golden-evals`
+- `ah-ai-trust-layer`
+- `ah-ai-trust-layer`
+- `ah-ai-trust-layer`
+- `ah-review-release`
+- `ah-visual-qa`
 
 Optional:
 
-- `fallback-safe-behavior` when degraded-state UX or retry logic changes
-- `prompt-hardening` when prompt text or model payload changes
+- `ah-backend-contracts` when degraded-state UX or retry logic changes
+- `ah-ai-trust-layer` when prompt text or model payload changes
 - `ai-observability` when request-path visibility or source flags change
-- `minimal-tool-calling` only when model/tool behavior itself changes
-- `result-flow-integration` only when the result-loop UI contract changes
-- `russian-trust-safe-copy` when disclaimers or recommendation copy changes
+- `ah-ai-trust-layer` only when model/tool behavior itself changes
+- `ah-result-flow` only when the result-loop UI contract changes
+- `ah-ui-direction` when disclaimers or recommendation copy changes
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Structured contract or schema change
 
 Core:
 
-- `architecture-guardrails`
-- `golden-evals`
-- `production-hardening`
+- `ah-backend-contracts`
+- `ah-visual-qa`
+- `ah-backend-contracts`
 
 Optional:
 
-- `bugfix-root-cause` when the schema change is driven by an actual defect
-- `ai-boundary-and-trust` when the contract belongs to recommendation surfaces
-- `result-flow-integration` when the change alters result-loop behavior
-- `docs-and-handoff` when callers, rollout assumptions, or follow-up work must be stated explicitly
+- `ah-backend-contracts` when the schema change is driven by an actual defect
+- `ah-ai-trust-layer` when the contract belongs to recommendation surfaces
+- `ah-result-flow` when the change alters result-loop behavior
+- `ah-product-strategy` when callers, rollout assumptions, or follow-up work must be stated explicitly
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Result flow integration change
 
 Core:
 
-- `result-flow-integration`
-- `product-ux-flow-review`
-- `russian-trust-safe-copy`
-- `trust-boundary-regression`
-- `a11y-trust-usability`
+- `ah-result-flow`
+- `ah-ui-direction`
+- `ah-ui-direction`
+- `ah-review-release`
+- `ah-ui-implementation`
 
 Optional:
 
-- `frontend-premium-ui` when hierarchy, CTA, or visual composition changes
-- `design-system-enforcer` when shared visual primitives or spacing change
-- `architecture-guardrails` when state, route params, or contracts change
-- `offer-semantics` when compare or recommendation semantics change
+- `ah-ui-implementation` when hierarchy, CTA, or visual composition changes
+- `ah-ui-implementation` when shared visual primitives or spacing change
+- `ah-backend-contracts` when state, route params, or contracts change
+- `ah-ai-trust-layer` when compare or recommendation semantics change
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Premium UI or UX refinement
 
 Core:
 
-- `protocol-structured-json-and-png-gate`
-- `frontend-premium-ui`
-- `design-system-enforcer`
-- `product-ux-flow-review`
-- `russian-trust-safe-copy`
-- `a11y-trust-usability`
+- `ah-control-protocol`
+- `ah-ui-implementation`
+- `ah-ui-implementation`
+- `ah-ui-direction`
+- `ah-ui-direction`
+- `ah-ui-implementation`
 
 Optional:
 
 - global `premium-png-screen-design` before implementation approval
-- `trust-boundary-regression` for result, trust, recommendation, or human-review surfaces
-- `performance-sanity` when motion, dense layouts, or large component trees are touched
-- `playwright-e2e-visual-qa` when browser verification or screenshots are realistic
+- `ah-review-release` for result, trust, recommendation, or human-review surfaces
+- `ah-visual-qa` when motion, dense layouts, or large component trees are touched
+- `ah-visual-qa` when browser verification or screenshots are realistic
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Reliability or fallback hardening
 
 Core:
 
-- `fallback-safe-behavior`
-- `ai-cache-and-state`
-- `production-hardening`
-- `trust-boundary-regression`
-- `bugfix-root-cause`
+- `ah-backend-contracts`
+- `ah-ai-trust-layer`
+- `ah-backend-contracts`
+- `ah-review-release`
+- `ah-backend-contracts`
 
 Optional:
 
-- `ai-boundary-and-trust` when recommendation ownership changes
-- `result-flow-integration` when the degraded state changes visible result-loop UX
-- `golden-evals` when deterministic semantics or compare output may drift
-- `docs-and-handoff` when the degraded path has explicit operational caveats
+- `ah-ai-trust-layer` when recommendation ownership changes
+- `ah-result-flow` when the degraded state changes visible result-loop UX
+- `ah-visual-qa` when deterministic semantics or compare output may drift
+- `ah-product-strategy` when the degraded path has explicit operational caveats
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Regression-test expansion
 
 Core:
 
-- `golden-evals`
-- `qa-self-review`
-- `release-readiness`
+- `ah-visual-qa`
+- `ah-review-release`
+- `ah-review-release`
 
 Optional:
 
-- `architecture-guardrails` when the missing coverage belongs at a contract boundary
-- `trust-boundary-regression` when the risk is trust-critical or recommendation-related
-- `playwright-e2e-visual-qa` when browser verification is the real missing proof
-- `docs-and-handoff` when the new coverage closes a known release gap
+- `ah-backend-contracts` when the missing coverage belongs at a contract boundary
+- `ah-review-release` when the risk is trust-critical or recommendation-related
+- `ah-visual-qa` when browser verification is the real missing proof
+- `ah-product-strategy` when the new coverage closes a known release gap
 
 Finish:
 
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Plugin / MCP surface governance
 
@@ -187,35 +187,35 @@ Use this bundle only when plugin or MCP surface is the actual dominant problem, 
 
 Core:
 
-- `plugin-surface-governance`
-- `repo-hygiene-and-structure`
-- `architecture-guardrails`
+- `ah-repo-automation`
+- `ah-repo-automation`
+- `ah-backend-contracts`
 
 Optional:
 
 - global `plugin-creator` when a real repo-local plugin scaffold is justified
-- `docs-and-handoff` when the main output is operator guidance or environment notes
-- `production-hardening` when plugin or MCP state affects repeated workflows or automation safety
+- `ah-product-strategy` when the main output is operator guidance or environment notes
+- `ah-backend-contracts` when plugin or MCP state affects repeated workflows or automation safety
 
 Finish:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 ### Final multi-lens review of a moderate change
 
 Core:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 Optional:
 
-- `bank-grade-review` for review or merge gates
-- `trust-boundary-regression` for result/trust/AI/user-facing diffs
-- `performance-sanity` for UI, motion, or render-heavy changes
+- `ah-review-release` for review or merge gates
+- `ah-review-release` for result/trust/AI/user-facing diffs
+- `ah-visual-qa` for UI, motion, or render-heavy changes
 
 Output:
 

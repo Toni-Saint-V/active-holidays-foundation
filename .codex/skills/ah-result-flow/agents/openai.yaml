@@ -1,0 +1,3 @@
+display_name: "AH Result Flow"
+short_description: "Result, trust, documents, compare, Russian copy, human review and scenario lab work."
+default_prompt: "Use $ah-result-flow to improve the Active Holidays result loop, Russian copy, and trust states without detached side screens or trust drift."

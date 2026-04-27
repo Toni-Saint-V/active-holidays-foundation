@@ -1,0 +1,3 @@
+display_name: "AH UI Direction"
+short_description: "PNG concept, UI direction, visual critique, hierarchy, CTA, trust boundary and Russian copy."
+default_prompt: "Use $ah-ui-direction to prepare or review Active Holidays UI direction, trust-safe copy, and hierarchy before any implementation."

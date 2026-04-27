@@ -1,0 +1,3 @@
+display_name: "AH Repo Automation"
+short_description: "Skills, automations, MCP/plugin governance, verification, and repo operating surface cleanup."
+default_prompt: "Use $ah-repo-automation to keep Active Holidays skills, automations, MCP/plugin surfaces, router docs, and verification checks compact and verifiable."

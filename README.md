@@ -13,6 +13,10 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - Zustand
 - Express
 - Vitest
+- OpenAI SDK with Responses API
+- LangGraph
+- Tavily
+- SQLite-backed LangGraph checkpoint memory
 
 ## Scripts
 
@@ -22,6 +26,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run build` — client build
 - `npm run test` — unit tests
 - `npm run typecheck` — TypeScript check
+- `npm run verify:agent-stack` — OpenAI Responses API + LangGraph + Tavily + memory DB smoke check
 - `npm run verify:engine` — deterministic scenario drift gate
 - `npm run autonomous:next` — select the current safe autonomous task
 - `npm run autonomous:execute` — prepare or run the local Stage A executor
@@ -34,6 +39,9 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 ## Environment
 
 - Copy `.env.example` when you need to override the API port locally.
+- `OPENAI_API_KEY` enables OpenAI-backed server flows. The installed SDK exposes the Responses API.
+- `TAVILY_API_KEY` enables Tavily research calls when a server-side research flow is added.
+- `ACTIVE_HOLIDAYS_AGENT_MEMORY_DB` defaults to `:memory:` for the agent-stack smoke check and future server-side LangGraph checkpoint memory. Use a file path only when persistence is intentionally wired into a runtime flow.
 - Human review state is persisted locally in `output/server-state/human-reviews.json`.
 - Override the file path with `ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE` when you need isolated runtime storage.
 - Protect internal human-review transitions with `ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN` and send it through the `x-active-holidays-internal-token` header from trusted server-side callers only.
@@ -71,10 +79,10 @@ Key repo-local bundles:
 
 - domain AI/trust/result-flow skills
 - engineering guardrails and hygiene skills
-- `plugin-surface-governance` for plugin and MCP boundary work
-- `frontend-premium-ui` as the repo-local premium UI executor
-- `multi-lens-review` as the mandatory final self-check
-- `release-readiness` as the final repo gate
+- `ah-repo-automation` for plugin and MCP boundary work
+- `ah-ui-implementation` as the repo-local premium UI executor
+- `ah-review-release` as the mandatory final self-check
+- `ah-review-release` as the final repo gate
 - primary-mode routing via `.codex/skills/modes.md`
 - bundle selection via `Core` / `Optional` / `Finish`
 - task templates for AI boundary, schema, result flow, premium UI, fallback, regression, plugin or MCP governance, and final review work

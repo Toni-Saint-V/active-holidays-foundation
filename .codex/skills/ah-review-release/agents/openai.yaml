@@ -1,0 +1,3 @@
+display_name: "AH Review Release"
+short_description: "Review findings, regression lens, multi-lens gate, release readiness and ship/block verdict."
+default_prompt: "Use $ah-review-release to review Active Holidays changes, catch regression risk, fix real findings, run proof, and decide ship or block."

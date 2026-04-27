@@ -11,7 +11,20 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "verify:agent-stack": "tsx scripts/verify-agent-stack.ts",
     "test:watch": "vitest",
+    "ah": "tsx scripts/codex/ah-command.ts",
+    "ah:route": "tsx scripts/codex/ah-command.ts auto",
+    "ah:auto": "tsx scripts/codex/ah-command.ts auto",
+    "ah:manual": "tsx scripts/codex/ah-command.ts manual",
+    "ah:custom": "tsx scripts/codex/ah-command.ts custom",
+    "ah:verify": "tsx scripts/codex/ah-command.ts verify",
+    "ah:review": "tsx scripts/codex/ah-command.ts review",
+    "ah:ui": "tsx scripts/codex/ah-command.ts ui",
+    "ah:ship": "tsx scripts/codex/ah-command.ts ship",
+    "ah:skills": "tsx scripts/codex/ah-command.ts skills",
+    "ah:next": "tsx scripts/codex/ah-command.ts next",
+    "ah:audit": "tsx scripts/codex/ah-command.ts audit",
     "verify:engine": "tsx scripts/verify-engine-drift.ts",
     "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update",
     "skills:verify": "node --experimental-strip-types scripts/codex/verify-skills.ts",
@@ -39,8 +52,12 @@
     "autonomous:verify": "tsx scripts/autonomous/verify-autonomous-os.ts"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.42",
+    "@langchain/langgraph": "^1.2.9",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
+    "@tavily/core": "^0.7.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
@@ -54,6 +71,9 @@
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.11",
     "zustand": "^5.0.8"
+  },
+  "overrides": {
+    "uuid": "14.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",

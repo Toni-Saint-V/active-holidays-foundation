@@ -1,0 +1,3 @@
+display_name: "AH AI Trust Layer"
+short_description: "OpenAI recommendations, prompts, cache, fallback, observability, verify checks and AI trust boundary."
+default_prompt: "Use $ah-ai-trust-layer to keep Active Holidays AI explanatory, fallback-safe, verified with proof, and below deterministic decisions."

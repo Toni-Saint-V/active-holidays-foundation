@@ -1,4 +1,0 @@
-interface:
-  display_name: "Architecture Guardrails"
-  short_description: "Границы client/server/shared без дрейфа"
-  default_prompt: "Use $architecture-guardrails to review this Active Holidays change for ownership, contract integrity, and clean client-server-shared boundaries."

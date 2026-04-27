@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plugin Surface Governance"
-  short_description: "Аудит plugin и MCP surface без лишних слоёв"
-  default_prompt: "Use $plugin-surface-governance to audit this Active Holidays plugin or MCP surface and decide whether docs, validation, or a real local plugin is justified."

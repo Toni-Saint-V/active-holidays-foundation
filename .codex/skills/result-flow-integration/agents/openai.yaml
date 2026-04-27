@@ -1,4 +1,0 @@
-interface:
-  display_name: "Result Flow Integration"
-  short_description: "Изменения внутри result loop без side screens"
-  default_prompt: "Use $result-flow-integration to extend this Active Holidays result-loop change without breaking result, trust, documents, compare, or human-review flow."

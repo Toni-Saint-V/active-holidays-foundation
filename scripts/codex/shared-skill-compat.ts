@@ -25,7 +25,7 @@ type SharedSkillCompatRule = {
 
 const COMPAT_RULES: SharedSkillCompatRule[] = [
   {
-    skillName: "protocol-structured-json-and-png-gate",
+    skillName: "ah-control-protocol",
     allowedMutationScope: [
       ".codex/automations/**",
       ".codex/skills/**",
@@ -38,37 +38,27 @@ const COMPAT_RULES: SharedSkillCompatRule[] = [
     fallbackMode: "fail-closed"
   },
   {
-    skillName: "architecture-guardrails",
+    skillName: "ah-backend-contracts",
     allowedMutationScope: ["shared/**", "server/**", "src/**", "scripts/codex/**"],
     fallbackMode: "manual-review"
   },
   {
-    skillName: "qa-self-review",
-    allowedMutationScope: ["review-only"],
-    fallbackMode: "manual-review"
-  },
-  {
-    skillName: "multi-lens-review",
-    allowedMutationScope: ["review-only"],
-    fallbackMode: "manual-review"
-  },
-  {
-    skillName: "release-readiness",
+    skillName: "ah-review-release",
     allowedMutationScope: ["review-only", "release-gating"],
     fallbackMode: "manual-review"
   },
   {
-    skillName: "bank-grade-review",
-    allowedMutationScope: ["review-only"],
-    fallbackMode: "repo-local-override-required"
+    skillName: "ah-visual-qa",
+    allowedMutationScope: ["review-only", "release-gating", "reports/**", "output/**"],
+    fallbackMode: "manual-review"
   },
   {
-    skillName: "plugin-surface-governance",
+    skillName: "ah-repo-automation",
     allowedMutationScope: ["plugins/**", ".agents/plugins/**", ".cursor/mcp.json", "scripts/codex/**"],
     fallbackMode: "manual-review"
   },
   {
-    skillName: "repo-hygiene-and-structure",
+    skillName: "ah-product-strategy",
     allowedMutationScope: [".codex/**", "scripts/codex/**", "README.md", "AGENTS.md", "RUNBOOK.md"],
     fallbackMode: "manual-review"
   }

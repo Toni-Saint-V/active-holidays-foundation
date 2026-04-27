@@ -119,6 +119,7 @@ export type NextTaskResult = {
   gitStatus: string[];
   trackedGitStatus: string[];
   scoringModel: ScoringModelSummary;
+  externalGateProjection: GateProjection;
   founderReport: string;
 };
 
@@ -144,6 +145,7 @@ export type ExecutionPacket = {
   trackedGitStatus: string[];
   verificationCommands: string[];
   verificationResults: VerificationCommandResult[];
+  controlTowerReadiness: ControlTowerReadiness;
   externalWriteState: {
     writePerformed: false;
     reason: string;
@@ -154,6 +156,29 @@ export type ExecutionPacket = {
   };
   founderReport: string;
   executionBrief: string;
+};
+
+export type GateProjectionEntry = {
+  status: string;
+  reasons: string[];
+};
+
+export type GateProjection = {
+  sourcePath: string;
+  available: boolean;
+  evaluatedAt: string | null;
+  projectionHash: string | null;
+  synthesis: GateProjectionEntry;
+  directorDryRun: GateProjectionEntry;
+  directorLiveWrite: GateProjectionEntry;
+  executor: GateProjectionEntry;
+};
+
+export type ControlTowerReadiness = {
+  localExecutor: GateProjectionEntry;
+  directorDryRun: GateProjectionEntry;
+  notionWriteback: GateProjectionEntry;
+  externalExecutor: GateProjectionEntry;
 };
 
 export type AutonomousCycleResult = {
@@ -242,6 +267,7 @@ const taskLifecycleStatuses = new Set<TaskLifecycleStatus>([
   "completed",
   "paused"
 ]);
+const usableGateProjectionStatuses = new Set(["passed", "blocked"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -257,6 +283,95 @@ function assertWeight(
     throw new Error(`Invalid scoring model: ${groupName}.${weightName} must be a finite non-negative number.`);
   }
   return value;
+}
+
+function unknownGateEntry(reason: string): GateProjectionEntry {
+  return {
+    status: "unknown",
+    reasons: [reason]
+  };
+}
+
+function normalizeGateProjectionEntry(value: unknown, missingReason: string): GateProjectionEntry {
+  if (!isRecord(value)) return unknownGateEntry(missingReason);
+  const status =
+    typeof value.status === "string" && usableGateProjectionStatuses.has(value.status)
+      ? value.status
+      : "unknown";
+  const reasons = Array.isArray(value.reasons)
+    ? value.reasons.filter((reason): reason is string => typeof reason === "string" && reason.length > 0)
+    : [];
+
+  return {
+    status,
+    reasons: reasons.length > 0 ? reasons : status === "passed" ? [] : [missingReason]
+  };
+}
+
+function unavailableGateProjection(sourcePath: string, reason: string): GateProjection {
+  const entry = unknownGateEntry(reason);
+  return {
+    sourcePath,
+    available: false,
+    evaluatedAt: null,
+    projectionHash: null,
+    synthesis: entry,
+    directorDryRun: entry,
+    directorLiveWrite: entry,
+    executor: entry
+  };
+}
+
+export function readGateProjection(currentRepoRoot = repoRoot): GateProjection {
+  const relativePath = path.join("reports", "automations", "state", "gate-eligibility-snapshot.json");
+  const sourcePath = path.join(currentRepoRoot, relativePath);
+  if (!existsSync(sourcePath)) {
+    return unavailableGateProjection(relativePath, "gate eligibility snapshot is missing");
+  }
+
+  let raw: unknown;
+  try {
+    raw = readJson<unknown>(sourcePath);
+  } catch {
+    return unavailableGateProjection(relativePath, "gate eligibility snapshot is malformed");
+  }
+  if (!isRecord(raw)) {
+    return unavailableGateProjection(relativePath, "gate eligibility snapshot root is malformed");
+  }
+  if (!isRecord(raw.eligibility)) {
+    return unavailableGateProjection(relativePath, "gate eligibility snapshot eligibility is missing or malformed");
+  }
+  const eligibility = raw.eligibility;
+  const synthesis = normalizeGateProjectionEntry(
+    eligibility.synthesis,
+    "synthesis gate is not available in gate snapshot"
+  );
+  const directorDryRun = normalizeGateProjectionEntry(
+    eligibility.directorDryRun,
+    "director dry-run gate is not available in gate snapshot"
+  );
+  const directorLiveWrite = normalizeGateProjectionEntry(
+    eligibility.directorLiveWrite,
+    "director live-write gate is not available in gate snapshot"
+  );
+  const executor = normalizeGateProjectionEntry(
+    eligibility.executor,
+    "external executor gate is not available in gate snapshot"
+  );
+  const available = [synthesis, directorDryRun, directorLiveWrite, executor].every(
+    (entry) => entry.status !== "unknown"
+  );
+
+  return {
+    sourcePath: relativePath,
+    available,
+    evaluatedAt: typeof raw.evaluatedAt === "string" ? raw.evaluatedAt : null,
+    projectionHash: typeof raw.projectionHash === "string" ? raw.projectionHash : null,
+    synthesis,
+    directorDryRun,
+    directorLiveWrite,
+    executor
+  };
 }
 
 export function readScoringModel(currentRepoRoot = repoRoot): ScoringModel {
@@ -669,6 +784,7 @@ export function selectNextTask(options?: {
   const eligible = scored.filter((candidate) => candidate.eligible);
   const selected = eligible[0] ?? null;
   const founderReport = buildFounderReport(selected, gitStatus, mode);
+  const externalGateProjection = readGateProjection(currentRepoRoot);
 
   return {
     schemaVersion: 1,
@@ -681,6 +797,7 @@ export function selectNextTask(options?: {
     gitStatus,
     trackedGitStatus,
     scoringModel: summarizeScoringModel(scoringModel),
+    externalGateProjection,
     founderReport
   };
 }
@@ -735,6 +852,40 @@ function findUntrackedScopeCollisions(gitStatus: string[], selected: ScoredCandi
     .filter((entry) => evidencePaths.some((evidencePath) => pathsOverlap(entry, evidencePath)));
 }
 
+function buildControlTowerReadiness(
+  blockedReasons: string[],
+  externalGateProjection: GateProjection
+): ControlTowerReadiness {
+  return {
+    localExecutor: {
+      status: blockedReasons.length === 0 ? "passed" : "blocked",
+      reasons: [...blockedReasons]
+    },
+    directorDryRun: externalGateProjection.directorDryRun,
+    notionWriteback: externalGateProjection.directorLiveWrite,
+    externalExecutor: externalGateProjection.executor
+  };
+}
+
+export function refreshExecutionPacketReadiness(packet: ExecutionPacket): void {
+  packet.blocked = packet.blockedReasons.length > 0;
+  packet.controlTowerReadiness.localExecutor = {
+    status: packet.blocked ? "blocked" : "passed",
+    reasons: [...packet.blockedReasons]
+  };
+}
+
+export function addExecutionBlocker(packet: ExecutionPacket, reason: string): void {
+  packet.blockedReasons.push(reason);
+  refreshExecutionPacketReadiness(packet);
+}
+
+function formatGateEntry(entry: GateProjectionEntry): string {
+  return entry.reasons.length === 0
+    ? entry.status
+    : `${entry.status} (${entry.reasons.join("; ")})`;
+}
+
 export function buildExecutionBrief(packet: ExecutionPacket): string {
   const blockedSection =
     packet.blockedReasons.length === 0
@@ -767,6 +918,13 @@ export function buildExecutionBrief(packet: ExecutionPacket): string {
     "## Verification Results",
     "",
     verificationSection,
+    "",
+    "## Control Tower Readiness",
+    "",
+    `- Local executor: ${formatGateEntry(packet.controlTowerReadiness.localExecutor)}`,
+    `- Director dry-run: ${formatGateEntry(packet.controlTowerReadiness.directorDryRun)}`,
+    `- Notion writeback: ${formatGateEntry(packet.controlTowerReadiness.notionWriteback)}`,
+    `- External executor: ${formatGateEntry(packet.controlTowerReadiness.externalExecutor)}`,
     "",
     "## Review Status",
     "",
@@ -830,6 +988,10 @@ export function prepareExecutionPacket(options?: {
   if (options?.write && branchName && branchExists(branchName, currentRepoRoot)) {
     blockedReasons.push(`Ветка \`${branchName}\` уже существует; cleanup или reuse нужно решить явно.`);
   }
+  const controlTowerReadiness = buildControlTowerReadiness(
+    blockedReasons,
+    selection.externalGateProjection
+  );
 
   const packet: ExecutionPacket = {
     schemaVersion: 1,
@@ -845,6 +1007,7 @@ export function prepareExecutionPacket(options?: {
     trackedGitStatus,
     verificationCommands: [...defaultVerificationCommands],
     verificationResults: [],
+    controlTowerReadiness,
     externalWriteState: {
       writePerformed: false,
       reason: "Live external writes stay fail-closed in Stage A."
@@ -918,6 +1081,7 @@ function buildCycleReport(result: AutonomousCycleResult): string {
     `- Generated at: ${result.generatedAt}`,
     `- Selected task: ${result.selectedTaskId ?? "none"}`,
     `- Blocked: ${result.blocked ? "yes" : "no"}`,
+    `- Gate snapshot: ${result.nextTask.externalGateProjection.available ? "available" : "missing"} (${result.nextTask.externalGateProjection.sourcePath})`,
     "",
     "## Blockers",
     "",
@@ -931,6 +1095,13 @@ function buildCycleReport(result: AutonomousCycleResult): string {
     "",
     `- Performed: ${result.executionPacket.externalWriteState.writePerformed ? "yes" : "no"}`,
     `- Reason: ${result.executionPacket.externalWriteState.reason}`,
+    "",
+    "## Control Tower Readiness",
+    "",
+    `- Local executor: ${formatGateEntry(result.executionPacket.controlTowerReadiness.localExecutor)}`,
+    `- Director dry-run: ${formatGateEntry(result.executionPacket.controlTowerReadiness.directorDryRun)}`,
+    `- Notion writeback: ${formatGateEntry(result.executionPacket.controlTowerReadiness.notionWriteback)}`,
+    `- External executor: ${formatGateEntry(result.executionPacket.controlTowerReadiness.externalExecutor)}`,
     "",
     "## Next Best Action",
     "",
@@ -981,8 +1152,8 @@ export function runAutonomousCycle(options?: {
     );
     const failedChecks = executionPacket.verificationResults.filter((result) => !result.ok);
     if (failedChecks.length > 0) {
-      executionPacket.blocked = true;
-      executionPacket.blockedReasons.push(
+      addExecutionBlocker(
+        executionPacket,
         `Verification failed: ${failedChecks.map((result) => result.command).join(", ")}`
       );
     }

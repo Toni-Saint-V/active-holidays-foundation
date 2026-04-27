@@ -127,6 +127,33 @@ This branch implements the repo-owned Stage A control layer:
 
 Stage A now supports executor-safe task selection, persisted dry-run cycle reports, dry-run execution packets, local `codex/*` branch preparation, and baseline verification without enabling live external writes.
 
+The control tower now exposes first-class readiness levels in every execution packet:
+
+- `localExecutor`: whether the local Codex executor may safely prepare or run the selected task.
+- `directorDryRun`: whether Notion/GitHub sync planning may produce dry-run packets.
+- `notionWriteback`: whether live Notion writeback is allowed.
+- `externalExecutor`: whether downstream automation may run from eligible sync packets.
+
+This means a green local autonomous check is no longer treated as full external autonomy. The system can be operational in safe local mode while live Notion writeback, external executor promotion, or stale feeder reports remain blocked.
+
 The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, applies `.autonomous/task-status.json`, validates evidence and approval gates, scores candidates, blocks completed or paused candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
 
 It still does not autonomously edit product code, push branches, open PRs, merge into `main`, or perform live Notion/GitHub writeback by itself. Those remain explicitly gated.
+
+## Done Boundary For Autonomous v1
+
+Autonomous v1 is considered usable when:
+
+- `npm run autonomous:next -- --json` selects one executor-safe task or explains why none is safe.
+- `npm run autonomous:execute -- --json` produces a packet with explicit local and external gate readiness.
+- `npm run autonomous:cycle -- --skip-verify -- --json` writes the full artifact set in `reports/autonomous/`.
+- `npm run autonomous:verify` passes.
+- live Notion writeback remains blocked unless the gate snapshot says `directorLiveWrite.status = passed`.
+
+Autonomous v2 starts only after:
+
+- required feeder reports are fresh.
+- operational Notion surfaces have locked target ids or data source ids.
+- dry-run diffs exist.
+- manual approval tuples match the planned writeback.
+- external executor packets are `ready_for_sync`.

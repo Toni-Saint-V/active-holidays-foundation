@@ -1,0 +1,3 @@
+display_name: "AH Control Protocol"
+short_description: "Старт задачи, режим работы, PNG gate и короткая execution discipline."
+default_prompt: "Use $ah-control-protocol to choose the right Active Holidays mode, enforce PNG approval when needed, and keep execution short and verified."

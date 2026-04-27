@@ -1,4 +1,0 @@
-interface:
-  display_name: "Fallback Safe Behavior"
-  short_description: "Fallback и trust-safe degraded behavior без ложной уверенности"
-  default_prompt: "Use $fallback-safe-behavior to keep fallback messaging, retries, and deterministic trust-safe behavior honest when optional AI layers fail."

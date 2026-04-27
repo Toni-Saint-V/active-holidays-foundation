@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+  addExecutionBlocker,
   buildExecutionBrief,
   prepareExecutionPacket,
   repoRoot,
@@ -42,8 +43,7 @@ function main() {
     packet.verificationResults = runVerificationStack(packet.verificationCommands, repoRoot);
     const failedCheck = packet.verificationResults.find((result) => !result.ok);
     if (failedCheck) {
-      packet.blocked = true;
-      packet.blockedReasons.push(`Baseline verification failed: ${failedCheck.command}`);
+      addExecutionBlocker(packet, `Baseline verification failed: ${failedCheck.command}`);
     }
   }
 

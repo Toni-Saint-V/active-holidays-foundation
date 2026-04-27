@@ -12,6 +12,13 @@ Scores all candidates and selects the highest-value safe task using the balanced
 
 Persists the selected task, founder report, executor packet, and cycle report, then runs verification in report-first mode with external writes disabled.
 
+The cycle report must include four readiness levels:
+
+- local executor readiness
+- director dry-run readiness
+- Notion writeback readiness
+- external executor readiness
+
 ## 4. Branch Executor
 
 Creates a `codex/*` branch for the selected task and keeps the change small and reviewable.
@@ -60,5 +67,7 @@ Workflow 4 now exists in Stage A form:
 - fail closed on dirty tracked state
 - create a local `codex/*` branch only in explicit write mode
 - keep external writes disabled
+
+Workflow 10 now reads `reports/automations/state/gate-eligibility-snapshot.json` and projects blocked/passed status into autonomous packets. Missing or malformed gate state is treated as `unknown`, not as permission.
 
 Workflow 6 is currently enforced by the operator/session review gate, including `$bank-grade-review` and `$multi-lens-review` after each task. Workflows 7 and 8 still require additional executor permissions and are activated only after the Stage A branch-preparation layer proves stable.

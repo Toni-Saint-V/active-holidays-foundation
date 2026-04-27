@@ -1,0 +1,3 @@
+display_name: "AH Backend Contracts"
+short_description: "Architecture, routes, shared contracts, domain logic, persistence and reliability hardening."
+default_prompt: "Use $ah-backend-contracts to change Active Holidays architecture, server, contracts, domain logic, or persistence safely with proof."

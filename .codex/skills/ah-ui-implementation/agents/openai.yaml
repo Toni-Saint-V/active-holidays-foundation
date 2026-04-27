@@ -1,0 +1,3 @@
+display_name: "AH UI Implementation"
+short_description: "Approved UI code work, components, responsive states, Russian copy, trust boundary and accessibility."
+default_prompt: "Use $ah-ui-implementation after PNG approval to implement Active Holidays UI changes with Russian copy, trust-safe states, and verification."

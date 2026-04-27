@@ -1,4 +1,0 @@
-interface:
-  display_name: "Protocol + PNG Gate"
-  short_description: "JSON-only replies and PNG approval for UI"
-  default_prompt: "Use $protocol-structured-json-and-png-gate to keep replies in structured JSON and block UI code until a PNG preview is approved."

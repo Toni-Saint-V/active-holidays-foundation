@@ -48,9 +48,9 @@ Protocol:
 
 Load:
 
-- `repo-hygiene-and-structure`
-- `architecture-guardrails`
-- `qa-self-review`
+- `ah-repo-automation`
+- `ah-backend-contracts`
+- `ah-review-release`
 
 Inspect:
 
@@ -68,7 +68,7 @@ Implement:
 - make the mode -> bundle -> template flow explicit when docs are ambiguous
 - keep mode selection, bundle selection, and verification aligned
 - do not add a new skill or doc when a tighter existing surface would solve the problem
-- if plugin or MCP surface is involved, hand off to `plugin-surface-governance`
+- if plugin or MCP surface is involved, hand off to `ah-repo-automation`
 
 Verify:
 
@@ -93,11 +93,11 @@ Primary flow:
 
 Load:
 
-- `ai-boundary-and-trust`
-- `offer-semantics`
-- `ai-cache-and-state`
-- `trust-boundary-regression`
-- `golden-evals`
+- `ah-ai-trust-layer`
+- `ah-ai-trust-layer`
+- `ah-ai-trust-layer`
+- `ah-review-release`
+- `ah-visual-qa`
 
 Inspect:
 
@@ -136,9 +136,9 @@ Primary flow:
 
 Load:
 
-- `architecture-guardrails`
-- `golden-evals`
-- `production-hardening`
+- `ah-backend-contracts`
+- `ah-visual-qa`
+- `ah-backend-contracts`
 
 Inspect:
 
@@ -175,11 +175,11 @@ Primary flow:
 
 Load:
 
-- `result-flow-integration`
-- `product-ux-flow-review`
-- `russian-trust-safe-copy`
-- `trust-boundary-regression`
-- `a11y-trust-usability`
+- `ah-result-flow`
+- `ah-ui-direction`
+- `ah-ui-direction`
+- `ah-review-release`
+- `ah-ui-implementation`
 
 Inspect:
 
@@ -218,12 +218,12 @@ Primary flow:
 
 Load:
 
-- `protocol-structured-json-and-png-gate`
-- `frontend-premium-ui`
-- `design-system-enforcer`
-- `product-ux-flow-review`
-- `russian-trust-safe-copy`
-- `a11y-trust-usability`
+- `ah-control-protocol`
+- `ah-ui-implementation`
+- `ah-ui-implementation`
+- `ah-ui-direction`
+- `ah-ui-direction`
+- `ah-ui-implementation`
 
 Inspect:
 
@@ -264,11 +264,11 @@ Primary flow:
 
 Load:
 
-- `fallback-safe-behavior`
-- `ai-cache-and-state`
-- `production-hardening`
-- `trust-boundary-regression`
-- `bugfix-root-cause`
+- `ah-backend-contracts`
+- `ah-ai-trust-layer`
+- `ah-backend-contracts`
+- `ah-review-release`
+- `ah-backend-contracts`
 
 Inspect:
 
@@ -305,9 +305,9 @@ Primary flow:
 
 Load:
 
-- `golden-evals`
-- `qa-self-review`
-- `release-readiness`
+- `ah-visual-qa`
+- `ah-review-release`
+- `ah-review-release`
 
 Inspect:
 
@@ -342,9 +342,9 @@ Primary flow:
 
 Load:
 
-- `plugin-surface-governance`
-- `repo-hygiene-and-structure`
-- `architecture-guardrails`
+- `ah-repo-automation`
+- `ah-repo-automation`
+- `ah-backend-contracts`
 
 Inspect:
 
@@ -384,9 +384,9 @@ Primary flow:
 
 Load:
 
-- `qa-self-review`
-- `multi-lens-review`
-- `release-readiness`
+- `ah-review-release`
+- `ah-review-release`
+- `ah-review-release`
 
 Inspect:
 
@@ -404,4 +404,4 @@ Implement:
 Verify:
 
 - rerun the relevant gates after any review-driven fix
-- if the task is a merge gate, add `bank-grade-review`
+- if the task is a merge gate, add `ah-review-release`
