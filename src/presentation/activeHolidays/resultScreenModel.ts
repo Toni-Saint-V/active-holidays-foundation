@@ -280,16 +280,6 @@ function documentRows(
   missingDocs: DocumentsReadinessItem[],
   recommendedScenario: ScenarioLabPayload["scenarios"][number] | null
 ): ResultScreenModel["workSection"]["rows"] {
-  if (missingDocs.length > 0) {
-    return missingDocs.slice(0, 2).map((item) => ({
-      id: item.id,
-      title: item.label,
-      meta: item.detail,
-      status: item.status === "blocked" ? "стоп" : "нужно",
-      tone: item.status === "blocked" ? "manual" : "need"
-    }));
-  }
-
   if (result.verdict === "HUMAN_REVIEW") {
     return [
       {
@@ -300,6 +290,16 @@ function documentRows(
         tone: "manual"
       }
     ];
+  }
+
+  if (missingDocs.length > 0) {
+    return missingDocs.slice(0, 2).map((item) => ({
+      id: item.id,
+      title: item.label,
+      meta: item.detail,
+      status: item.status === "blocked" ? "стоп" : "нужно",
+      tone: item.status === "blocked" ? "manual" : "need"
+    }));
   }
 
   if (recommendedScenario) {
@@ -335,9 +335,11 @@ export function buildResultScreenModel({
   const missingDocs = result.documents.items.filter((item) => item.status !== "ready");
   const isHumanReview = result.verdict === "HUMAN_REVIEW";
   const recommendedScenario =
-    scenarioLab?.scenarios.find((scenario) => scenario.id === scenarioLab.recommendedScenarioId) ??
-    scenarioLab?.scenarios[0] ??
-    null;
+    isHumanReview
+      ? null
+      : scenarioLab?.scenarios.find((scenario) => scenario.id === scenarioLab.recommendedScenarioId) ??
+        scenarioLab?.scenarios[0] ??
+        null;
 
   return {
     eyebrow: isHumanReview ? "ручная проверка" : "основной маршрут",

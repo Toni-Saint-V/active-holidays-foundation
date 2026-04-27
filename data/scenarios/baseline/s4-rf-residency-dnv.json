@@ -2,7 +2,7 @@
   "caseId": "s4-rf-residency-dnv",
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
-  "resultFingerprint": "095221f58bd059095908614f4b9a6d42c000dedc4bf0e80c4db93f4b7466f79d",
+  "resultFingerprint": "8c6431428b709e5ee297924c360e35c022d5632ddf0dee929a7d8aafa616380a",
   "catalogFingerprint": "0ec5b3179da255f64cea54403d4cac2de2d7b8675ade889b85c7346c52853455",
   "verdict": "GO",
   "nextActionType": "collect_financial_docs",

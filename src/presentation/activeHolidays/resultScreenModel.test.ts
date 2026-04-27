@@ -187,7 +187,7 @@ describe("buildResultScreenModel", () => {
         verdict: "HUMAN_REVIEW",
         nextAction: {
           type: "send_for_review",
-          priority: "blocking",
+          priority: "human_review",
           label: "Передать кейс менеджеру",
           detail: "Автомат не может честно подтвердить маршрут.",
           targetScreen: "human-review",
@@ -201,6 +201,16 @@ describe("buildResultScreenModel", () => {
     expect(model.bridge.activeNodeId).toBe("review");
     expect(model.ai.summary).toContain("менеджера");
     expect(model.cta.targetScreen).toBe("human-review");
+    expect(model.workSection.rows).toEqual([
+      {
+        id: "manual-review",
+        title: "Передать кейс",
+        meta: "Автомат не может честно подтвердить маршрут.",
+        status: "проверка",
+        tone: "manual"
+      }
+    ]);
+    expect(model.compareCard).toBeNull();
   });
 
   it("uses the next action as the work row when documents are already ready", () => {

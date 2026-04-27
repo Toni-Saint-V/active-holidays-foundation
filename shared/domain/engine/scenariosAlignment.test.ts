@@ -30,6 +30,19 @@ describe("seed scenarios", () => {
       expect(result.verdict).toBe(scenario.expectedVerdict);
       expect(result.nextAction.type).toBe(scenario.expectedActionType);
       expect(result.primaryPath?.id ?? null).toBe(scenario.expectedPrimaryPath);
+
+      if (scenario.expectedVerdict === "HUMAN_REVIEW") {
+        expect(result.nextAction.priority).toBe("human_review");
+        expect(result.nextAction.targetScreen).toBe("human-review");
+        expect(result.primaryPath).toBeNull();
+        expect(result.alternativePaths).toEqual([]);
+        expect(result.documents.items).toEqual([]);
+        expect(result.trust.confidence).toBe(0);
+        expect(result.trust.confidenceBreakdown.capsApplied).toContain("human_review");
+      } else {
+        expect(result.nextAction.priority).not.toBe("human_review");
+        expect(result.nextAction.targetScreen).not.toBe("human-review");
+      }
     }
   });
 });
