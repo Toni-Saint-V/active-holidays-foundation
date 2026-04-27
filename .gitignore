@@ -29,6 +29,7 @@ automation/yepcode/**/.env.*
 .superpowers/
 reports/autonomous/
 reports/design/
+reports/presentations/
 .playwright-cli/
 tmp/
 research_*/

@@ -1,7 +1,7 @@
 export const REPO_RUNTIME_MANIFEST = {
   repoId: "active-holidays-foundation",
   canonicalRepoRoot: "/Users/user/Projects/active-holidays-foundation",
-  branchScope: "codex/control-tower-v2-1-runtime-hardening",
+  branchScope: "main",
   controlTowerScope: "non-ui dominant surface only",
   automationRoot: ".codex/automations",
   runtimeReportsRoot: "reports/automations/runs",

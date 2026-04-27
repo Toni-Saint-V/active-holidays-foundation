@@ -61,6 +61,10 @@ npm run automations:sync -- --dry-run
 npm run automations:sync
 ```
 
+Non-dry sync is intended to run from `main` after the repo-owned automation
+contract has landed. From an implementation branch, use `--allow-branch-mismatch`
+only for an intentional local activation or migration pass.
+
 Optional narrow sync:
 
 ```bash
@@ -77,14 +81,20 @@ npm run automations:sync -- --force-reset-installed-state
 
 - repo defaults are intentionally `PAUSED`
 - this keeps the suite safe until the owner chooses which loops go live first
+- installed activation lives in `${CODEX_HOME:-$HOME/.codex}/automations/`
+- prefer the repo-owned `ah-*` automation ids over legacy unprefixed copies
 
 Recommended first activation order:
 
-1. `ah-agent-memory-guard`
-2. `ah-skill-dedupe-gap-harvester`
-3. `ah-product-os-radar`
-4. `ah-ui-premium-polish-pass`
-5. `ah-design-drift-vs-contract`
+1. `ah-product-os-radar`
+2. `ah-truth-freshness-watch`
+3. `ah-execution-brief-sync`
+4. `ah-design-drift-vs-contract`
+5. `ah-copy-trust-upgrade`
+
+Legacy installed copies without the `ah-` prefix should stay `PAUSED` once the
+matching `ah-*` automation is active. Do not delete them during a migration
+unless the owner explicitly asks for destructive cleanup.
 
 Because the local CLI does not expose a stable automation-status command during this audit, activation should be done in the Codex automation UI or by editing the copied `automation.toml` files in `${CODEX_HOME:-$HOME/.codex}/automations/` using the live status value supported by that Codex build. `automations:sync` now preserves the installed `status` field by default; only `--force-reset-installed-state` resets it.
 
