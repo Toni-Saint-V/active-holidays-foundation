@@ -49,6 +49,9 @@
     "autonomous:next:write": "tsx scripts/autonomous/next-best-task-loop.ts --write",
     "autonomous:cycle": "tsx scripts/autonomous/run-autonomous-cycle.ts",
     "autonomous:execute": "tsx scripts/autonomous/execute-autonomous-task.ts",
+    "autonomous:health": "tsx scripts/autonomous/health.ts",
+    "autonomous:level-b": "tsx scripts/autonomous/level-b.ts",
+    "autonomous:level-b:write": "tsx scripts/autonomous/level-b.ts --write",
     "autonomous:verify": "tsx scripts/autonomous/verify-autonomous-os.ts"
   },
   "dependencies": {

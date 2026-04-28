@@ -116,12 +116,17 @@ This branch implements the repo-owned Stage A control layer:
 - deterministic scoring candidates
 - repo-owned task lifecycle status
 - `scripts/autonomous/runtime.ts`
+- `scripts/autonomous/health.ts`
+- `scripts/autonomous/level-b.ts`
 - `scripts/autonomous/next-best-task-loop.ts`
 - `scripts/autonomous/execute-autonomous-task.ts`
 - `scripts/autonomous/verify-autonomous-os.ts`
 - `npm run autonomous:next`
 - `npm run autonomous:cycle`
 - `npm run autonomous:execute`
+- `npm run autonomous:health`
+- `npm run autonomous:level-b`
+- `npm run autonomous:level-b:write`
 - `npm run autonomous:verify`
 - GitHub Actions check workflow
 
@@ -135,6 +140,26 @@ The control tower now exposes first-class readiness levels in every execution pa
 - `externalExecutor`: whether downstream automation may run from eligible sync packets.
 
 This means a green local autonomous check is no longer treated as full external autonomy. The system can be operational in safe local mode while live Notion writeback, external executor promotion, or stale feeder reports remain blocked.
+
+## Repo-Local Level B
+
+Level B is repo-local only. It means the local control loop can continuously diagnose itself, produce next-action artifacts, audit multi-agent coverage for every operating mode, and classify corrective work without mutating product code, Notion, GitHub, deploy targets, or `main`.
+
+Level B readiness requires:
+
+- `localExecutor = passed`
+- every skill mode has a valid three-agent pack with owner, verifier, and reviewer-equivalent coverage
+- every cycle can expose health, agent-state, gate-state, and next-action state
+- stale feeders and blocked gates produce explicit self-healing recommendations
+- external write gates stay fail-closed unless separate Notion/GitHub promotion checks pass
+
+Primary commands:
+
+- `npm run autonomous:health -- --json` reports subsystem health without writing artifacts.
+- `npm run autonomous:level-b -- --json` runs the dry-run Level B cycle without writing artifacts.
+- `npm run autonomous:level-b:write -- --json` writes `health-latest.*` and `level-b-latest.*` into `reports/autonomous/`.
+
+The plain commands fail closed on tracked working-tree changes. Verifier-only schema checks may pass `--allow-dirty-tracked --allow-non-base-branch`; those flags are for diagnostics and do not permit product-code mutation or external writes.
 
 The implemented Stage A selector is intentionally static: it reads `.autonomous/task-candidates.json`, applies `.autonomous/task-status.json`, validates evidence and approval gates, scores candidates, blocks completed or paused candidates, and fails closed on unknown gates. A full runtime scanner/generator remains target architecture, not current implementation.
 

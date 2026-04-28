@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addExecutionBlocker,
+  buildAutonomousHealthSnapshot,
   buildAutonomousBranchName,
+  collectSystemMetrics,
+  computeLevelBReadiness,
   prepareExecutionPacket,
   readGateProjection,
   runAutonomousCycle,
@@ -70,6 +73,26 @@ async function writeTaskStatus(
   );
 }
 
+async function writeSkillStubs() {
+  for (const skillName of [
+    "ah-ai-trust-layer",
+    "ah-backend-contracts",
+    "ah-control-protocol",
+    "ah-product-strategy",
+    "ah-repo-automation",
+    "ah-result-flow",
+    "ah-review-release",
+    "ah-ui-direction",
+    "ah-ui-implementation",
+    "ah-visual-qa"
+  ]) {
+    await writeRepoFile(
+      `.codex/skills/${skillName}/SKILL.md`,
+      `---\nname: ${skillName}\ndescription: test stub\n---\n\n# ${skillName}\n`
+    );
+  }
+}
+
 async function writeGateEligibilitySnapshot(
   eligibility: Record<string, unknown> = {}
 ) {
@@ -92,6 +115,7 @@ beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), "autonomous-runtime-"));
   await writeScoringModel();
   await writeTaskStatus();
+  await writeSkillStubs();
 });
 
 afterEach(async () => {
@@ -1092,13 +1116,258 @@ describe("autonomous runtime", () => {
       path.join(tempDir, "reports/autonomous/next-best-task-latest.json"),
       "utf8"
     );
+    const healthJson = await readFile(path.join(tempDir, "reports/autonomous/health-latest.json"), "utf8");
 
     expect(result.selectedTaskId).toBe("backend-hardening");
     expect(result.blocked).toBe(false);
     expect(result.executionPacket.externalWriteState.writePerformed).toBe(false);
+    expect(result.executionPacket.levelB.agentSync.status).toBe("passed");
     expect(JSON.parse(cycleJson).selectedTaskId).toBe("backend-hardening");
     expect(JSON.parse(nextTaskJson).eligibleCandidates).toHaveLength(1);
+    expect(JSON.parse(healthJson).agentSync.status).toBe("passed");
     expect(cycleReport).toContain("Autonomous Cycle Report");
+  });
+
+  it("returns degraded health when Notion is unauthorized but local executor passes", async () => {
+    await writeGateEligibilitySnapshot({
+      directorDryRun: { status: "passed", reasons: [] },
+      directorLiveWrite: { status: "blocked", reasons: ["blocked_by_writeback_promotion"] },
+      executor: { status: "blocked", reasons: ["blocked_by_no_ready_packet"] },
+      synthesis: { status: "passed", reasons: [] }
+    });
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const health = buildAutonomousHealthSnapshot({
+      currentRepoRoot: tempDir,
+      notionAuthStatus: "unauthorized",
+      githubRuns: [],
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(health.status).toBe("degraded");
+    expect(health.notionAuth.status).toBe("unauthorized");
+    expect(health.subsystems.find((subsystem) => subsystem.id === "governance")?.status).toBe("passed");
+    expect(health.subsystems.find((subsystem) => subsystem.id === "communication")?.status).toBe("degraded");
+    expect(health.selfHealingRecommendations.map((recommendation) => recommendation.id)).toContain(
+      "restore-notion-auth"
+    );
+  });
+
+  it("blocks Level B when a required multi-agent role is missing", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+    const readiness = computeLevelBReadiness({
+      packet,
+      agentStates: [
+        {
+          mode: "skill-system-governance",
+          packId: "broken-pack",
+          agentRole: "runtime-owner",
+          objective: "Missing verifier and reviewer equivalents",
+          skills: ["ah-repo-automation"],
+          owns: ["scripts/codex/*"],
+          heartbeatAt: "2026-04-27T00:00:00.000Z",
+          syncStatus: "blocked",
+          blockers: ["skill-system-governance: missing verifier-equivalent agent"],
+          handoff: []
+        }
+      ]
+    });
+
+    expect(readiness.status).toBe("blocked");
+    expect(readiness.criteria.multiAgentCoverage).toBe("blocked");
+    expect(readiness.agentSync.blockedAgents).toBe(1);
+  });
+
+  it("creates a self-healing recommendation for stale feeder gates", async () => {
+    await writeGateEligibilitySnapshot({
+      directorDryRun: {
+        status: "blocked",
+        reasons: ["blocked_by_freshness:ah-product-os-radar,ah-execution-brief-sync"]
+      },
+      directorLiveWrite: {
+        status: "blocked",
+        reasons: ["blocked_by_writeback_promotion"]
+      },
+      executor: {
+        status: "blocked",
+        reasons: ["blocked_by_no_ready_packet"]
+      },
+      synthesis: {
+        status: "blocked",
+        reasons: ["blocked_by_freshness:ah-next-best-action-distiller"]
+      }
+    });
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      currentBranch: "main",
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(packet.levelB.selfHealingRecommendations.map((recommendation) => recommendation.id)).toContain(
+      "refresh-stale-feeders"
+    );
+    expect(packet.levelB.selfHealingRecommendations.find((recommendation) => recommendation.id === "refresh-stale-feeders")?.blockedBy).toEqual(
+      expect.arrayContaining(["ah-product-os-radar", "ah-execution-brief-sync", "ah-next-best-action-distiller"])
+    );
+  });
+
+  it("classifies GitHub startup_failure as external CI degradation, not local executor failure", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const health = buildAutonomousHealthSnapshot({
+      currentRepoRoot: tempDir,
+      githubRuns: [
+        {
+          status: "completed",
+          conclusion: "startup_failure",
+          workflowName: "",
+          headBranch: "main",
+          url: "https://github.com/example/repo/actions/runs/1"
+        }
+      ],
+      gitStatus: [],
+      trackedGitStatus: []
+    });
+
+    expect(health.githubActions.status).toBe("degraded");
+    expect(health.subsystems.find((subsystem) => subsystem.id === "governance")?.status).toBe("passed");
+    expect(health.selfHealingRecommendations.map((recommendation) => recommendation.id)).toContain(
+      "repair-github-actions-startup"
+    );
+  });
+
+  it("tolerates missing network metrics commands", () => {
+    const metrics = collectSystemMetrics({ networkCommand: "__missing_network_metrics_command__" });
+
+    expect(metrics.status).toBe("degraded");
+    expect(metrics.network.status).toBe("unknown");
+    expect(metrics.network.error).toBeTruthy();
   });
 
   it("builds a stable codex branch name", () => {

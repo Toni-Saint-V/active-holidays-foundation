@@ -30,6 +30,9 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run verify:engine` — deterministic scenario drift gate
 - `npm run autonomous:next` — select the current safe autonomous task
 - `npm run autonomous:execute` — prepare or run the local Stage A executor
+- `npm run autonomous:health` — diagnose repo-local autonomous health without writing artifacts
+- `npm run autonomous:level-b` — run the repo-local Level B readiness cycle without writing artifacts
+- `npm run autonomous:level-b:write` — write Level B health/readiness artifacts into `reports/autonomous/`
 - `npm run autonomous:verify` — autonomous runtime readiness gate
 - `npm run skills:verify` — repo-local Codex skill system check
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
@@ -154,6 +157,9 @@ Key entrypoints:
 - `RUNBOOK.md`
 - `npm run autonomous:next`
 - `npm run autonomous:execute`
+- `npm run autonomous:health`
+- `npm run autonomous:level-b`
+- `npm run autonomous:level-b:write`
 - `npm run autonomous:verify`
 - `npm run automations:verify`
 - `npm run automations:sync -- --dry-run`

@@ -55,6 +55,16 @@ This runs the local report-first loop:
 5. save the cycle report
 6. keep external writes disabled
 
+## Level B Commands
+
+```bash
+npm run autonomous:health -- --json
+npm run autonomous:level-b -- --json
+npm run autonomous:level-b:write -- --json
+```
+
+Level B adds repo-local subsystem diagnostics, multi-agent state, gate-state projection, and self-healing recommendations. Dry-run commands do not write artifacts. The write command updates `reports/autonomous/health-latest.*` and `reports/autonomous/level-b-latest.*` only.
+
 ## Output Contract
 
 The loop returns:
@@ -69,6 +79,7 @@ The loop returns:
 - blocked gates
 - lifecycle status
 - founder report text
+- Level B readiness and agent sync when the full cycle or Level B cycle runs
 
 ## Activation Boundary
 
@@ -76,8 +87,11 @@ The current loop is deterministic and local.
 
 - `npm run autonomous:next` selects and reports the next executor-safe task.
 - `npm run autonomous:cycle` persists the next-task artifacts, executor packet, verification results, and cycle report in `reports/autonomous/`.
+- `npm run autonomous:health` reports governance, monitoring, communication, agent sync, and external gate health.
+- `npm run autonomous:level-b` runs a dry-run health -> next task -> executor packet -> agent-pack verification -> gate projection cycle.
 - `npm run autonomous:next -- --mode=planning` selects and reports the next planning task, including tasks that may require approval before execution.
 - `.autonomous/task-status.json` marks completed or paused candidates so the static selector does not keep re-selecting shipped work.
 - `npm run autonomous:execute` prepares an executor packet and may create a local `codex/*` branch only when explicitly run with `--write`.
 - Executor branch preparation fails closed on tracked working-tree changes, but untracked local artifacts are warning-only unless they collide with the selected task scope.
+- Level B remains repo-local: Notion, GitHub, deploys, product code, and `main` stay blocked unless their separate gates pass.
 - The system still does not autonomously edit product code, push PRs, merge into `main`, or perform live Notion writeback.

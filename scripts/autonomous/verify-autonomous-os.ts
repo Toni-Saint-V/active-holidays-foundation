@@ -32,6 +32,8 @@ const requiredFiles = [
   ".autonomous/task-candidates.json",
   "scripts/autonomous/runtime.ts",
   "scripts/autonomous/execute-autonomous-task.ts",
+  "scripts/autonomous/health.ts",
+  "scripts/autonomous/level-b.ts",
   "scripts/autonomous/next-best-task-loop.ts",
   "scripts/autonomous/run-autonomous-cycle.ts",
   "scripts/autonomous/verify-autonomous-os.ts",
@@ -43,6 +45,9 @@ const requiredPackageScripts = [
   "autonomous:next:write",
   "autonomous:cycle",
   "autonomous:execute",
+  "autonomous:health",
+  "autonomous:level-b",
+  "autonomous:level-b:write",
   "autonomous:verify"
 ];
 const knownApprovalGates = new Set<string>(approvalGates);
@@ -237,6 +242,54 @@ function assertExecutorDryRunRuns() {
   }
 }
 
+function assertLevelBRuns() {
+  const output = execFileSync(
+    "npx",
+    [
+      "tsx",
+      "scripts/autonomous/level-b.ts",
+      "--json",
+      "--allow-dirty-tracked",
+      "--allow-non-base-branch"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
+  const parsed = JSON.parse(output) as {
+    status?: string;
+    levelB?: {
+      agentSync?: { status?: string; totalAgents?: number };
+      criteria?: { localExecutor?: string; failClosedExternalGates?: string };
+    };
+    executionPacket?: { levelB?: unknown };
+    health?: { subsystems?: unknown[] };
+  };
+
+  if (!["passed", "degraded"].includes(parsed.status ?? "")) {
+    fail(`Level B dry-run must pass or degrade in repo-local mode, got ${parsed.status}`);
+  }
+  if (parsed.levelB?.agentSync?.status !== "passed") {
+    fail("Level B dry-run must have synchronized multi-agent packs");
+  }
+  if ((parsed.levelB?.agentSync?.totalAgents ?? 0) < 27) {
+    fail("Level B dry-run must cover every mode with a three-agent pack");
+  }
+  if (parsed.levelB?.criteria?.localExecutor !== "passed") {
+    fail("Level B dry-run must keep local executor passed");
+  }
+  if (parsed.levelB?.criteria?.failClosedExternalGates !== "passed") {
+    fail("Level B dry-run must keep external writes fail-closed");
+  }
+  if (!parsed.executionPacket?.levelB) {
+    fail("executor packet must include levelB readiness");
+  }
+  if (!Array.isArray(parsed.health?.subsystems) || parsed.health.subsystems.length < 5) {
+    fail("Level B health must include subsystem diagnostics");
+  }
+}
+
 function assertExecutorFailsClosedOnCurrentTrackedDirtyTree() {
   const trackedGitStatus = execFileSync("git", ["status", "--short", "--untracked-files=no"], {
     cwd: repoRoot,
@@ -301,6 +354,7 @@ function main() {
   assertTaskStatus(new Set(candidateFile.candidates.map((candidate) => candidate.id)));
   assertNextLoopRuns();
   assertExecutorDryRunRuns();
+  assertLevelBRuns();
   assertExecutorFailsClosedOnCurrentTrackedDirtyTree();
   assertWorkflowCoverage();
   console.log("[OK] autonomous product operating system verified");
