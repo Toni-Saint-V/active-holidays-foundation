@@ -41,6 +41,7 @@ export const REQUIRED_CONTEXT_SURFACES = [
   "scripts/codex/automation-contract-utils.ts",
   "scripts/codex/automation-context-packet.ts",
   "scripts/codex/automation-registry.ts",
+  "scripts/codex/product-system-intelligence-contract.ts",
   "scripts/codex/notion-operational-contract.ts",
   "scripts/codex/shared-skill-compat.ts",
   "scripts/codex/automation-runtime-governance.ts",

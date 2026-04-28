@@ -11,6 +11,7 @@ import { REQUIRED_CONTEXT_SURFACES } from "../codex/required-context-surfaces.ts
 import { runAgentSystemEvaluation } from "../codex/evaluate-agent-system.ts";
 import { MODE_DEFINITIONS } from "../codex/skill-mode-registry.ts";
 import { buildAutomationContextPacket } from "../codex/automation-context-packet.ts";
+import { buildProductSystemIntelligenceContract } from "../codex/product-system-intelligence-contract.ts";
 
 async function exists(target: string): Promise<boolean> {
   try {
@@ -320,6 +321,85 @@ async function main() {
   } catch (error) {
     failures.push(
       `automation context packet unavailable: ${error instanceof Error ? error.message : "unknown error"}`
+    );
+  }
+
+  try {
+    const intelligence = await buildProductSystemIntelligenceContract({
+      repoRoot,
+      generatedAt: "1970-01-01T00:00:00.000Z"
+    });
+    if (intelligence.schemaVersion !== 1) {
+      failures.push("product system intelligence contract schemaVersion must be 1");
+    }
+    if (intelligence.mode !== "report-first") {
+      failures.push("product system intelligence contract must remain report-first");
+    }
+    if (intelligence.layers.memoryMcp.role !== "decision-memory") {
+      failures.push("Memory MCP must be modeled as decision-memory");
+    }
+    const memoryStatus = intelligence.layers.memoryMcp.status;
+    const memoryBindingEvidence = intelligence.layers.memoryMcp.bindingEvidence;
+    if (!["required_not_configured", "configured_with_binding"].includes(memoryStatus)) {
+      failures.push("Memory MCP status must be absent or configured with binding evidence");
+    }
+    if (memoryStatus === "required_not_configured" && memoryBindingEvidence.status !== "absent") {
+      failures.push("unconfigured Memory MCP must not carry binding evidence");
+    }
+    if (memoryStatus === "configured_with_binding" && memoryBindingEvidence.status !== "verified") {
+      failures.push("configured Memory MCP must carry verified binding evidence");
+    }
+    if (
+      memoryBindingEvidence.status === "verified" &&
+      (!memoryBindingEvidence.mcpServerName ||
+        !memoryBindingEvidence.configSurface ||
+        !memoryBindingEvidence.storageSurface ||
+        !memoryBindingEvidence.verifiedAt)
+    ) {
+      failures.push("verified Memory MCP binding evidence must include server, config, storage, and timestamp");
+    }
+    if (!intelligence.layers.memoryMcp.promotionRequired) {
+      failures.push("Memory MCP must require explicit promotion before durable writes");
+    }
+    if (!intelligence.layers.memoryMcp.mustNotOwn.includes("executor eligibility")) {
+      failures.push("Memory MCP must not own executor eligibility");
+    }
+    if (!intelligence.layers.memoryMcp.mustNotStore.includes("secrets")) {
+      failures.push("Memory MCP must prohibit secret storage");
+    }
+    if (intelligence.layers.githubControl.role !== "tasks-pr-review-ci-control") {
+      failures.push("GitHub control must own tasks, PRs, reviews, and CI control only");
+    }
+    if (!intelligence.layers.githubControl.mustNotOwn.includes("automation gate eligibility")) {
+      failures.push("GitHub control must not own automation gate eligibility");
+    }
+    if (intelligence.layers.langGraphFlows.role !== "agent-flow-orchestration") {
+      failures.push("LangGraph must be modeled as agent-flow-orchestration");
+    }
+    if (intelligence.layers.langGraphFlows.status !== "dependency_present") {
+      failures.push("LangGraph dependency must stay present for flow orchestration");
+    }
+    if (!intelligence.layers.langGraphFlows.mustNotOwn.includes("durable decision memory")) {
+      failures.push("LangGraph checkpoint memory must not own durable decision memory");
+    }
+    if (
+      !intelligence.boundaries.noLandgrafApi ||
+      !intelligence.boundaries.noInventedExternalMemoryEndpoint
+    ) {
+      failures.push("product system intelligence contract must not enable Landgraf or invented memory APIs");
+    }
+    if (!intelligence.boundaries.memoryMcpRequiresRealBinding) {
+      failures.push("Memory MCP must require a real binding before durable decision memory writes");
+    }
+    if (!intelligence.boundaries.gateSnapshotOwnsExecutionEligibility) {
+      failures.push("gate snapshot must remain the owner of execution eligibility");
+    }
+    if (intelligence.boundaries.context7 !== "docs-only") {
+      failures.push("product system intelligence contract must keep Context7 docs-only");
+    }
+  } catch (error) {
+    failures.push(
+      `product system intelligence contract unavailable: ${error instanceof Error ? error.message : "unknown error"}`
     );
   }
 

@@ -35,6 +35,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run autonomous:level-b:write` — write Level B health/readiness artifacts into `reports/autonomous/`
 - `npm run autonomous:verify` — autonomous runtime readiness gate
 - `npm run automations:context:packet` — build the report-first automation memory/context packet without writing artifacts
+- `npm run automations:intelligence:contract` — print the repo-local Product/System intelligence contract for Memory MCP, GitHub control, and LangGraph flows
 - `npm run skills:verify` — repo-local Codex skill system check
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
@@ -107,6 +108,14 @@ Repo-local plugin and MCP surface is governance-first:
 - prefer runtime plugins or existing skills before adding local plugin scaffolds
 - use `.codex/skills/_shared/active-holidays/plugin-surface.md` for the decision boundary
 - treat local plugin manifests and marketplace state as optional but real repo surface once introduced
+
+Product/System intelligence stays explicit and separated:
+
+- Memory MCP is the decision-memory layer for durable choices, accepted/rejected approaches, review lessons, and operator preferences; it is not a fake Landgraf DB and is not considered configured until a real MCP binding with evidence exists
+- GitHub control owns tasks, PRs, review comments, and CI inspection through the active runtime plugin/MCP or `gh` fallback, not through a repo-local placeholder
+- LangGraph owns complex agent flow orchestration and runtime checkpoints; checkpoint memory is not durable decision memory unless a future persistence contract promotes it
+- `reports/automations/state/gate-eligibility-snapshot.json` remains the execution eligibility authority
+- inspect the machine-readable contract with `npm run automations:intelligence:contract`
 
 Automation context stays repo-local and report-first. `automationContextPacket` is built from
 `reports/automations/runs/*/latest.md`, `reports/automations/state/gate-eligibility-snapshot.json`,

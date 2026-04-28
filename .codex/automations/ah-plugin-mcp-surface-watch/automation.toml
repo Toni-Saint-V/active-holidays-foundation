@@ -11,13 +11,16 @@ prompt = """
 
 Обязательно:
 - используй `scripts/automations/check-context-surface.ts`
+- используй `npm run automations:intelligence:contract` для Product/System слоя: Memory MCP, GitHub control, LangGraph flows
 - проверь `.codex/skills`, `.codex/automations`, repo docs, optional `.cursor/mcp.json`, optional `.agents/plugins/marketplace.json`, optional `plugins/*/.codex-plugin/plugin.json`
 - смотри на practical impact: уменьшает ли изменение friction для product/design/agent workflows
 - зафиксируй, покрывают ли уже задачу существующие runtime plugins и skills до идеи локального plugin scaffold
+- Memory MCP = память решений; GitHub = задачи/PR/контроль; LangGraph = сложные agent flows
 - если есть real low-risk improvement, подготовь patch plan or config note
 
 Жёсткие правила:
 - не выдумывай plugin formats
+- не выдумывай Landgraf DB/API или внешний memory endpoint без реального MCP binding
 - не создавай MCP config без реального назначения
 - не создавай repo-local plugin, если это можно закрыть skills/docs/automation слоем
 - не дублируй один и тот же context в трёх местах

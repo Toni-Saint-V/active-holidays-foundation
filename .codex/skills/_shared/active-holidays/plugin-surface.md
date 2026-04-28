@@ -21,6 +21,16 @@ When available in the current Codex session, prefer existing runtime plugins bef
 
 Do not assume a plugin is available in every environment. Check the live session first.
 
+## Product/System Intelligence Contract
+
+Use `npm run automations:intelligence:contract` to inspect the repo-local contract before changing MCP or agent-flow surfaces.
+
+- Memory MCP is a core decision-memory layer for durable product/system choices, review lessons, and operator preferences.
+- GitHub control is the core task/PR/review/CI lane through the active runtime plugin/MCP or `gh` fallback.
+- LangGraph is the enhancement layer for complex agent flows and runtime checkpoint state.
+- `gate-eligibility-snapshot.json` owns execution eligibility; Memory MCP and LangGraph must not override it.
+- Do not create a Landgraf substitute, invented external memory endpoint, or repo-local MCP config until a real binding and repeated workflow are known.
+
 ## Repo-Local Plugin Files
 
 - `plugins/*/.codex-plugin/plugin.json`

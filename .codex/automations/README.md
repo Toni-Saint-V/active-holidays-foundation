@@ -47,6 +47,15 @@ a report is missing but the report artifacts now exist, the packet must classify
 LangGraph checkpoint memory is not treated as long-term recommendation memory unless a future explicit
 persistence contract promotes it.
 
+Product/System intelligence is exposed through `npm run automations:intelligence:contract`.
+That contract keeps the requested MCP/agent stack split explicit:
+
+- Memory MCP is core decision memory, currently `required_not_configured` until a real MCP binding with evidence is chosen
+- GitHub control is core task/PR/review/CI control through the active runtime plugin/MCP or `gh` fallback
+- LangGraph is an enhancement for complex agent flows and runtime checkpoints, not durable decision memory
+- gate eligibility stays owned by `reports/automations/state/gate-eligibility-snapshot.json`
+- no Landgraf API, invented external memory endpoint, live writeback, or repo-local plugin scaffold is implied by this layer
+
 Safety contract:
 
 - tracked deterministic state lives in:

@@ -36,6 +36,7 @@
     "automations:sync": "node --experimental-strip-types scripts/codex/sync-automations.ts",
     "automations:verify": "node --experimental-strip-types scripts/codex/verify-automations.ts",
     "automations:context:packet": "node --experimental-strip-types scripts/codex/automation-context-packet.ts",
+    "automations:intelligence:contract": "node --experimental-strip-types scripts/codex/product-system-intelligence-contract.ts",
     "automations:snapshot:write": "node --experimental-strip-types scripts/codex/write-gate-eligibility-snapshot.ts",
     "automations:verify:negative": "node --experimental-strip-types scripts/codex/verify-automations-negative-fixtures.ts",
     "automations:check:truth": "node --experimental-strip-types scripts/automations/check-source-freshness.ts",

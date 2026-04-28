@@ -28,11 +28,20 @@ Context packet:
   - `reports/automations/state/gate-eligibility-snapshot.json`
   - `.autonomous/task-candidates.json`
   - `.autonomous/task-status.json`
-- `.autonomous/scoring-model.json`
-- current git status from the local checkout
+  - `.autonomous/scoring-model.json`
+  - current git status from the local checkout
 - if required upstream reports are missing, packet status is `distillation_incomplete`
 - if the gate snapshot says a report is missing but the required report artifacts now exist, the packet reports `stale_gate_snapshot`
 - no external memory API, live Notion/GitHub write, plugin scaffold, or Context7 runtime dependency is implied
+
+Product/System intelligence contract:
+
+- `npm run automations:intelligence:contract` prints the report-first contract for Memory MCP, GitHub control, and LangGraph flows
+- Memory MCP is decision memory only and remains `required_not_configured` until a real MCP binding with evidence exists
+- GitHub control covers tasks, PRs, reviews, and CI checks through the active runtime plugin/MCP or `gh` fallback
+- LangGraph covers complex agent flows and runtime checkpoints, not durable decision memory
+- `gate-eligibility-snapshot.json` remains the execution eligibility authority
+- no Landgraf DB/API or invented external memory endpoint is allowed
 
 Notion-aware loop:
 
