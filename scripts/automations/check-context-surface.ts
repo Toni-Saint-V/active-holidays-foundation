@@ -10,6 +10,7 @@ import {
 import { REQUIRED_CONTEXT_SURFACES } from "../codex/required-context-surfaces.ts";
 import { runAgentSystemEvaluation } from "../codex/evaluate-agent-system.ts";
 import { MODE_DEFINITIONS } from "../codex/skill-mode-registry.ts";
+import { buildAutomationContextPacket } from "../codex/automation-context-packet.ts";
 
 async function exists(target: string): Promise<boolean> {
   try {
@@ -71,6 +72,19 @@ async function pluginDirsMissingManifest(pluginsRoot: string): Promise<string[]>
   }
 
   return missing.sort();
+}
+
+function reportHasArtifact(
+  report: {
+    latestReportExists: boolean;
+    datedReportExists: boolean;
+  } | undefined,
+  artifact: string
+): boolean {
+  if (!report) return false;
+  if (artifact === "latest-md") return report.latestReportExists;
+  if (artifact === "dated-report-md") return report.datedReportExists;
+  return false;
 }
 
 async function main() {
@@ -219,6 +233,93 @@ async function main() {
   } catch (error) {
     failures.push(
       `agent-system evaluation unavailable for context surface check: ${error instanceof Error ? error.message : "unknown error"}`
+    );
+  }
+
+  try {
+    const packet = await buildAutomationContextPacket({
+      repoRoot,
+      generatedAt: "1970-01-01T00:00:00.000Z"
+    });
+    if (packet.schemaVersion !== 1) {
+      failures.push("automation context packet schemaVersion must be 1");
+    }
+    if (packet.mode !== "report-first") {
+      failures.push("automation context packet must remain report-first");
+    }
+    if (!["ready", "distillation_incomplete"].includes(packet.status)) {
+      failures.push(`automation context packet has invalid status: ${packet.status}`);
+    }
+    if (packet.status !== "ready" && packet.statusReasons.length === 0) {
+      failures.push("automation context packet incomplete status must include statusReasons");
+    }
+    if (packet.status === "ready" && packet.statusReasons.length > 0) {
+      failures.push("automation context packet ready status must not include statusReasons");
+    }
+    if (
+      packet.status !== "ready" &&
+      packet.deterministicRecommendation.kind === "use_selected_executor_safe_task"
+    ) {
+      failures.push("automation context packet must not recommend executor tasks while incomplete");
+    }
+    if (
+      packet.deterministicRecommendation.kind === "use_selected_executor_safe_task" &&
+      packet.autonomousTasks.selectedExecutorSafeTask === null
+    ) {
+      failures.push("automation context packet must not recommend a missing executor task");
+    }
+    if (packet.status === "ready" && packet.missingRequiredReports.length > 0) {
+      failures.push("automation context packet ready status must not include missing reports");
+    }
+    if (packet.constraints.externalMemoryApi !== "disabled") {
+      failures.push("automation context packet must not enable external memory APIs");
+    }
+    if (packet.constraints.context7 !== "docs-only") {
+      failures.push("automation context packet must keep Context7 docs-only");
+    }
+    if (packet.latestReports.length !== automationCount) {
+      failures.push(
+        `automation context packet report inventory mismatch: ${packet.latestReports.length}/${automationCount}`
+      );
+    }
+    const latestReportById = new Map<string, (typeof packet.latestReports)[number]>(
+      packet.latestReports.map((report) => [report.automationId, report])
+    );
+    for (const automationId of packet.missingRequiredReports) {
+      const artifacts = packet.missingRequiredReportArtifacts[automationId] ?? [];
+      if (artifacts.length === 0) {
+        failures.push(`automation context packet missing report has no artifact detail: ${automationId}`);
+      }
+      for (const artifact of artifacts) {
+        if (reportHasArtifact(latestReportById.get(automationId), artifact)) {
+          failures.push(
+            `automation context packet marks existing artifact missing: ${automationId}/${artifact}`
+          );
+        }
+      }
+    }
+    for (const automationId of packet.staleGateSnapshotReports) {
+      const artifacts = packet.staleGateSnapshotArtifacts[automationId] ?? [];
+      if (artifacts.length === 0) {
+        failures.push(`automation context packet stale snapshot has no artifact detail: ${automationId}`);
+      }
+      for (const artifact of artifacts) {
+        if (!reportHasArtifact(latestReportById.get(automationId), artifact)) {
+          failures.push(
+            `automation context packet marks absent artifact as stale snapshot: ${automationId}/${artifact}`
+          );
+        }
+      }
+    }
+    if (
+      packet.staleGateSnapshotReports.length > 0 &&
+      !packet.statusReasonDetails.some((reason) => reason.code === "stale_gate_snapshot")
+    ) {
+      failures.push("automation context packet stale snapshot must have structured status reason");
+    }
+  } catch (error) {
+    failures.push(
+      `automation context packet unavailable: ${error instanceof Error ? error.message : "unknown error"}`
     );
   }
 

@@ -38,6 +38,15 @@ The suite now supports a Notion-aware operating loop:
 4. `ah-notion-sync-director` becomes the only automation allowed to prepare or write operational truth back to Notion
 5. `ah-draft-pr-executor` may run only after the gate snapshot exposes a concrete `eligiblePackets[]` entry for executor eligibility
 
+Automation memory/context is exposed through `npm run automations:context:packet`.
+The packet is report-first and deterministic: it reads latest automation reports, the tracked gate snapshot,
+the repo-owned autonomous candidate/status/scoring files, and current git status. Missing required reports
+must surface as `distillation_incomplete`, not as guessed next actions. If the tracked gate snapshot says
+a report is missing but the report artifacts now exist, the packet must classify that as
+`stale_gate_snapshot`, not as another backfill task. Context7 remains a docs lookup tool only, and
+LangGraph checkpoint memory is not treated as long-term recommendation memory unless a future explicit
+persistence contract promotes it.
+
 Safety contract:
 
 - tracked deterministic state lives in:

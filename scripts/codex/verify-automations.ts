@@ -66,6 +66,7 @@ const REQUIRED_DOCS = [
 const REQUIRED_HELPERS = [
   "scripts/codex/repo-runtime-manifest.ts",
   "scripts/codex/automation-contract-utils.ts",
+  "scripts/codex/automation-context-packet.ts",
   "scripts/codex/automation-registry.ts",
   "scripts/codex/notion-operational-contract.ts",
   "scripts/codex/shared-skill-compat.ts",

@@ -9,6 +9,7 @@ prompt = """
 - собрать все automation findings в один weekly brief, из которого реально можно стартовать следующую неделю
 
 Обязательно:
+- сначала используй `npm run automations:context:packet` как compact memory/context input
 - прочитай latest reports из `reports/automations/runs/*/latest.md`, если они есть
 - используй `reports/automations/state/gate-eligibility-snapshot.json` как единственный текущий eligibility snapshot для synthesis / writeback / executor выводов
 - не выводи eligibility напрямую из volatile observed state
@@ -25,6 +26,7 @@ prompt = """
 - не создавай backlog flood
 - не дублируй actions с прошлой недели без нового основания
 - не предлагай включать writeback или executor вопреки текущему gate snapshot
+- если `automationContextPacket.status = distillation_incomplete`, первым действием должен быть backfill missing reports, а не продуктовая рекомендация
 - если данных мало, честно скажи, что distillation incomplete
 
 Артефакт:
