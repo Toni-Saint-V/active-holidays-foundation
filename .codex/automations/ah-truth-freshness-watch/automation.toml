@@ -7,6 +7,7 @@ prompt = """
 
 Цель:
 - защищать trust-critical source layer, на котором держится decision system
+- переводить stale source signals в понятный product risk и один следующий safe action
 
 Обязательно:
 - сначала используй `scripts/automations/check-source-freshness.ts`
@@ -14,6 +15,7 @@ prompt = """
 - затем интерпретируй output с product точки зрения: какие stale or broken source mappings реально подрывают доверие
 - приоритет: official/operator freshness, missing mappings, risky crowdsourced dependencies
 - если report содержит `nextTasks[]`, перенеси highest-severity item в REQUIRED ACTION с owner/manual-review boundary
+- разделяй `blocking`, `warning`, `watch` по пользовательскому impact: может ли stale truth исказить решение, стоимость, срок, eligibility или disclaimer
 - если нужен downstream sync, используй `task-packet-latest.json`: там есть Codex brief, acceptance criteria и `downstreamSyncDraft`
 - `downstreamSyncDraft` не является canonical Notion packet envelope; live writeback требует отдельного adapter/envelope с packetKey, diffHash, dedupeKey и lifecycle fields
 
@@ -21,6 +23,8 @@ prompt = """
 - не обновляй product truth автоматически
 - не называй данные свежими без evidence
 - если signal низкого риска, пометь как warning, а не раздувай severity
+- не превращай freshness report в legal conclusion
+- не скрывай stale official/operator source за общим "mostly green"
 
 Артефакт:
 - обнови `reports/automations/runs/ah-truth-freshness-watch/latest.md`
@@ -30,8 +34,9 @@ Output строго:
 1) SOURCE HEALTH
 2) RISKS TO TRUST
 3) REQUIRED ACTION
-4) SAFE PATCH OR MANUAL REVIEW
-5) VERIFY
+4) DOWNSTREAM PACKET
+5) SAFE PATCH OR MANUAL REVIEW
+6) VERIFY
 """
 status = "PAUSED"
 rrule = "FREQ=WEEKLY;BYDAY=MO,WE,FR;BYHOUR=8;BYMINUTE=45"

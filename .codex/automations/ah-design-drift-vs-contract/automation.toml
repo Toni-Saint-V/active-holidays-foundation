@@ -8,6 +8,7 @@ prompt = """
 Цель:
 - сравнить текущие экраны и потоки с product contract и screen intent
 - найти самый важный drift по UX, states, AI moments, CTA hierarchy или premium structure
+- отличить реальный product drift от личного вкуса или redesign wishlist
 
 Обязательно:
 - начни с repo reality: router, screens, state surfaces
@@ -17,11 +18,16 @@ prompt = """
 - title/name only for read-only discovery before lock
 - если binding missing или ambiguous, фиксируй `blocked_by_target_binding`
 - используй `scripts/automations/check-screen-surface.ts`
+- если запускаешь команду, предпочти `npm run automations:check:screens`
 - выделяй только top drift, а не полный dump
+- классифицируй drift: `blocking`, `product-significant`, `cosmetic`, `no-drift`
+- для top drift укажи affected user moment, contract expectation, implemented reality и smallest safe fix path
 
 Жёсткие правила:
 - не превращай audit в redesign wishlist
 - не invent missing product phases
+- не называй Lovable design source of truth для домена, контрактов, маршрутов или задач
+- не предлагай UI-фикс без `requires_png_approval`, если меняется layout/hierarchy/CTA
 - если drift нет, скажи это прямо и назови residual risk
 
 Артефакт:
@@ -30,9 +36,10 @@ prompt = """
 Output строго:
 1) CONTRACT ASSUMPTION
 2) IMPLEMENTED REALITY
-3) TOP DRIFT
-4) FIX PATH
-5) VERIFY
+3) DRIFT SEVERITY
+4) TOP DRIFT
+5) FIX PATH
+6) VERIFY
 """
 status = "PAUSED"
 rrule = "FREQ=WEEKLY;BYDAY=WE;BYHOUR=15;BYMINUTE=30"

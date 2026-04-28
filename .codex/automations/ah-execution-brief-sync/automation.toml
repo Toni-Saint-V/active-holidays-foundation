@@ -8,11 +8,13 @@ prompt = """
 Цель:
 - превратить текущую repo reality и product truth в clean execution artifact для следующего шага
 - убрать лишний шум, legacy-подсказки и размытые промты
+- собрать один реально стартуемый task packet из product/trust/design/copy сигналов
 
 Обязательно:
 - прочитай `AGENTS.md`, `RUNBOOK.md`, `AUTOMATIONS_*`
 - проверь текущие сильные/слабые места по последним automation reports
 - используй `reports/automations/state/gate-eligibility-snapshot.json` как source of truth для текущего gate состояния
+- если есть свежие outputs от `ah-product-os-radar`, `ah-design-drift-vs-contract`, `ah-truth-freshness-watch`, `ah-copy-trust-upgrade`, используй их как feeder signals
 - если нужен context из `Execution`, сначала открой `.codex/automations/notion-surface-lock.json`
 - title/name only for read-only discovery before lock
 - если у `Execution` нет locked `targetId` / `dataSourceId`, не выдумывай target и помечай `blocked_by_target_binding`
@@ -20,12 +22,15 @@ prompt = """
 - если доступен Notion operational layer, используй только canonical anchors и locked operational targets как read-only context
 - не резолви `Execution` или любую другую operational DB по title/name после появления lock; ориентируйся только на machine-owned lock state
 - собери один компактный execution brief и один paste-ready prompt block
+- включи `acceptanceCriteria`, `verification`, `blockedBy`, `requiresPngApproval`, `nonGoals`
+- если задача UI-facing, не делай вид, что ее можно сразу кодить без PNG approval
 
 Жёсткие правила:
 - никаких mega-prompts
 - не дублируй то, что уже прямо сказано в AGENTS
 - не пиши задачи, которые нельзя начать из текущего repo state
 - не читай eligibility напрямую из volatile observed state
+- не смешивай несколько задач в один "супер-prompt"; выбери один следующий шаг
 
 Артефакт:
 - обнови `reports/automations/runs/ah-execution-brief-sync/latest.md`
@@ -35,7 +40,8 @@ Output строго:
 2) REQUIRED CONTEXT
 3) EXECUTION BRIEF
 4) PASTE-READY PROMPT
-5) VERIFY
+5) ACCEPTANCE CRITERIA
+6) VERIFY
 """
 status = "PAUSED"
 rrule = "FREQ=WEEKLY;BYDAY=MO,TH;BYHOUR=12;BYMINUTE=0"

@@ -12,6 +12,26 @@ Principles:
 - prefer deterministic helpers where the repo exposes enough structure
 - keep plugin and MCP surface governance explicit instead of creating speculative local config
 
+## Product-Moving Pack
+
+The five automations that should move product quality most directly are:
+
+1. `ah-product-os-radar` - chooses the next evidence-backed product move.
+2. `ah-design-drift-vs-contract` - catches product/screen drift before it becomes a shipped mismatch.
+3. `ah-truth-freshness-watch` - protects the trust-critical source layer behind the decision system.
+4. `ah-copy-trust-upgrade` - improves Russian copy, trust cues, and conversion clarity without overstating claims.
+5. `ah-execution-brief-sync` - turns product signals into one startable task packet.
+
+Run them as a product loop, not as five unrelated reports:
+
+1. collect product opportunity
+2. check contract drift
+3. check source freshness and trust risk
+4. tighten visible copy where safe
+5. synthesize one execution brief
+
+The loop should prefer one high-leverage move over backlog flood. UI-facing execution still requires PNG approval before code changes.
+
 Install flow:
 
 ```bash

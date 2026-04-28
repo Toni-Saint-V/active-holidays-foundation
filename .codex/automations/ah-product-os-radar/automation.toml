@@ -8,21 +8,27 @@ prompt = """
 Цель:
 - найти следующую лучшую product / AI-native / interactive возможность, которая реально усиливает продукт сейчас
 - смотреть не на абстракцию, а на текущие repo surfaces: landing, intake, result, trust, profile, autopilot, what-if, replay, source trust
+- превратить обзор в один проверяемый product move, а не в список идей
 
 Обязательно:
 - сначала собери repo reality: routes, screen surfaces, product autopilot, signal autopilot, trust surfaces, live preview, what-if, replay
+- используй `npm run automations:check:screens` как быстрый deterministic signal по screen surface, если команда доступна
 - затем, если доступен Notion, сравни repo reality с canonical anchors `P0`, `P1`, `P2`, `04 · Roadmap` и operational layer как read-only context через `.codex/automations/notion-surface-lock.json`
 - title/name only for read-only discovery before lock
 - если binding missing или ambiguous, фиксируй `blocked_by_target_binding`
 - не опирайся на legacy backbone wording как на текущий contract
 - ищи только улучшения, совместимые с текущей архитектурой
 - приоритет: clarity > trust > AI-native usefulness > speed > premium feel
+- перед рекомендацией дай короткую критику текущего продукта: где пользователь теряет понимание, доверие или next action
+- оцени кандидатов по 4 признакам: product impact, effort, reversibility, evidence
 - если есть low-complexity / high-impact improvement, подготовь маленький patch plan или точечный patch
 
 Жёсткие правила:
 - не выдумывай новый backend, ML-pipeline, API или аналитику
 - не делай broad redesign
 - не предлагай десять идей; выбери 1-3 сильных
+- не выбирай UI-задачу как executable patch без явной PNG approval boundary
+- не называй гипотезу "найденной проблемой", если она не подтверждена repo/Notion/report evidence
 - сохраняй совместимость с возможным UI-layer handoff через Lovable, но не строй target logic на Lovable или exact surface name
 
 Артефакт:
@@ -30,11 +36,12 @@ prompt = """
 
 Output строго:
 1) CURRENT PRODUCT PICTURE
-2) TOP OPPORTUNITY
-3) WHY NOW
-4) RECOMMENDED MOVE
-5) PATCH OR BRIEF
-6) VERIFY
+2) PRODUCT CRITIQUE
+3) TOP OPPORTUNITY
+4) WHY NOW
+5) RECOMMENDED MOVE
+6) PATCH OR BRIEF
+7) VERIFY
 """
 status = "PAUSED"
 rrule = "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=15"

@@ -7,17 +7,23 @@ prompt = """
 
 Цель:
 - усиливать русский product copy, trust cues и conversion clarity на ключевых экранах
+- превращать слабые формулировки в более ясные, честные и продающие без изменения продуктового смысла
 
 Обязательно:
 - работай только с реальными user-facing strings
 - смотри landing, intake, result, trust, human-review, profile
+- начни с `rg -n` по user-facing copy в `src`, `shared`, `server`, если нужна точная строка
 - ищи vague copy, generic CTA, неубедительные trust формулировки, слабые disclaimers
+- для каждой правки покажи before/after и объясни, какой trust/conversion defect она исправляет
 - если есть safe локальные win'ы, подготовь или внеси маленький patch
 
 Жёсткие правила:
 - не меняй смысл продукта
 - не прячь UX-изменения под copy pass
 - избегай сухой “сервисной” речи; цель — premium, clear, confident Russian
+- не усиливай обещания до гарантий по визам, срокам, legal/compliance или стоимости
+- не редактируй placeholder/demo copy, если она не видна пользователю в текущем flow
+- если copy change требует layout/CTA hierarchy changes, пометь `requires_png_approval` и не делай UI patch
 
 Артефакт:
 - обнови `reports/automations/runs/ah-copy-trust-upgrade/latest.md`
@@ -26,8 +32,9 @@ Output строго:
 1) TARGET STRINGS
 2) WEAK COPY
 3) STRONGER VERSION
-4) PATCH OR TASK
-5) VERIFY
+4) PRODUCT EFFECT
+5) PATCH OR TASK
+6) VERIFY
 """
 status = "PAUSED"
 rrule = "FREQ=WEEKLY;BYDAY=WE;BYHOUR=12;BYMINUTE=30"
