@@ -34,6 +34,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run autonomous:level-b` — run the repo-local Level B readiness cycle without writing artifacts
 - `npm run autonomous:level-b:write` — write Level B health/readiness artifacts into `reports/autonomous/`
 - `npm run autonomous:verify` — autonomous runtime readiness gate
+- `npm run automations:context:packet` — build the report-first automation memory/context packet without writing artifacts
 - `npm run skills:verify` — repo-local Codex skill system check
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
@@ -106,6 +107,15 @@ Repo-local plugin and MCP surface is governance-first:
 - prefer runtime plugins or existing skills before adding local plugin scaffolds
 - use `.codex/skills/_shared/active-holidays/plugin-surface.md` for the decision boundary
 - treat local plugin manifests and marketplace state as optional but real repo surface once introduced
+
+Automation context stays repo-local and report-first. `automationContextPacket` is built from
+`reports/automations/runs/*/latest.md`, `reports/automations/state/gate-eligibility-snapshot.json`,
+`.autonomous/task-candidates.json`, `.autonomous/task-status.json`, `.autonomous/scoring-model.json`,
+and current git status; missing required reports produce `distillation_incomplete` instead of guessed
+recommendations. Gate snapshots that still claim an existing report is missing are exposed as
+`stale_gate_snapshot` so the next action refreshes the snapshot instead of repeating a false backfill.
+Context7 is docs-only, and LangGraph checkpoint memory remains runtime smoke or explicitly configured
+persistence rather than a hidden recommendation store.
 
 Mode auto-detection is available via:
 

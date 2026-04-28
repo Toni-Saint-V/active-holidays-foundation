@@ -20,6 +20,20 @@ Tracked singleton state is intentionally committed.
 Volatile runtime-observed state stays gitignored.
 Example outputs live next to each automation definition in `.codex/automations/<id>/sample-output.md`.
 
+Context packet:
+
+- `npm run automations:context:packet` builds the report-first `automationContextPacket` without writing files
+- sources are limited to:
+  - `reports/automations/runs/*/latest.md`
+  - `reports/automations/state/gate-eligibility-snapshot.json`
+  - `.autonomous/task-candidates.json`
+  - `.autonomous/task-status.json`
+- `.autonomous/scoring-model.json`
+- current git status from the local checkout
+- if required upstream reports are missing, packet status is `distillation_incomplete`
+- if the gate snapshot says a report is missing but the required report artifacts now exist, the packet reports `stale_gate_snapshot`
+- no external memory API, live Notion/GitHub write, plugin scaffold, or Context7 runtime dependency is implied
+
 Notion-aware loop:
 
 - feeder and synthesis automations write evidence here first
