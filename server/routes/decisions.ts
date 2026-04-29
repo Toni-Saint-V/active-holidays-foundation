@@ -50,6 +50,13 @@ export function decisionsRouter(): Router {
       );
     }
     const snapshot = record.replayableSnapshot;
+    if (!snapshot.evidenceContractCaptured) {
+      throw new HttpError(
+        409,
+        "Replay невозможен: исторический снимок создан до evidence contract и не содержит каталог доказательств.",
+        "evidence_contract_missing"
+      );
+    }
     const replayResult = runDecision(
       { case: snapshot.case, catalogs: snapshot.catalogs },
       { now: () => new Date(snapshot.now) }

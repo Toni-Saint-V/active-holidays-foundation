@@ -3,6 +3,7 @@ export * from "./verdict";
 export * from "./signals";
 export * from "./visa";
 export * from "./sources";
+export * from "./evidence";
 export * from "./paths";
 export * from "./residency";
 export * from "./insurance";

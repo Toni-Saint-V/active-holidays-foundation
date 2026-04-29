@@ -175,6 +175,41 @@ describe("path-scoped travel rules", () => {
           ],
           restrictions: [],
           sources,
+          ruleEvidence: [
+            {
+              ruleId: "R12",
+              countryOrScope: "RU->IT",
+              sourceUrlOrRef: "repo:test:visa-free-cost",
+              sourceKind: "internal_note",
+              lastVerifiedAt: NOW,
+              freshnessWindowDays: 30,
+              automationClass: "safe_auto",
+              evidenceStatus: "valid",
+              rationale: "Test fixture covers the cost-prioritization rule evidence."
+            },
+            {
+              ruleId: "R15",
+              countryOrScope: "RU->IT",
+              sourceUrlOrRef: "repo:test:seasonal-demand",
+              sourceKind: "internal_note",
+              lastVerifiedAt: NOW,
+              freshnessWindowDays: 30,
+              automationClass: "safe_auto",
+              evidenceStatus: "valid",
+              rationale: "Test fixture covers the seasonal-demand rule evidence."
+            },
+            {
+              ruleId: "R11",
+              countryOrScope: "RU->IT",
+              sourceUrlOrRef: "repo:rule:R11",
+              sourceKind: "internal_note",
+              lastVerifiedAt: NOW,
+              freshnessWindowDays: 30,
+              automationClass: "safe_auto",
+              evidenceStatus: "valid",
+              rationale: "Test fixture covers the path-strategy rule evidence."
+            }
+          ],
           residencyPrograms: [],
           insuranceProducts: []
         }

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "evaluatedAt": "2026-04-27T03:19:45.000Z",
+  "evaluatedAt": "2026-04-22T21:00:00.000Z",
   "sourceHashes": {
     "runtimeMaturity": "a1b4bd05286160b5f4673974f4b80eca1db31204e1d46a4b222833ba6790795c",
     "notionSurfaceLock": "64efa7c30b687514615d0ed0a84ea18b27c4768cadfe126f7fe7922ea9d367a9",
     "notionWritebackPromotion": "ea3921d617293e012b7a5211a8d96a8f9a4b8777dfa8587e6a39ada56374037f",
     "manualApprovals": "d987c51e6d3279dd42ca4cc5dbcf55c6550d685187505ce6417d8063119bfe8a",
-    "checkWaivers": "2a004a2cba58ff97e5dd9fc4153ee32e1fe698f5acf8b7b2612adfeb4cdcaf65",
+    "checkWaivers": "e0f936192f6ee6b7357aa2a8c3fc6e3e6e0fbcca8cbbec5cf76cb588b2034cfa",
     "openDecisionsLegacyBridge": "d3fb10d3c7112bbd151cdb5aa29230496e54d75b9b6fdbe8b79907110c5114b6",
     "observedState": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "executionRuns": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -23,9 +23,7 @@
         "latest-md",
         "dated-report-md"
       ],
-      "waivedBy": [
-        "wv-src-russia-mfa-tr-2026-04-27"
-      ]
+      "waivedBy": []
     },
     "ah-product-os-radar": {
       "status": "blocked_by_missing_artifacts",
@@ -571,5 +569,5 @@
       "blockedPackets": []
     }
   },
-  "projectionHash": "1170be0cd16ab2d393ef5a0ef90cf2891de514b03ac1f20c133cd4ad9b21ee14"
+  "projectionHash": "c50035118ef6acb9adb59cd912196f8dd3700d816dd080b12edcc0f0d43ddc15"
 }

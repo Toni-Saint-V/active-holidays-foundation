@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Case, Source } from "@shared/contracts";
+import type { Case, RuleEvidenceRecord, Source } from "@shared/contracts";
 import type { OrchestratorCatalogs } from "./orchestrator";
 import {
   fingerprintCase,
@@ -40,6 +40,7 @@ function toOrchestrator(
     visaRules: catalogs.visaRules,
     restrictions: catalogs.restrictions,
     sources: catalogs.sources,
+    ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
     insuranceProducts: catalogs.insuranceProducts
   };
@@ -149,6 +150,37 @@ describe("fingerprintCatalogs", () => {
       )
     };
     expect(fingerprintCatalogs(base)).not.toBe(fingerprintCatalogs(nudged));
+  });
+
+  it("is stable when same-scope rule evidence records are reordered", async () => {
+    const base = toOrchestrator(await loadCatalogs());
+    const first: RuleEvidenceRecord = {
+      ruleId: "R_MULTI",
+      countryOrScope: "global",
+      sourceUrlOrRef: "src_a",
+      sourceKind: "official",
+      lastVerifiedAt: "2026-04-17T09:00:00.000Z",
+      freshnessWindowDays: 14,
+      automationClass: "safe_auto",
+      evidenceStatus: "valid",
+      rationale: "First source."
+    };
+    const second: RuleEvidenceRecord = {
+      ...first,
+      sourceUrlOrRef: "src_b",
+      sourceKind: "operator",
+      rationale: "Second source."
+    };
+    const left: OrchestratorCatalogs = {
+      ...base,
+      ruleEvidence: [first, second]
+    };
+    const right: OrchestratorCatalogs = {
+      ...base,
+      ruleEvidence: [second, first]
+    };
+
+    expect(fingerprintCatalogs(left)).toBe(fingerprintCatalogs(right));
   });
 });
 

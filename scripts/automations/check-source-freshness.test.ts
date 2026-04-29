@@ -3,6 +3,7 @@ import {
   buildRunArtifactStem,
   buildSourceFreshnessReport,
   renderMarkdownReport,
+  type RecordWithSource,
   type Source
 } from "./check-source-freshness";
 
@@ -19,7 +20,7 @@ const freshOfficial: Source = {
 
 function buildReport(overrides: {
   sources: Source[];
-  records?: Array<{ sourceId?: string; sources?: Array<{ id: string }> }>;
+  records?: RecordWithSource[];
 }) {
   return buildSourceFreshnessReport({
     now,
@@ -86,6 +87,25 @@ describe("buildSourceFreshnessReport", () => {
     );
   });
 
+  it("uses the same timestamp-level stale boundary as the engine", () => {
+    const boundaryOfficial: Source = {
+      id: "src_official_boundary",
+      label: "Official boundary source",
+      url: "https://example.com/boundary",
+      tier: "official",
+      lastCheckedAt: "2026-04-17T11:59:59.000Z",
+      volatilityScore: 0.1
+    };
+
+    const report = buildReport({
+      sources: [boundaryOfficial],
+      records: [{ sourceId: "src_official_boundary" }]
+    });
+
+    expect(report.status).toBe("blocked");
+    expect(report.failures).toContain("src_official_boundary stale 7d > 7d (official)");
+  });
+
   it("keeps waived referenced freshness drift actionable without failing the gate", () => {
     const waivedOfficial: Source = {
       id: "src_official_waived",
@@ -150,6 +170,27 @@ describe("buildSourceFreshnessReport", () => {
         })
       })
     );
+  });
+
+  it("collects external rule evidence source refs and ignores repo-local evidence refs", () => {
+    const report = buildReport({
+      sources: [freshOfficial],
+      records: [
+        {
+          sourceUrlOrRef: "src_official_fresh",
+          sourceKind: "official"
+        },
+        {
+          sourceUrlOrRef: "repo:rule:R11",
+          sourceKind: "internal_note"
+        }
+      ]
+    });
+
+    expect(report.status).toBe("pass");
+    expect(report.referencedSourceCount).toBe(1);
+    expect(report.failures).toEqual([]);
+    expect(report.warnings).toEqual([]);
   });
 
   it("keeps invalid source freshness timestamps behind manual review", () => {

@@ -77,6 +77,10 @@ function createBaseResult(overrides: Partial<ResultPayload> = {}): ResultPayload
         capsApplied: [],
         factors: []
       },
+      evidenceStatus: "valid",
+      freshnessStatus: "fresh",
+      blockingReason: null,
+      humanReviewReason: null,
       volatilityScore: 0.12,
       sources: [],
       lastCheckedAt: "2026-04-21T00:00:00.000Z"

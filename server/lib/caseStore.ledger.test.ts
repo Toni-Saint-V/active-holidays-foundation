@@ -4,6 +4,7 @@ import type {
   DecisionLedgerEntry,
   DecisionRecord
 } from "@shared/contracts";
+import { resultPayloadSchema } from "@shared/contracts";
 import { runDecision, type OrchestratorCatalogs } from "@shared/domain/engine";
 import { CaseStore } from "./caseStore";
 import { loadCatalogs, type Catalogs } from "./catalogs";
@@ -16,6 +17,7 @@ function toOrchestrator(catalogs: Catalogs): OrchestratorCatalogs {
     visaRules: catalogs.visaRules,
     restrictions: catalogs.restrictions,
     sources: catalogs.sources,
+    ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
     insuranceProducts: catalogs.insuranceProducts
   };
@@ -154,6 +156,90 @@ describe("CaseStore ledger", () => {
     const store = new CaseStore({ ...catalogs, decisionsLog: [record] });
 
     expect(store.getRecord(record.decisionId)).toEqual(record);
+  });
+
+  it("keeps old full DecisionRecords whose replayable snapshot predates ruleEvidence", async () => {
+    const catalogs = await loadCatalogs();
+    const orchestrator = toOrchestrator(catalogs);
+    const caseData = findCase(catalogs, "s1-rf-italy");
+    const record: DecisionRecord = {
+      decisionId: "dec_s1-rf-italy_8",
+      caseId: "s1-rf-italy",
+      engineVersion: "rdc.v1",
+      engineRevision: "2026.04.18",
+      computedAt: "2026-04-17T09:00:00.000Z",
+      recordedAt: "2026-04-17T09:00:00.000Z",
+      inputFingerprint: "a".repeat(64),
+      catalogFingerprint: "b".repeat(64),
+      resultFingerprint: "c".repeat(64),
+      replayableSnapshot: {
+        case: caseData,
+        catalogs: {
+          paths: orchestrator.paths,
+          visaRules: orchestrator.visaRules,
+          restrictions: orchestrator.restrictions,
+          sources: orchestrator.sources,
+          residencyPrograms: orchestrator.residencyPrograms,
+          insuranceProducts: orchestrator.insuranceProducts
+        } as unknown as OrchestratorCatalogs,
+        now: "2026-04-17T09:00:00.000Z"
+      } as unknown as DecisionRecord["replayableSnapshot"],
+      result: null,
+      auditTrail: null,
+      verdict: "GO",
+      confidence: 0.66,
+      summary: "old full record",
+      kind: "recompute",
+      changedSignalIds: [],
+      changedPreferenceIds: []
+    };
+    const store = new CaseStore({ ...catalogs, decisionsLog: [record] });
+
+    const parsed = store.getRecord(record.decisionId);
+    expect(parsed?.replayableSnapshot?.catalogs.ruleEvidence).toEqual([]);
+    expect(parsed?.replayableSnapshot?.evidenceContractCaptured).toBe(false);
+  });
+
+  it("keeps old full DecisionRecords whose result trust predates evidence fields", async () => {
+    const catalogs = await loadCatalogs();
+    const orchestrator = toOrchestrator(catalogs);
+    const caseData = findCase(catalogs, "s1-rf-italy");
+    const result = runDecision({ case: caseData, catalogs: orchestrator });
+    const legacyResult = structuredClone(result) as Record<string, unknown> & {
+      trust: Record<string, unknown>;
+    };
+    delete legacyResult.trust.evidenceStatus;
+    delete legacyResult.trust.freshnessStatus;
+    delete legacyResult.trust.blockingReason;
+    delete legacyResult.trust.humanReviewReason;
+    expect(resultPayloadSchema.safeParse(legacyResult).success).toBe(false);
+    const record: DecisionRecord = {
+      decisionId: "dec_s1-rf-italy_legacy_trust",
+      caseId: "s1-rf-italy",
+      engineVersion: "rdc.v1",
+      engineRevision: "2026.04.18",
+      computedAt: "2026-04-17T09:00:00.000Z",
+      recordedAt: "2026-04-17T09:00:00.000Z",
+      inputFingerprint: "a".repeat(64),
+      catalogFingerprint: "b".repeat(64),
+      resultFingerprint: "c".repeat(64),
+      replayableSnapshot: null,
+      result: legacyResult as DecisionRecord["result"],
+      auditTrail: null,
+      verdict: "GO",
+      confidence: 0.66,
+      summary: "old full record with legacy trust",
+      kind: "recompute",
+      changedSignalIds: [],
+      changedPreferenceIds: []
+    };
+    const store = new CaseStore({ ...catalogs, decisionsLog: [record] });
+
+    const parsed = store.getRecord(record.decisionId);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.result?.trust.evidenceStatus).toBe("missing");
+    expect(parsed?.result?.trust.freshnessStatus).toBe("unknown");
+    expect(parsed?.result?.trust.blockingReason).toContain("Историческая запись");
   });
 
   it("exposes getRecord, latestRecordFor, and allRecords after recompute", async () => {

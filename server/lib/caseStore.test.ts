@@ -31,6 +31,7 @@ function buildCatalogs(caseData: Case): Catalogs {
     visaRules: [],
     restrictions: [],
     sources: [],
+    ruleEvidence: [],
     cases: [caseData],
     decisionsLog: [],
     residencyPrograms: [],

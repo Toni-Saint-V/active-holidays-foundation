@@ -9,6 +9,7 @@ import type {
   PathDefinition,
   PathPreference,
   ResidencyProgramDefinition,
+  RuleEvidenceRecord,
   ResultPayload,
   Source,
   VisaRule
@@ -146,6 +147,26 @@ function normalizeSources(sources: readonly Source[]): Source[] {
   );
 }
 
+function normalizeRuleEvidence(
+  records: readonly RuleEvidenceRecord[]
+): RuleEvidenceRecord[] {
+  return sortByKey(
+    records,
+    (record) =>
+      [
+        record.ruleId,
+        record.countryOrScope,
+        record.sourceUrlOrRef,
+        record.sourceKind,
+        record.automationClass,
+        record.evidenceStatus,
+        record.lastVerifiedAt ?? "",
+        String(record.freshnessWindowDays),
+        record.rationale
+      ].join("|")
+  );
+}
+
 function normalizeResidency(
   items: readonly ResidencyProgramDefinition[]
 ): ResidencyProgramDefinition[] {
@@ -164,6 +185,7 @@ function normalizeCatalogs(catalogs: OrchestratorCatalogs) {
     visaRules: normalizeVisaRules(catalogs.visaRules),
     restrictions: normalizeRestrictions(catalogs.restrictions),
     sources: normalizeSources(catalogs.sources),
+    ruleEvidence: normalizeRuleEvidence(catalogs.ruleEvidence),
     residencyPrograms: normalizeResidency(catalogs.residencyPrograms),
     insuranceProducts: normalizeInsurance(catalogs.insuranceProducts)
   };

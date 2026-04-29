@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  isIsoFreshnessStale,
+  sourceFreshnessThresholdDaysByTier
+} from "../../shared/domain/evidence/sourceFreshness.ts";
 
 export type SourceTier = "official" | "operator" | "crowdsourced";
 
@@ -28,6 +32,8 @@ export type CheckWaiverState = {
 export type RecordWithSource = {
   sourceId?: string;
   sources?: Array<{ id: string }>;
+  sourceUrlOrRef?: string;
+  sourceKind?: "official" | "operator" | "crowdsourced" | "internal_note";
 };
 
 export type SourceDataset = {
@@ -111,11 +117,7 @@ const freshnessCheckId = `freshness:${automationId}`;
 const sourcesPath = "data/db/sources.json";
 const verificationCommands = ["npm run automations:check:truth"];
 
-const thresholdDaysByTier: Record<SourceTier, number> = {
-  official: 7,
-  operator: 5,
-  crowdsourced: 14
-};
+const thresholdDaysByTier = sourceFreshnessThresholdDaysByTier;
 
 async function loadJson<T>(relativePath: string): Promise<T> {
   const target = path.join(process.cwd(), relativePath);
@@ -143,6 +145,13 @@ function collectSourceIds(records: RecordWithSource[]): string[] {
   for (const record of records) {
     if (record.sourceId) ids.push(record.sourceId);
     for (const source of record.sources ?? []) ids.push(source.id);
+    if (
+      record.sourceUrlOrRef &&
+      record.sourceKind !== "internal_note" &&
+      !record.sourceUrlOrRef.startsWith("repo:")
+    ) {
+      ids.push(record.sourceUrlOrRef);
+    }
   }
   return ids;
 }
@@ -378,7 +387,8 @@ export function buildSourceFreshnessReport(
     }
 
     const threshold = thresholdDaysByTier[source.tier];
-    if (age > threshold && isReferenced) {
+    const stale = isIsoFreshnessStale(source.lastCheckedAt, threshold, now);
+    if (stale && isReferenced) {
       const waived = hasActiveFreshnessWaiver(source.id, input.waiverState.waivers, now);
       const severity = source.tier === "crowdsourced" || waived ? "warning" : "blocker";
       addIssue(
@@ -400,7 +410,7 @@ export function buildSourceFreshnessReport(
         warnings
       );
       if (waived && source.tier !== "crowdsourced") warnings.push(`${source.id} freshness waiver active`);
-    } else if (age > threshold && !isReferenced) {
+    } else if (stale && !isReferenced) {
       addIssue(
         issues,
         {
@@ -589,6 +599,10 @@ async function loadRuntimeInput(): Promise<BuildSourceFreshnessReportInput> {
       {
         path: "data/db/country_restrictions.json",
         records: await loadJson<RecordWithSource[]>("data/db/country_restrictions.json")
+      },
+      {
+        path: "data/db/rule_evidence.json",
+        records: await loadJson<RecordWithSource[]>("data/db/rule_evidence.json")
       },
       {
         path: "data/db/residency_programs.json",

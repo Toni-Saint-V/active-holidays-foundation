@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
@@ -160,6 +160,26 @@ describe("decision integrity HTTP surface", () => {
     expect(fetched.json.record.result).toBeTruthy();
   });
 
+  it("POST /api/cases/:id/recompute fails closed when referenced evidence source is stale", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-29T09:00:00.000Z"));
+    try {
+      const recompute = await postJson("/api/cases/s2-tr-spb/recompute");
+
+      expect(recompute.status).toBe(200);
+      expect(recompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(recompute.json.result.nextAction.type).toBe("send_for_review");
+      expect(recompute.json.result.trust.confidence).toBe(0);
+      expect(
+        recompute.json.result.ruleResults.find(
+          (rule: { ruleId: string }) => rule.ruleId === "EVIDENCE_GATE:R12"
+        )?.explanation
+      ).toContain("stale");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("POST /api/decisions/:id/replay returns diff:null on a fresh record", async () => {
     const recompute = await postJson("/api/cases/s2-tr-spb/recompute");
     const recordId = recompute.json.decisionRecordId as string;
@@ -181,7 +201,7 @@ describe("decision integrity HTTP surface", () => {
   });
 
   it("GET /api/cases/:id/drift surfaces a structured diff when the stored record is stale", async () => {
-    const recompute = await postJson("/api/cases/s5-rf-italy-insurance/recompute");
+    const recompute = await postJson("/api/cases/s1-rf-italy/recompute");
     const store = getCaseStore();
     const fresh = store.getRecord(recompute.json.decisionRecordId);
     expect(fresh).not.toBeNull();
@@ -205,7 +225,7 @@ describe("decision integrity HTTP surface", () => {
     };
     store.insertRecordForTest(stale);
 
-    const drift = await getJson("/api/cases/s5-rf-italy-insurance/drift");
+    const drift = await getJson("/api/cases/s1-rf-italy/drift");
     expect(drift.status).toBe(200);
     expect(drift.json.drifted).toBe(true);
     expect(drift.json.diff.verdict).toEqual({
@@ -214,6 +234,12 @@ describe("decision integrity HTTP surface", () => {
     });
     expect(drift.json.diff.nextActionType).toBeDefined();
     expect(drift.json.diff.primaryPathId).toBeDefined();
+
+    store.insertRecordForTest({
+      ...fresh,
+      decisionId: `${fresh.decisionId}_restore`,
+      recordedAt: "2099-01-01T00:00:01.000Z"
+    });
   });
 
   it("GET /api/cases/:id/drift flags drift by fingerprint even when driftDiff returns null", async () => {
@@ -293,6 +319,31 @@ describe("decision integrity HTTP surface", () => {
     expect(replay.json.drifted).toBe(true);
     expect(replay.json.original.resultFingerprint).toBe("0".repeat(64));
     expect(replay.json.replay.resultFingerprint).not.toBe("0".repeat(64));
+  });
+
+  it("POST /api/decisions/:id/replay returns 409 for pre-evidence snapshots", async () => {
+    const recompute = await postJson("/api/cases/s1-rf-italy/recompute");
+    const store = getCaseStore();
+    const fresh = store.getRecord(recompute.json.decisionRecordId);
+    expect(fresh).not.toBeNull();
+    if (!fresh?.replayableSnapshot) return;
+
+    const preEvidenceSnapshot = structuredClone(fresh.replayableSnapshot) as Record<string, unknown> & {
+      catalogs: Record<string, unknown>;
+    };
+    delete preEvidenceSnapshot.catalogs.ruleEvidence;
+    delete preEvidenceSnapshot.evidenceContractCaptured;
+    const preEvidence = {
+      ...fresh,
+      decisionId: `${fresh.decisionId}_pre_evidence`,
+      recordedAt: "2099-02-03T00:00:00.000Z",
+      replayableSnapshot: preEvidenceSnapshot
+    } as unknown as DecisionRecord;
+    store.insertRecordForTest(preEvidence);
+
+    const replay = await postJson(`/api/decisions/${preEvidence.decisionId}/replay`);
+    expect(replay.status).toBe(409);
+    expect(replay.json.error).toBe("evidence_contract_missing");
   });
 
   it("GET /api/decisions/:id returns 404 with Russian message for unknown id", async () => {

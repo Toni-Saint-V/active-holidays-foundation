@@ -38,6 +38,10 @@ function createResult(overrides: Partial<ResultPayload> = {}): ResultPayload {
         capsApplied: [],
         factors: []
       },
+      evidenceStatus: "valid",
+      freshnessStatus: "fresh",
+      blockingReason: null,
+      humanReviewReason: null,
       volatilityScore: 0.14,
       sources: [
         {

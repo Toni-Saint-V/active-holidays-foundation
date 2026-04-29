@@ -3,6 +3,7 @@ import { caseSchema } from "./case";
 import { countryRestrictionsSchema, visaRulesSchema } from "./visa";
 import { pathsCatalogSchema } from "./paths";
 import { sourcesCatalogSchema } from "./sources";
+import { ruleEvidenceCatalogSchema } from "./evidence";
 import { residencyProgramsCatalogSchema } from "./residency";
 import { insuranceProductsCatalogSchema } from "./insurance";
 
@@ -11,6 +12,7 @@ export const orchestratorCatalogsSchema = z.object({
   visaRules: visaRulesSchema,
   restrictions: countryRestrictionsSchema,
   sources: sourcesCatalogSchema,
+  ruleEvidence: ruleEvidenceCatalogSchema,
   residencyPrograms: residencyProgramsCatalogSchema,
   insuranceProducts: insuranceProductsCatalogSchema
 });
@@ -31,9 +33,30 @@ export const engineFingerprintSchema = z
   );
 export type EngineFingerprint = z.infer<typeof engineFingerprintSchema>;
 
-export const replayableSnapshotSchema = z.object({
+const replayableSnapshotWithEvidenceSchema = z.object({
   case: caseSchema,
   catalogs: orchestratorCatalogsSchema,
-  now: z.string().datetime()
+  now: z.string().datetime(),
+  evidenceContractCaptured: z.boolean().default(true)
 });
+
+const preEvidenceReplayableSnapshotSchema = z
+  .object({
+    case: caseSchema,
+    catalogs: orchestratorCatalogsSchema.omit({ ruleEvidence: true }),
+    now: z.string().datetime()
+  })
+  .transform((snapshot) => ({
+    ...snapshot,
+    catalogs: {
+      ...snapshot.catalogs,
+      ruleEvidence: []
+    },
+    evidenceContractCaptured: false
+  }));
+
+export const replayableSnapshotSchema = z.union([
+  replayableSnapshotWithEvidenceSchema,
+  preEvidenceReplayableSnapshotSchema
+]);
 export type ReplayableSnapshot = z.infer<typeof replayableSnapshotSchema>;

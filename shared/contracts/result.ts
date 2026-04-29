@@ -3,7 +3,7 @@ import { verdictSchema } from "./verdict";
 import { nextActionSchema } from "./action";
 import { criticalRiskSchema, risksSchema } from "./risk";
 import { ruleResultsSchema } from "./rules";
-import { trustSchema } from "./trust";
+import { legacyTrustSchema, trustSchema } from "./trust";
 import { auditTrailSchema } from "./audit";
 import { signalIdSchema } from "./signals";
 import { productTypeSchema } from "./product";
@@ -72,3 +72,7 @@ export const resultPayloadSchema = z.object({
   preview: z.boolean().default(false)
 });
 export type ResultPayload = z.infer<typeof resultPayloadSchema>;
+
+export const legacyResultPayloadSchema = resultPayloadSchema.extend({
+  trust: legacyTrustSchema
+});
