@@ -5,7 +5,7 @@ import { Duplex } from "node:stream";
 import { createApp } from "../index";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
-import type { DecisionRecord } from "@shared/contracts";
+import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
 
 let app: Express;
 
@@ -135,6 +135,17 @@ async function getJson(path: string) {
 }
 
 describe("decision integrity HTTP surface", () => {
+  it("GET /api/cases returns shared case summaries with productType", async () => {
+    const response = await getJson("/api/cases");
+    expect(response.status).toBe(200);
+    const parsed = caseSummarySchema.array().parse(response.json.cases);
+    const residency = parsed.find((item) => item.id === "s4-rf-residency-dnv");
+    const insurance = parsed.find((item) => item.id === "s5-rf-italy-insurance");
+
+    expect(residency?.productType).toBe("residency_es");
+    expect(insurance?.productType).toBe("insurance_adult");
+  });
+
   it("POST /api/cases/:id/recompute returns a decisionRecordId and makes it fetchable", async () => {
     const recompute = await postJson("/api/cases/s1-rf-italy/recompute");
     expect(recompute.status).toBe(200);

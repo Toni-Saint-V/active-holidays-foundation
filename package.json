@@ -9,6 +9,8 @@
     "dev:all": "concurrently -k \"npm run server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
+    "verify": "npm run verify:boundaries && npm run typecheck && npm run test && npm run build && npm run verify:engine",
+    "verify:boundaries": "tsx scripts/verify-boundaries.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:agent-stack": "tsx scripts/verify-agent-stack.ts",

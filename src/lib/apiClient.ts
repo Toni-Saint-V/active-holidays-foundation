@@ -5,11 +5,12 @@ import {
   intakeQueueSchema,
   intakePreviewSchema,
   decisionsLogSchema,
-  rulesCatalogSchema,
   ruleMetadataSchema,
+  ruleResultSchema,
   sourcesCatalogSchema,
   sourceSchema,
   auditTrailSchema,
+  caseSummarySchema,
   documentsReadinessSchema,
   caseOverrideSchema,
   caseSignalsSchema,
@@ -31,6 +32,7 @@ import {
   type Case,
   type CaseOverride,
   type CaseSignals,
+  type CaseSummary,
   type DecisionLogEntry,
   type HumanReviewCreateRequest,
   type HumanReviewRequest,
@@ -106,22 +108,37 @@ async function request<Schema extends z.ZodTypeAny>(
 }
 
 const caseListSchema = z.object({
-  cases: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      productType: productTypeSchema.default("travel"),
-      createdAt: z.string(),
-      updatedAt: z.string(),
-      signalCount: z.number(),
-      forkedFrom: z.string().nullable()
+  cases: z.array(caseSummarySchema)
+});
+
+const strictCaseSchema = caseSchema.extend({
+  productType: productTypeSchema
+});
+
+const strictResultPayloadSchema = resultPayloadSchema.extend({
+  productType: productTypeSchema,
+  ruleResults: z.array(
+    ruleResultSchema.extend({
+      productType: productTypeSchema
     })
   )
 });
 
+const strictRuleMetadataSchema = ruleMetadataSchema.extend({
+  productType: productTypeSchema
+});
+
+const strictScenarioLabPayloadSchema = scenarioLabPayloadSchema.extend({
+  baseResult: strictResultPayloadSchema
+});
+
+const strictScenarioLabCompareResponseSchema = scenarioLabCompareResponseSchema.extend({
+  candidateCase: strictCaseSchema
+});
+
 export const scenarioCardSchema = z.object({
   caseId: z.string(),
-  productType: productTypeSchema.default("travel"),
+  productType: productTypeSchema,
   title: z.string(),
   subtitle: z.string(),
   expectedVerdict: verdictSchema,
@@ -136,9 +153,12 @@ const scenariosResponseSchema = z.object({
 });
 
 const decisionsResponseSchema = z.object({ decisions: decisionsLogSchema });
-const caseResultResponseSchema = z.object({ case: caseSchema, result: resultPayloadSchema });
+const caseResultResponseSchema = z.object({
+  case: strictCaseSchema,
+  result: strictResultPayloadSchema
+});
 const pathsResponseSchema = z.object({ paths: offersSchema });
-const rulesResponseSchema = z.object({ rules: rulesCatalogSchema });
+const rulesResponseSchema = z.object({ rules: z.array(strictRuleMetadataSchema) });
 const sourcesResponseSchema = z.object({ sources: sourcesCatalogSchema });
 const auditResponseSchema = z.object({
   trail: auditTrailSchema,
@@ -157,15 +177,18 @@ export const apiClient = {
       })
     );
   },
-  async listCases() {
+  async listCases(): Promise<CaseSummary[]> {
     const response = await request("/api/cases", caseListSchema);
     return response.cases;
   },
   async getCase(id: string): Promise<Case> {
-    return request(`/api/cases/${encodeURIComponent(id)}`, caseSchema);
+    return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema);
   },
   async getResult(id: string): Promise<ResultPayload> {
-    return request(`/api/cases/${encodeURIComponent(id)}/result`, resultPayloadSchema);
+    return request(
+      `/api/cases/${encodeURIComponent(id)}/result`,
+      strictResultPayloadSchema
+    );
   },
   async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
     return request(
@@ -252,7 +275,7 @@ export const apiClient = {
     const body = scenarioLabCompareRequestSchema.parse(payload);
     return request(
       `/api/cases/${encodeURIComponent(id)}/scenarios/compare`,
-      scenarioLabCompareResponseSchema,
+      strictScenarioLabCompareResponseSchema,
       {
         method: "POST",
         body: JSON.stringify(body)
@@ -262,7 +285,7 @@ export const apiClient = {
   async decisionScenarioLab(id: string): Promise<ScenarioLabPayload> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/scenario-lab`,
-      scenarioLabPayloadSchema
+      strictScenarioLabPayloadSchema
     );
   },
   async paths(caseId: string): Promise<Offer[]> {
@@ -277,7 +300,7 @@ export const apiClient = {
     return response.rules;
   },
   async rule(id: string): Promise<RuleMetadata> {
-    return request(`/api/rules/${encodeURIComponent(id)}`, ruleMetadataSchema);
+    return request(`/api/rules/${encodeURIComponent(id)}`, strictRuleMetadataSchema);
   },
   async sources(): Promise<Source[]> {
     const response = await request("/api/sources", sourcesResponseSchema);
