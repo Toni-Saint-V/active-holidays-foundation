@@ -1,9 +1,9 @@
-import type { Case } from "@shared/contracts";
+import type { CaseSummary } from "@shared/contracts";
 import { Card, Badge } from "./primitives";
 import { formatDate, pluralizeSignals } from "@/lib/format";
 
 type Props = {
-  caseData: Pick<Case, "id" | "title" | "updatedAt" | "signals" | "forkedFrom">;
+  caseData: CaseSummary;
   onOpen?: (id: string) => void;
   active?: boolean;
 };
@@ -25,7 +25,7 @@ export function CaseCard({ caseData, onOpen, active }: Props) {
         </div>
         <p className="text-xs text-textSecondary">{caseData.id}</p>
         <p className="text-xs text-textMuted">
-          {pluralizeSignals(caseData.signals.length)} · обновлён {formatDate(caseData.updatedAt)}
+          {pluralizeSignals(caseData.signalCount)} · обновлён {formatDate(caseData.updatedAt)}
         </p>
       </Card>
     </button>

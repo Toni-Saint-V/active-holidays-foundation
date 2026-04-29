@@ -10,31 +10,21 @@ import { staggerChild, staggerParent } from "@/animations/variants";
 import { useScreenView } from "@/instrumentation/screenView";
 import { useToast } from "@/ui/Toast";
 import { recentEvents } from "@/instrumentation/events";
+import type { CaseSummary } from "@shared/contracts";
 
 export function ProfileScreen() {
   useScreenView("profile");
   const navigate = useNavigate();
   const toast = useToast();
   const { activeCaseId, bootstrap } = useCaseStore();
-  const [cases, setCases] = useState<
-    Array<{ id: string; title: string; createdAt: string; updatedAt: string; signalCount: number; forkedFrom: string | null }>
-  >([]);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
 
   useEffect(() => {
     void bootstrap();
     void (async () => {
       try {
         const loaded = await apiClient.listCases();
-        setCases(
-          loaded.map((item) => ({
-            id: item.id,
-            title: item.title,
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt,
-            signalCount: item.signalCount,
-            forkedFrom: item.forkedFrom
-          }))
-        );
+        setCases(loaded);
       } catch (error) {
         toast.push(
           error instanceof Error ? error.message : "Не удалось загрузить список кейсов.",
@@ -86,18 +76,7 @@ export function ProfileScreen() {
           cases.map((caseData) => (
             <CaseCard
               key={caseData.id}
-              caseData={{
-                id: caseData.id,
-                title: caseData.title,
-                updatedAt: caseData.updatedAt,
-                signals: Array.from({ length: caseData.signalCount }, () => ({
-                  id: "citizenship" as const,
-                  value: "RU",
-                  source: "seed" as const,
-                  capturedAt: caseData.updatedAt
-                })),
-                forkedFrom: caseData.forkedFrom
-              }}
+              caseData={caseData}
               active={caseData.id === activeCaseId}
               onOpen={(id) => navigate(`/result?case=${encodeURIComponent(id)}`)}
             />

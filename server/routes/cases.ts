@@ -11,6 +11,7 @@ import {
   pathPreferencesSchema,
   recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
+  caseSummarySchema,
   type Case,
   type CaseSignals,
   type DecisionKind,
@@ -119,12 +120,13 @@ export function casesRouter(): Router {
       .map((caseData) => ({
         id: caseData.id,
         title: caseData.title,
+        productType: caseData.productType,
         createdAt: caseData.createdAt,
         updatedAt: caseData.updatedAt,
         signalCount: caseData.signals.length,
         forkedFrom: caseData.forkedFrom
       }));
-    res.json({ cases: summaries });
+    res.json({ cases: caseSummarySchema.array().parse(summaries) });
   });
 
   router.get("/:id", validateParams(caseIdParams), (req, res) => {
