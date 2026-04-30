@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   humanReviewRequestSchema,
+  humanReviewOpsActionRequestSchema,
+  humanReviewOpsActionResponseSchema,
   humanReviewOpsDetailResponseSchema,
   humanReviewOpsQueueResponseSchema,
   type ResultPayload
@@ -323,6 +325,115 @@ describe("human review ops workbench contracts", () => {
     expect(parsed.success).toBe(false);
     if (parsed.success) throw new Error("Terminal detail with actions should be rejected.");
     expect(parsed.error.issues[0]?.path).toEqual(["detail", "operatorNextActions"]);
+  });
+
+  it("validates operator action requests and refreshed action responses", () => {
+    const actionRequest = humanReviewOpsActionRequestSchema.parse({
+      actionId: "mark_resolved",
+      transitionStatus: "resolved",
+      note: "Оператор закрыл проверку.",
+      resolution: {
+        summary: "Проверка завершена оператором."
+      }
+    });
+    expect(actionRequest.resolution?.summary).toContain("Проверка завершена");
+
+    const invalid = humanReviewOpsActionRequestSchema.safeParse({
+      actionId: "mark_resolved",
+      transitionStatus: "resolved"
+    });
+    expect(invalid.success).toBe(false);
+
+    const invalidNonTerminalResolution = humanReviewOpsActionRequestSchema.safeParse({
+      actionId: "move_in_review",
+      transitionStatus: "in_review",
+      resolution: {
+        summary: "Нельзя передавать resolution до закрытия."
+      }
+    });
+    expect(invalidNonTerminalResolution.success).toBe(false);
+
+    const parsed = humanReviewOpsActionResponseSchema.parse({
+      generatedAt: "2026-04-30T09:06:00.000Z",
+      capabilities: {
+        terminalResolve: "transition_only",
+        learningFeedback: "available"
+      },
+      detail: {
+        request: {
+          id: "hr_case-1_1",
+          caseId: "case-1",
+          status: "cancelled",
+          channel: "email",
+          contact: "traveler@example.com",
+          message: "Прошу проверить кейс вручную.",
+          createdAt: "2026-04-30T09:00:00.000Z",
+          updatedAt: "2026-04-30T09:05:00.000Z",
+          closedAt: "2026-04-30T09:05:00.000Z",
+          durability: "persisted",
+          resolution: null,
+          snapshot: {
+            decisionId: null,
+            verdict: "HUMAN_REVIEW",
+            confidence: 0.32,
+            computedAt: "2026-04-30T09:00:00.000Z",
+            lastCheckedAt: "2026-04-30T09:00:00.000Z",
+            nextActionLabel: "Передать кейс менеджеру",
+            summary: "Нужна ручная проверка."
+          },
+          events: [
+            {
+              id: "hr_case-1_1_submitted",
+              at: "2026-04-30T09:00:00.000Z",
+              type: "submitted",
+              status: "submitted",
+              changedBy: "traveler",
+              note: null
+            },
+            {
+              id: "hr_case-1_1_2",
+              at: "2026-04-30T09:05:00.000Z",
+              type: "status_changed",
+              status: "cancelled",
+              changedBy: "ops",
+              note: "Оператор отменил дубль."
+            }
+          ]
+        },
+        caseSummary: {
+          id: "case-1",
+          title: "Case 1",
+          productType: "travel",
+          updatedAt: "2026-04-30T09:00:00.000Z"
+        },
+        currentResult: resultFixture(),
+        blockingReasons: [],
+        auditTrail: [],
+        resolution: {
+          status: "cancelled",
+          closedAt: "2026-04-30T09:05:00.000Z",
+          note: "Оператор отменил дубль.",
+          mode: "transition_only",
+          recompute: null
+        },
+        learning: {
+          source: "learning_api",
+          summary: "Learning feedback is captured after terminal operator resolution."
+        },
+        operatorNextActions: []
+      },
+      action: {
+        id: "cancel_review",
+        label: "Отменить проверку",
+        transitionStatus: "cancelled",
+        internalOnly: true
+      },
+      decisionRecordId: null,
+      learningFeedback: null
+    });
+
+    expect(parsed.action.transitionStatus).toBe("cancelled");
+    expect(parsed.learningFeedback).toBeNull();
   });
 
   it("rejects inconsistent human review closedAt lifecycle", () => {

@@ -227,6 +227,134 @@ describe("human review HTTP surface", () => {
     expect(moveInReview.transitionStatus).toBe("in_review");
   });
 
+  it("executes operator workbench actions and captures learning on terminal resolve", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-ops-action-"));
+    const previousReviewFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+    const previousLearningFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        isolatedTempDir,
+        "human-reviews.json"
+      );
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = path.join(
+        isolatedTempDir,
+        "human-review-learning.json"
+      );
+      const isolatedApp = await createApp();
+      const created = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/human-review",
+        {
+          channel: "email",
+          contact: "ops-action@example.com",
+          message: "Нужно проверить конфликтующие evidence-источники оператором."
+        },
+        isolatedApp
+      );
+      expect(created.status).toBe(200);
+
+      const inReview = await requestJson(
+        "POST",
+        `/api/human-review/ops/requests/${created.json.request.id}/actions`,
+        {
+          actionId: "move_in_review",
+          transitionStatus: "in_review",
+          note: "Оператор взял кейс в работу."
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(inReview.status).toBe(200);
+      expect(inReview.json.detail.request.status).toBe("in_review");
+      expect(inReview.json.detail.request.events.at(-1).changedBy).toBe("ops");
+      expect(inReview.json.decisionRecordId).toBeNull();
+      expect(inReview.json.learningFeedback).toBeNull();
+
+      const resolved = await requestJson(
+        "POST",
+        `/api/human-review/ops/requests/${created.json.request.id}/actions`,
+        {
+          actionId: "mark_resolved",
+          transitionStatus: "resolved",
+          note: "Оператор закрыл конфликт evidence.",
+          resolution: {
+            summary: "Оператор подтвердил: автоматический совет не выдаём из-за конфликта источников."
+          }
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(resolved.status).toBe(200);
+      expect(resolved.json.detail.request.status).toBe("resolved");
+      expect(resolved.json.detail.request.resolution.changedBy).toBe("ops");
+      expect(resolved.json.detail.request.resolution.postDecisionRecordId).toBe(
+        resolved.json.decisionRecordId
+      );
+      expect(resolved.json.detail.operatorNextActions).toEqual([]);
+      expect(resolved.json.decisionRecordId).toMatch(/^dec_s2-tr-spb_\d+$/);
+      expect(resolved.json.learningFeedback.inserted).toBe(true);
+      expect(resolved.json.learningFeedback.event.ingestedVia).toBe("terminal_resolution");
+      expect(resolved.json.learningFeedback.event.rootCause).toBe("conflicting_evidence");
+
+      const repeatedResolve = await requestJson(
+        "POST",
+        `/api/human-review/ops/requests/${created.json.request.id}/actions`,
+        {
+          actionId: "mark_resolved",
+          transitionStatus: "resolved",
+          note: "Повторная доставка того же действия.",
+          resolution: {
+            summary: "Оператор подтвердил: автоматический совет не выдаём из-за конфликта источников."
+          }
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(repeatedResolve.status).toBe(200);
+      expect(repeatedResolve.json.decisionRecordId).toBe(resolved.json.decisionRecordId);
+      expect(repeatedResolve.json.learningFeedback.inserted).toBe(false);
+      expect(repeatedResolve.json.detail.request.status).toBe("resolved");
+
+      const queue = await requestJson(
+        "GET",
+        "/api/human-review/ops/queue",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(queue.status).toBe(200);
+      expect(
+        queue.json.queue.some(
+          (entry: { requestId: string }) => entry.requestId === created.json.request.id
+        )
+      ).toBe(false);
+
+      const learningSummary = await requestJson(
+        "GET",
+        "/api/human-review/learning/summary",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(learningSummary.status).toBe(200);
+      expect(learningSummary.json.totalEvents).toBe(1);
+      expect(learningSummary.json.rootCauseCounts.conflicting_evidence).toBe(1);
+    } finally {
+      if (previousReviewFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      if (previousLearningFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = previousLearningFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
   it("keeps the operator queue available when persisted review points to a missing case", async () => {
     const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-ops-orphan-"));
     const previous = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;

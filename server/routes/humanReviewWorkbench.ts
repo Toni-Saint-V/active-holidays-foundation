@@ -6,12 +6,22 @@ import {
   humanReviewLearningIngestResponseSchema,
   humanReviewLearningSummaryResponseSchema,
   humanReviewLearningTopBlockersResponseSchema,
+  humanReviewOpsActionRequestSchema,
+  humanReviewOpsActionResponseSchema,
   humanReviewOpsDetailResponseSchema,
-  humanReviewOpsQueueResponseSchema
+  humanReviewOpsQueueResponseSchema,
+  type HumanReviewOpsAction,
+  type HumanReviewOpsActionRequest,
+  type HumanReviewRequest
 } from "@shared/contracts";
 import { runDecision, type OrchestratorCatalogs } from "@shared/domain/engine";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
+import { extractHumanReviewBlockers } from "../lib/humanReviewBlockers";
+import {
+  buildHumanReviewLearningEvent,
+  humanReviewLearningEventId
+} from "../lib/humanReviewLearning";
 import {
   buildHumanReviewOpsDetail,
   buildHumanReviewOpsOrphanQueueItem,
@@ -60,6 +70,140 @@ function computeResultForCaseId(caseId: string) {
     { now: () => new Date() }
   );
   return { caseData, result };
+}
+
+function buildDetailResponse(request: HumanReviewRequest) {
+  const { caseData, result } = computeResultForCaseId(request.caseId);
+  return humanReviewOpsDetailResponseSchema.parse({
+    generatedAt: new Date().toISOString(),
+    capabilities: HUMAN_REVIEW_OPS_CAPABILITIES,
+    detail: buildHumanReviewOpsDetail({
+      request,
+      caseData,
+      currentResult: result
+    })
+  });
+}
+
+function snapshotResolvedOpsDecision(input: {
+  requestId: string;
+  caseId: string;
+}) {
+  const catalogs = orchestratorCatalogs();
+  const caseData = getCaseStore().get(input.caseId);
+  if (!caseData) {
+    throw new HttpError(404, `Кейс ${input.caseId} не найден.`, "case_not_found");
+  }
+  const result = runDecision(
+    { case: caseData, catalogs },
+    { now: () => new Date() }
+  );
+  const record = getCaseStore().snapshotDecisionRecord({
+    case: caseData,
+    catalogs,
+    result,
+    summary: `Ops workbench закрыл ручную проверку ${input.requestId}; результат пересчитан без новых предположений.`,
+    kind: "recompute",
+    changedSignalIds: []
+  });
+  return { result, record };
+}
+
+function actionFromPayload(payload: HumanReviewOpsActionRequest): HumanReviewOpsAction | null {
+  if (payload.actionId === "move_in_review" && payload.transitionStatus === "in_review") {
+    return {
+      id: "move_in_review",
+      label: "Взять в работу",
+      transitionStatus: "in_review",
+      internalOnly: true
+    };
+  }
+  if (payload.actionId === "mark_resolved" && payload.transitionStatus === "resolved") {
+    return {
+      id: "mark_resolved",
+      label: "Закрыть проверку",
+      transitionStatus: "resolved",
+      internalOnly: true
+    };
+  }
+  if (payload.actionId === "cancel_review" && payload.transitionStatus === "cancelled") {
+    return {
+      id: "cancel_review",
+      label: "Отменить проверку",
+      transitionStatus: "cancelled",
+      internalOnly: true
+    };
+  }
+  return null;
+}
+
+function ensureResolvedOpsArtifacts(input: {
+  requestBefore: HumanReviewRequest;
+  requestAfter: HumanReviewRequest;
+}) {
+  const existingRecordId = input.requestAfter.resolution?.postDecisionRecordId ?? null;
+  const existingRecord = existingRecordId ? getCaseStore().getRecord(existingRecordId) : null;
+  const resolvedDecision = existingRecord?.result
+    ? { result: existingRecord.result, record: existingRecord }
+    : snapshotResolvedOpsDecision({
+        requestId: input.requestAfter.id,
+        caseId: input.requestAfter.caseId
+      });
+
+  const decisionRecordId = resolvedDecision.record.decisionId;
+  const requestWithRecord =
+    input.requestAfter.resolution?.postDecisionRecordId === decisionRecordId
+      ? input.requestAfter
+      : getCaseStore().attachHumanReviewDecisionRecord({
+          requestId: input.requestAfter.id,
+          postDecisionRecordId: decisionRecordId
+        });
+
+  const learningStore = getHumanReviewLearningStore();
+  const existingEvent = learningStore.get(humanReviewLearningEventId(requestWithRecord));
+  if (existingEvent) {
+    return {
+      requestAfter: requestWithRecord,
+      decisionRecordId,
+      learningFeedback: {
+        event: existingEvent,
+        inserted: false
+      }
+    };
+  }
+
+  const event = buildHumanReviewLearningEvent({
+    requestBefore: input.requestBefore,
+    requestAfter: requestWithRecord,
+    postResult: resolvedDecision.result,
+    blockers: extractHumanReviewBlockers(resolvedDecision.result),
+    postDecisionRecordId: decisionRecordId
+  });
+  return {
+    requestAfter: requestWithRecord,
+    decisionRecordId,
+    learningFeedback: learningStore.ingest(event)
+  };
+}
+
+function assertSameResolvedPayload(input: {
+  request: HumanReviewRequest;
+  payload: HumanReviewOpsActionRequest;
+}) {
+  if (
+    input.request.status !== "resolved" ||
+    input.payload.transitionStatus !== "resolved" ||
+    input.payload.actionId !== "mark_resolved" ||
+    !input.request.resolution ||
+    !input.payload.resolution ||
+    input.request.resolution.summary !== input.payload.resolution.summary
+  ) {
+    throw new HttpError(
+      409,
+      `Действие ${input.payload.actionId} недоступно для статуса ${input.request.status}.`,
+      "human_review_ops_action_not_allowed"
+    );
+  }
 }
 
 export function humanReviewWorkbenchRouter(): Router {
@@ -173,6 +317,120 @@ export function humanReviewWorkbenchRouter(): Router {
             caseData,
             currentResult: result
           })
+        })
+      );
+    }
+  );
+
+  router.post(
+    "/ops/requests/:requestId/actions",
+    requireInternalApiToken,
+    validateParams(requestIdParams),
+    validateBody(humanReviewOpsActionRequestSchema),
+    (req, res) => {
+      const requestId = getRequestId(req);
+      const payload = humanReviewOpsActionRequestSchema.parse(req.body);
+      const requestBefore = getCaseStore().getHumanReviewById(requestId);
+      if (!requestBefore) {
+        throw new HttpError(
+          404,
+          `Запрос ручной проверки ${requestId} не найден.`,
+          "human_review_not_found"
+        );
+      }
+
+      if (requestBefore.status === "resolved") {
+        const action = actionFromPayload(payload);
+        assertSameResolvedPayload({ request: requestBefore, payload });
+        if (!action) {
+          throw new HttpError(
+            409,
+            `Действие ${payload.actionId} недоступно для статуса ${requestBefore.status}.`,
+            "human_review_ops_action_not_allowed"
+          );
+        }
+        try {
+          const completed = ensureResolvedOpsArtifacts({
+            requestBefore,
+            requestAfter: requestBefore
+          });
+          const refreshed = buildDetailResponse(completed.requestAfter);
+          res.json(
+            humanReviewOpsActionResponseSchema.parse({
+              ...refreshed,
+              action,
+              decisionRecordId: completed.decisionRecordId,
+              learningFeedback: completed.learningFeedback
+            })
+          );
+          return;
+        } catch (error) {
+          if (error instanceof HumanReviewLearningConflictError) {
+            throw new HttpError(409, error.message, "human_review_learning_conflict");
+          }
+          throw error;
+        }
+      }
+
+      const beforeDetail = buildDetailResponse(requestBefore);
+      const action = beforeDetail.detail.operatorNextActions.find(
+        (candidate) =>
+          candidate.id === payload.actionId &&
+          candidate.transitionStatus === payload.transitionStatus
+      );
+      if (!action) {
+        throw new HttpError(
+          409,
+          `Действие ${payload.actionId} недоступно для статуса ${requestBefore.status}.`,
+          "human_review_ops_action_not_allowed"
+        );
+      }
+
+      let requestAfter: HumanReviewRequest;
+      try {
+        requestAfter = getCaseStore().transitionHumanReview({
+          requestId,
+          status: payload.transitionStatus,
+          changedBy: "ops",
+          note: payload.note ?? null,
+          resolution: payload.resolution ?? null
+        });
+      } catch (error) {
+        throw new HttpError(
+          409,
+          error instanceof Error
+            ? error.message
+            : "Не удалось выполнить действие оператора.",
+          "human_review_ops_action_failed"
+        );
+      }
+
+      let decisionRecordId: string | null = null;
+      let learningFeedback = null;
+      if (payload.transitionStatus === "resolved") {
+        try {
+          const completed = ensureResolvedOpsArtifacts({
+            requestBefore,
+            requestAfter
+          });
+          requestAfter = completed.requestAfter;
+          decisionRecordId = completed.decisionRecordId;
+          learningFeedback = completed.learningFeedback;
+        } catch (error) {
+          if (error instanceof HumanReviewLearningConflictError) {
+            throw new HttpError(409, error.message, "human_review_learning_conflict");
+          }
+          throw error;
+        }
+      }
+
+      const refreshed = buildDetailResponse(requestAfter);
+      res.json(
+        humanReviewOpsActionResponseSchema.parse({
+          ...refreshed,
+          action,
+          decisionRecordId,
+          learningFeedback
         })
       );
     }
