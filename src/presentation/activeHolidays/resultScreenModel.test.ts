@@ -114,7 +114,7 @@ function createScenarioLab(): ScenarioLabPayload {
   const baseResult = createBaseResult();
 
   return {
-    version: "scenario-lab.v1",
+    version: "scenario-lab.v2",
     caseId: "s1-rf-italy",
     generatedAt: "2026-04-21T00:00:00.000Z",
     baseResult,

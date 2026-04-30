@@ -2,6 +2,7 @@ import { z } from "zod";
 import { nextActionSchema } from "./action";
 import { evidenceStatusSchema } from "./evidence";
 import { signalIdSchema } from "./signals";
+import { freshnessStatusSchema } from "./trust";
 import {
   documentsReadinessItemSchema,
   resultPayloadSchema
@@ -15,8 +16,6 @@ export const scenarioSafetyStatusSchema = z.enum([
   "human_review_only"
 ]);
 export type ScenarioSafetyStatus = z.infer<typeof scenarioSafetyStatusSchema>;
-
-const scenarioFreshnessStatusSchema = z.enum(["fresh", "stale", "unknown"]);
 
 const scenarioValueDeltaSchema = <T extends z.ZodTypeAny>(schema: T) =>
   z.object({
@@ -69,7 +68,7 @@ export const scenarioConciergeDeltaSchema = z.object({
   risks: scenarioRiskDeltaSchema,
   nextAction: scenarioNextActionDeltaSchema,
   evidenceStatus: scenarioValueDeltaSchema(evidenceStatusSchema),
-  freshnessStatus: scenarioValueDeltaSchema(scenarioFreshnessStatusSchema),
+  freshnessStatus: scenarioValueDeltaSchema(freshnessStatusSchema),
   blockingReason: scenarioValueDeltaSchema(z.string().min(1).nullable()),
   humanReviewReason: scenarioValueDeltaSchema(z.string().min(1).nullable())
 });
@@ -141,7 +140,7 @@ export const scenarioCandidateSchema = z.object({
   recommended: z.boolean(),
   safetyStatus: scenarioSafetyStatusSchema,
   evidenceStatus: evidenceStatusSchema,
-  freshnessStatus: scenarioFreshnessStatusSchema,
+  freshnessStatus: freshnessStatusSchema,
   blockingReason: z.string().min(1).nullable(),
   humanReviewReason: z.string().min(1).nullable(),
   nextAction: nextActionSchema,
@@ -152,7 +151,7 @@ export const scenarioCandidateSchema = z.object({
 export type ScenarioCandidate = z.infer<typeof scenarioCandidateSchema>;
 
 export const scenarioLabPayloadSchema = z.object({
-  version: z.literal("scenario-lab.v1"),
+  version: z.literal("scenario-lab.v2"),
   caseId: z.string().min(1),
   generatedAt: z.string().datetime(),
   baseResult: resultPayloadSchema,
