@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { HumanReviewLearningEvent } from "@shared/contracts";
+import { humanReviewLearningEventSchema, type HumanReviewLearningEvent } from "@shared/contracts";
 import {
   HumanReviewLearningConflictError,
   HumanReviewLearningStore
@@ -8,7 +8,7 @@ import {
 function event(overrides: Partial<HumanReviewLearningEvent> = {}): HumanReviewLearningEvent {
   const requestId = overrides.requestId ?? "hr_case_1";
   const resolvedAt = overrides.resolvedAt ?? "2026-04-30T10:00:00.000Z";
-  return {
+  return humanReviewLearningEventSchema.parse({
     version: "human-review-learning.v1",
     ingestedVia: "terminal_resolution",
     ingestReason: "Captured automatically when operator resolved human review.",
@@ -50,7 +50,7 @@ function event(overrides: Partial<HumanReviewLearningEvent> = {}): HumanReviewLe
       applied: false
     },
     ...overrides
-  };
+  });
 }
 
 describe("HumanReviewLearningStore", () => {
@@ -61,11 +61,13 @@ describe("HumanReviewLearningStore", () => {
     expect(store.ingest(first).inserted).toBe(true);
     expect(store.ingest(first).inserted).toBe(false);
 
-    const wrongEventId = event({
-      requestId: "hr_case_3",
-      resolvedAt: "2026-04-30T10:03:00.000Z",
+    const wrongEventId = {
+      ...event({
+        requestId: "hr_case_3",
+        resolvedAt: "2026-04-30T10:03:00.000Z"
+      }),
       eventId: "legacy_import_with_wrong_id"
-    });
+    } as HumanReviewLearningEvent;
     expect(() => store.ingest(wrongEventId)).toThrow(HumanReviewLearningConflictError);
 
     expect(() =>

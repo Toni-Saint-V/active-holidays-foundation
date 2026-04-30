@@ -6,6 +6,7 @@ export const auditStepNameSchema = z.enum([
   "resolveVisaRules",
   "evaluateRules",
   "evaluateEvidence",
+  "evaluateHumanReviewCalibration",
   "rankPaths",
   "computeRisks",
   "computeVerdict",

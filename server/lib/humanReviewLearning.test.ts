@@ -235,6 +235,16 @@ describe("buildHumanReviewLearningEvent", () => {
     });
     expect(event.actionDelta.changed).toBe(true);
     expect(event.confidenceDelta).toBe(0.35);
+    expect(event.trustCalibration).toMatchObject({
+      calibrationId: "hrc_hr_case_1_2026-04-30T10:00:00.000Z",
+      action: "manual_policy_review_only",
+      status: "active",
+      confidenceDelta: 0.35,
+      applyToFutureAutomation: true,
+      evidenceStatus: "valid",
+      freshnessStatus: "fresh"
+    });
+    expect(event.trustCalibration.reason).toContain("ручной интерпретации");
     expect(event.sourceCatalogMutation).toEqual({
       allowed: false,
       applied: false

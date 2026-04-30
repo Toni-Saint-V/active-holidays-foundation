@@ -6,6 +6,7 @@ import {
   humanReviewLearningIngestResponseSchema,
   humanReviewLearningSummaryResponseSchema,
   humanReviewLearningTopBlockersResponseSchema,
+  humanReviewTrustCalibrationResponseSchema,
   humanReviewOpsActionRequestSchema,
   humanReviewOpsActionResponseSchema,
   humanReviewOpsDetailResponseSchema,
@@ -32,6 +33,7 @@ import {
   getHumanReviewLearningStore,
   HumanReviewLearningConflictError
 } from "../lib/humanReviewLearningStore";
+import { buildHumanReviewTrustCalibration } from "../lib/humanReviewTrustCalibration";
 import { HttpError } from "../middleware/errorHandler";
 import { requireInternalApiToken } from "../middleware/internalApi";
 import { validateBody, validateParams } from "../middleware/validate";
@@ -40,6 +42,10 @@ const requestIdParams = z.object({ requestId: z.string().min(1) });
 const learningEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0)
+});
+const learningCalibrationQuerySchema = z.object({
+  minOccurrences: z.coerce.number().int().min(1).max(20).default(2),
+  limit: z.coerce.number().int().min(1).max(50).default(10)
 });
 
 function getRequestId(req: Request): string {
@@ -56,7 +62,8 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
     sources: catalogs.sources,
     ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
-    insuranceProducts: catalogs.insuranceProducts
+    insuranceProducts: catalogs.insuranceProducts,
+    humanReviewCalibrations: getHumanReviewLearningStore().calibrations()
   };
 }
 
@@ -266,6 +273,19 @@ export function humanReviewWorkbenchRouter(): Router {
     res.json(
       humanReviewLearningTopBlockersResponseSchema.parse(
         getHumanReviewLearningStore().topBlockers()
+      )
+    );
+  });
+
+  router.get("/learning/trust-calibration", requireInternalApiToken, (req, res) => {
+    const query = learningCalibrationQuerySchema.parse(req.query);
+    res.json(
+      humanReviewTrustCalibrationResponseSchema.parse(
+        buildHumanReviewTrustCalibration({
+          events: getHumanReviewLearningStore().list(),
+          minOccurrences: query.minOccurrences,
+          limit: query.limit
+        })
       )
     );
   });

@@ -296,6 +296,15 @@ describe("human review HTTP surface", () => {
       expect(resolved.json.learningFeedback.inserted).toBe(true);
       expect(resolved.json.learningFeedback.event.ingestedVia).toBe("terminal_resolution");
       expect(resolved.json.learningFeedback.event.rootCause).toBe("conflicting_evidence");
+      expect(resolved.json.learningFeedback.event.trustCalibration).toMatchObject({
+        action: "fail_closed_until_evidence_refresh",
+        status: "active",
+        applyToFutureAutomation: true,
+        sourceCatalogMutation: {
+          allowed: false,
+          applied: false
+        }
+      });
 
       const repeatedResolve = await requestJson(
         "POST",
@@ -340,6 +349,9 @@ describe("human review HTTP surface", () => {
       expect(learningSummary.status).toBe(200);
       expect(learningSummary.json.totalEvents).toBe(1);
       expect(learningSummary.json.rootCauseCounts.conflicting_evidence).toBe(1);
+      expect(
+        learningSummary.json.calibrationActionCounts.fail_closed_until_evidence_refresh
+      ).toBe(1);
     } finally {
       if (previousReviewFile) {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
@@ -713,6 +725,9 @@ describe("human review HTTP surface", () => {
       expect(resolved.json.learningFeedback.event.ingestedVia).toBe("terminal_resolution");
       expect(resolved.json.learningFeedback.event.rootCause).toBe("conflicting_evidence");
       expect(resolved.json.learningFeedback.inserted).toBe(true);
+      expect(resolved.json.learningFeedback.event.trustCalibration.reason).toContain(
+        "автоматический совет остаётся закрытым"
+      );
 
       const laterRecompute = await requestJson(
         "POST",
@@ -721,6 +736,19 @@ describe("human review HTTP surface", () => {
         isolatedApp
       );
       expect(laterRecompute.status).toBe(200);
+      expect(laterRecompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(
+        laterRecompute.json.result.ruleResults.some((rule: { ruleId: string }) =>
+          rule.ruleId.startsWith("HUMAN_REVIEW_CALIBRATION:")
+        )
+      ).toBe(true);
+      expect(
+        laterRecompute.json.result.auditTrail.steps.some(
+          (step: { name: string; outputSummary: string }) =>
+            step.name === "evaluateHumanReviewCalibration" &&
+            step.outputSummary.includes("Активных fail-closed calibration-сигналов: 1")
+        )
+      ).toBe(true);
 
       const repeated = await requestJson(
         "POST",
@@ -743,6 +771,9 @@ describe("human review HTTP surface", () => {
       expect(repeated.json.learningFeedback.event.eventId).toBe(
         resolved.json.learningFeedback.event.eventId
       );
+      expect(repeated.json.learningFeedback.event.trustCalibration.calibrationId).toBe(
+        resolved.json.learningFeedback.event.trustCalibration.calibrationId
+      );
 
       const events = await requestJson(
         "GET",
@@ -757,6 +788,7 @@ describe("human review HTTP surface", () => {
       expect(events.json.offset).toBe(0);
       expect(events.json.events).toHaveLength(1);
       expect(events.json.events[0].sourceCatalogMutation.applied).toBe(false);
+      expect(events.json.events[0].trustCalibration.applyToFutureAutomation).toBe(true);
     } finally {
       if (previousReviewFile) {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
@@ -810,7 +842,7 @@ describe("human review HTTP surface", () => {
         allowed: false,
         applied: false
       }
-    };
+      };
 
     try {
       process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
@@ -959,6 +991,12 @@ describe("human review HTTP surface", () => {
       expect(summary.json.totalEvents).toBe(3);
       expect(summary.json.rootCauseCounts.stale_evidence).toBe(2);
       expect(summary.json.actionDeltaCounts.changed).toBe(1);
+      expect(summary.json.calibrationActionCounts).toMatchObject({
+        fail_closed_until_evidence_refresh: 2,
+        fail_closed_until_signal_capture: 1,
+        manual_policy_review_only: 0,
+        informational_operator_note: 0
+      });
       expect(summary.json.sourceCatalogMutationsApplied).toBe(0);
 
       const blockers = await requestJson(
@@ -979,6 +1017,39 @@ describe("human review HTTP surface", () => {
           missing_signal: 1
         })
       });
+
+      const calibration = await requestJson(
+        "GET",
+        "/api/human-review/learning/trust-calibration?minOccurrences=2",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(calibration.status).toBe(200);
+      expect(calibration.json.recommendations[0]).toMatchObject({
+        blockerId: "EVIDENCE_GATE:visa_rule",
+        occurrences: 3,
+        rootCause: "stale_evidence",
+        action: "fail_closed_until_evidence_refresh",
+        safety: {
+          mode: "proposal_only",
+          sourceCatalogMutation: {
+            allowed: false,
+            applied: false
+          }
+        }
+      });
+
+      const emptyCalibration = await requestJson(
+        "GET",
+        "/api/human-review/learning/trust-calibration?minOccurrences=4",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(emptyCalibration.status).toBe(200);
+      expect(emptyCalibration.json.recommendations).toEqual([]);
+      expect(emptyCalibration.json.emptyState.title).toContain("Недостаточно");
     } finally {
       if (previousReviewFile) {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;

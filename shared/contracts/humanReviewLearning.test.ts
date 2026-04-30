@@ -6,6 +6,8 @@ import {
   humanReviewLearningIngestResponseSchema,
   humanReviewLearningRootCauseSchema,
   humanReviewLearningSummaryResponseSchema,
+  humanReviewTrustCalibrationSchema,
+  humanReviewTrustCalibrationResponseSchema,
   humanReviewLearningTopBlockersResponseSchema
 } from "./humanReviewLearning";
 
@@ -65,9 +67,34 @@ describe("human review learning contracts", () => {
   });
 
   it("accepts a normalized feedback event and rejects catalog mutation claims", () => {
-    expect(humanReviewLearningEventSchema.parse(baseEvent).eventId).toBe(
+    const parsed = humanReviewLearningEventSchema.parse(baseEvent);
+    expect(parsed.eventId).toBe(
       "hrl_hr_case_1_2026-04-30T10:00:00.000Z"
     );
+    expect(parsed.trustCalibration).toMatchObject({
+      version: "human-review-trust-calibration.v1",
+      calibrationId: "hrc_hr_case_1_2026-04-30T10:00:00.000Z",
+      action: "fail_closed_until_evidence_refresh",
+      applyToFutureAutomation: true,
+      sourceCatalogMutation: {
+        allowed: false,
+        applied: false
+      }
+    });
+
+    expect(
+      humanReviewTrustCalibrationSchema.safeParse({
+        ...parsed.trustCalibration,
+        applyToFutureAutomation: true,
+        status: "informational"
+      }).success
+    ).toBe(false);
+    expect(
+      humanReviewTrustCalibrationSchema.safeParse({
+        ...parsed.trustCalibration,
+        action: "informational_operator_note"
+      }).success
+    ).toBe(false);
 
     const mutated = {
       ...baseEvent,
@@ -122,6 +149,12 @@ describe("human review learning contracts", () => {
           changed: 0,
           unchanged: 1
         },
+        calibrationActionCounts: {
+          fail_closed_until_evidence_refresh: 1,
+          fail_closed_until_signal_capture: 0,
+          manual_policy_review_only: 0,
+          informational_operator_note: 0
+        },
         sourceCatalogMutationsApplied: 0
       }).totalEvents
     ).toBe(1);
@@ -160,5 +193,52 @@ describe("human review learning contracts", () => {
         ]
       }).blockers[0].count
     ).toBe(1);
+
+    expect(
+      humanReviewTrustCalibrationResponseSchema.parse({
+        generatedAt: "2026-05-01T09:00:00.000Z",
+        totalEvents: 2,
+        minOccurrences: 2,
+        recommendations: [
+          {
+            id: "cal_EVIDENCE_GATE:rule_1",
+            blockerId: "EVIDENCE_GATE:rule_1",
+            label: "Evidence gate заблокировал rule_1.",
+            rootCause: "stale_evidence",
+            rootCauseCounts: {
+              missing_evidence: 0,
+              stale_evidence: 2,
+              conflicting_evidence: 0,
+              missing_signal: 0,
+              policy_ambiguity: 0,
+              operator_override_only: 0
+            },
+            occurrences: 2,
+            severity: "high",
+            lastSeenAt: "2026-05-01T08:30:00.000Z",
+            confidenceImpact: {
+              averageDelta: -0.1,
+              negativeEvents: 2
+            },
+            action: "fail_closed_until_evidence_refresh",
+            actionLabel: "Оставить fail-closed до обновления источников",
+            rationale:
+              "2 повторяющихся закрытия HUMAN_REVIEW: источники устарели. Рекомендация только для операционного разбора, без автоматической правки каталогов.",
+            sourceEventIds: [
+              "hrl_hr_1_2026-05-01T08:00:00.000Z",
+              "hrl_hr_2_2026-05-01T08:30:00.000Z"
+            ],
+            safety: {
+              mode: "proposal_only",
+              sourceCatalogMutation: {
+                allowed: false,
+                applied: false
+              }
+            }
+          }
+        ],
+        emptyState: null
+      }).recommendations[0].safety.sourceCatalogMutation.applied
+    ).toBe(false);
   });
 });
