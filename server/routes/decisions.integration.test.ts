@@ -9,6 +9,19 @@ import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
 
 let app: Express;
 
+function markValidEvidenceFresh(): void {
+  const catalogs = getCatalogsOrThrow();
+  const refreshedAt = "2026-04-30T00:00:00.000Z";
+  for (const source of catalogs.sources) {
+    source.lastCheckedAt = refreshedAt;
+  }
+  for (const record of catalogs.ruleEvidence) {
+    if (record.evidenceStatus === "valid") {
+      record.lastVerifiedAt = refreshedAt;
+    }
+  }
+}
+
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
   remoteAddress = "127.0.0.1";
@@ -63,6 +76,7 @@ class MockSocket extends Duplex {
 
 beforeAll(async () => {
   app = await createApp();
+  markValidEvidenceFresh();
 });
 
 async function requestJson(

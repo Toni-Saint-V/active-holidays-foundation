@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Case, HumanReviewSnapshot } from "@shared/contracts";
+import type { Case, HumanReviewHandoff, HumanReviewSnapshot } from "@shared/contracts";
 import { CaseStore, initializeCaseStore, getCaseStore } from "./caseStore";
 import type { Catalogs } from "./catalogs";
 import {
@@ -59,6 +59,23 @@ function buildSnapshot(
   };
 }
 
+function buildHandoff(scenarioId: string): HumanReviewHandoff {
+  return {
+    source: "scenario_lab",
+    scenarioId,
+    scenarioTitle: `Сценарий ${scenarioId}`,
+    safetyStatus: "human_review_only",
+    evidenceStatus: "manual_only",
+    freshnessStatus: "stale",
+    blockingReason: null,
+    humanReviewReason: "Нужна ручная проверка сценария.",
+    operatorNextAction: "Проверить сценарий и вернуть честный next action.",
+    userNextActionLabel: "Открыть ручную проверку",
+    triggeredBy: ["no_helpful_scenarios"],
+    createdFromDecisionId: "dec_case_hr_1_1"
+  };
+}
+
 describe("CaseStore human review lifecycle", () => {
   it("reuses the active request without replacing its snapshot", () => {
     const store = new CaseStore(buildCatalogs(buildCase()));
@@ -90,6 +107,35 @@ describe("CaseStore human review lifecycle", () => {
     expect(second.request.contact).toBe("user@example.com");
   });
 
+  it("rejects a different scenario handoff while another handoff is active", () => {
+    const store = new CaseStore(buildCatalogs(buildCase()));
+
+    const first = store.createOrReuseHumanReview({
+      caseId: "case_hr_1",
+      request: {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Первый сценарий нужно проверить вручную."
+      },
+      snapshot: buildSnapshot("HUMAN_REVIEW"),
+      handoff: buildHandoff("human-review")
+    });
+
+    expect(first.reused).toBe(false);
+    expect(() =>
+      store.createOrReuseHumanReview({
+        caseId: "case_hr_1",
+        request: {
+          channel: "telegram",
+          contact: "@user",
+          message: "Другой сценарий не должен молча переиспользовать старый handoff."
+        },
+        snapshot: buildSnapshot("HUMAN_REVIEW"),
+        handoff: buildHandoff("stale-evidence")
+      })
+    ).toThrow(/already tracks scenario human-review/);
+  });
+
   it("blocks any mutation after a terminal state", () => {
     const store = new CaseStore(buildCatalogs(buildCase()));
     const created = store.createOrReuseHumanReview({
@@ -106,10 +152,14 @@ describe("CaseStore human review lifecycle", () => {
       requestId: created.request.id,
       status: "resolved",
       changedBy: "ops",
-      note: "Эксперт ответил."
+      note: "Эксперт ответил.",
+      resolution: {
+        summary: "Эксперт завершил проверку и зафиксировал решение."
+      }
     });
 
     expect(resolved.status).toBe("resolved");
+    expect(resolved.resolution?.summary).toContain("Эксперт завершил");
     expect(() =>
       store.transitionHumanReview({
         requestId: created.request.id,

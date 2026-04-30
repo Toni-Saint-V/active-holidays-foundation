@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { evidenceStatusSchema } from "./evidence";
+import { resultPayloadSchema } from "./result";
+import { freshnessStatusSchema } from "./trust";
 import { verdictSchema } from "./verdict";
 
 export const humanReviewStatusSchema = z.enum([
@@ -22,6 +25,37 @@ export type HumanReviewActor = z.infer<typeof humanReviewActorSchema>;
 export const humanReviewDurabilitySchema = z.enum(["volatile", "persisted"]);
 export type HumanReviewDurability = z.infer<typeof humanReviewDurabilitySchema>;
 
+export const humanReviewHandoffSafetyStatusSchema = z.enum([
+  "evidence_blocked",
+  "human_review_only"
+]);
+export type HumanReviewHandoffSafetyStatus = z.infer<
+  typeof humanReviewHandoffSafetyStatusSchema
+>;
+
+export const humanReviewHandoffSchema = z.object({
+  source: z.literal("scenario_lab"),
+  scenarioId: z.string().min(1),
+  scenarioTitle: z.string().min(1),
+  safetyStatus: humanReviewHandoffSafetyStatusSchema,
+  evidenceStatus: evidenceStatusSchema,
+  freshnessStatus: freshnessStatusSchema,
+  blockingReason: z.string().min(1).nullable(),
+  humanReviewReason: z.string().min(1),
+  operatorNextAction: z.string().min(1),
+  userNextActionLabel: z.string().min(1),
+  triggeredBy: z.array(z.string().min(1)),
+  createdFromDecisionId: z.string().min(1).nullable()
+});
+export type HumanReviewHandoff = z.infer<typeof humanReviewHandoffSchema>;
+
+export const humanReviewResolutionSchema = z.object({
+  summary: z.string().min(1).max(2000),
+  resolvedAt: z.string().datetime(),
+  changedBy: humanReviewActorSchema
+});
+export type HumanReviewResolution = z.infer<typeof humanReviewResolutionSchema>;
+
 export const humanReviewSnapshotSchema = z.object({
   decisionId: z.string().min(1).nullable(),
   verdict: verdictSchema,
@@ -33,7 +67,11 @@ export const humanReviewSnapshotSchema = z.object({
 });
 export type HumanReviewSnapshot = z.infer<typeof humanReviewSnapshotSchema>;
 
-export const humanReviewEventTypeSchema = z.enum(["submitted", "status_changed"]);
+export const humanReviewEventTypeSchema = z.enum([
+  "submitted",
+  "handoff_created",
+  "status_changed"
+]);
 export type HumanReviewEventType = z.infer<typeof humanReviewEventTypeSchema>;
 
 export const humanReviewEventSchema = z.object({
@@ -58,6 +96,8 @@ export const humanReviewRequestSchema = z.object({
   closedAt: z.string().datetime().nullable(),
   durability: humanReviewDurabilitySchema,
   snapshot: humanReviewSnapshotSchema,
+  handoff: humanReviewHandoffSchema.nullable().default(null),
+  resolution: humanReviewResolutionSchema.nullable().default(null),
   events: z.array(humanReviewEventSchema).min(1)
 });
 export type HumanReviewRequest = z.infer<typeof humanReviewRequestSchema>;
@@ -69,7 +109,8 @@ export const humanReviewCreateRequestSchema = z
   .object({
     channel: humanReviewChannelSchema,
     contact: z.string().min(3),
-    message: z.string().min(10)
+    message: z.string().min(10),
+    scenarioId: z.string().min(1).optional()
   })
   .strict();
 export type HumanReviewCreateRequest = z.infer<typeof humanReviewCreateRequestSchema>;
@@ -84,13 +125,37 @@ export const humanReviewTransitionRequestSchema = z
   .object({
     requestId: z.string().min(1),
     status: humanReviewStatusSchema,
-    note: z.string().min(1).max(2000).optional()
+    note: z.string().min(1).max(2000).optional(),
+    resolution: z
+      .object({
+        summary: z.string().min(1).max(2000)
+      })
+      .strict()
+      .optional()
   })
-  .strict();
+  .strict()
+  .superRefine((payload, ctx) => {
+    if (payload.status === "resolved" && !payload.resolution) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "resolution is required when resolving a human review request"
+      });
+    }
+    if (payload.status !== "resolved" && payload.resolution) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "resolution is only allowed for resolved human review requests"
+      });
+    }
+  });
 export type HumanReviewTransitionRequest = z.infer<typeof humanReviewTransitionRequestSchema>;
 
 export const humanReviewTransitionResponseSchema = z.object({
-  request: humanReviewRequestSchema
+  request: humanReviewRequestSchema,
+  result: resultPayloadSchema.nullable().optional(),
+  decisionRecordId: z.string().min(1).nullable().optional()
 });
 export type HumanReviewTransitionResponse = z.infer<typeof humanReviewTransitionResponseSchema>;
 

@@ -12,6 +12,8 @@ import type {
   Verdict,
   HumanReviewActor,
   HumanReviewCreateRequest,
+  HumanReviewHandoff,
+  HumanReviewResolution,
   HumanReviewRequest,
   HumanReviewSnapshot,
   HumanReviewStatus
@@ -49,6 +51,7 @@ export type CreateOrReuseHumanReviewInput = {
   caseId: string;
   request: HumanReviewCreateRequest;
   snapshot: HumanReviewSnapshot;
+  handoff?: HumanReviewHandoff | null;
   now?: Date;
 };
 
@@ -57,6 +60,7 @@ export type TransitionHumanReviewInput = {
   status: HumanReviewStatus;
   changedBy: HumanReviewActor;
   note?: string | null;
+  resolution?: Pick<HumanReviewResolution, "summary"> | null;
   now?: Date;
 };
 
@@ -76,6 +80,13 @@ const ALLOWED_HUMAN_REVIEW_TRANSITIONS: Record<
   resolved: [],
   cancelled: []
 };
+
+export class HumanReviewHandoffConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HumanReviewHandoffConflictError";
+  }
+}
 
 function migrateLegacyEntry(entry: DecisionLogEntry): DecisionRecord {
   const placeholder = `legacy:${entry.id}`;
@@ -371,6 +382,43 @@ export class CaseStore {
   ): { request: HumanReviewRequest; reused: boolean } {
     const existing = this.activeHumanReviewFor(input.caseId);
     if (existing) {
+      if (
+        existing.handoff &&
+        input.handoff &&
+        existing.handoff.scenarioId !== input.handoff.scenarioId
+      ) {
+        throw new HumanReviewHandoffConflictError(
+          `Active HumanReviewRequest ${existing.id} already tracks scenario ${existing.handoff.scenarioId}.`
+        );
+      }
+      if (!existing.handoff && input.handoff) {
+        const now = (input.now ?? new Date()).toISOString();
+        const enriched: HumanReviewRequest = {
+          ...existing,
+          handoff: structuredClone(input.handoff),
+          updatedAt: now,
+          events: [
+            ...existing.events,
+            {
+              id: `${existing.id}_handoff`,
+              at: now,
+              type: "handoff_created",
+              status: existing.status,
+              changedBy: "system",
+              note: input.handoff.humanReviewReason
+            }
+          ]
+        };
+        this.persistHumanReviewSnapshot(
+          this.humanReviews.map((request) =>
+            request.id === enriched.id
+              ? structuredClone(enriched)
+              : structuredClone(request)
+          )
+        );
+        this.replaceHumanReview(enriched);
+        return { request: structuredClone(enriched), reused: true };
+      }
       return { request: existing, reused: true };
     }
 
@@ -397,7 +445,21 @@ export class CaseStore {
       closedAt: null,
       durability: "persisted",
       snapshot: structuredClone(input.snapshot),
-      events: [event]
+      handoff: input.handoff ? structuredClone(input.handoff) : null,
+      resolution: null,
+      events: input.handoff
+        ? [
+            event,
+            {
+              id: `${requestId}_handoff`,
+              at: now,
+              type: "handoff_created" as const,
+              status: "submitted" as const,
+              changedBy: "system" as const,
+              note: input.handoff.humanReviewReason
+            }
+          ]
+        : [event]
     };
     this.persistHumanReviewSnapshot([...this.humanReviews, structuredClone(request)]);
     this.appendHumanReview(request);
@@ -412,6 +474,16 @@ export class CaseStore {
     if (isHumanReviewTerminalStatus(existing.status)) {
       throw new Error(`HumanReviewRequest ${input.requestId} уже закрыт и не может меняться.`);
     }
+    if (input.status === "resolved" && !input.resolution && !existing.resolution) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} требует resolution payload перед закрытием.`
+      );
+    }
+    if (input.status !== "resolved" && input.resolution) {
+      throw new Error(
+        `Resolution payload допустим только для resolved HumanReviewRequest ${input.requestId}.`
+      );
+    }
     if (existing.status === input.status) {
       return structuredClone(existing);
     }
@@ -422,11 +494,20 @@ export class CaseStore {
     }
 
     const now = (input.now ?? new Date()).toISOString();
+    const resolution =
+      input.status === "resolved" && input.resolution
+        ? {
+            summary: input.resolution.summary,
+            resolvedAt: now,
+            changedBy: input.changedBy
+          }
+        : existing.resolution;
     const next: HumanReviewRequest = {
       ...existing,
       status: input.status,
       updatedAt: now,
       closedAt: isHumanReviewTerminalStatus(input.status) ? now : null,
+      resolution,
       events: [
         ...existing.events,
         {

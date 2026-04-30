@@ -222,7 +222,10 @@ describe("human review HTTP surface", () => {
     const resolved = await requestJson("POST", "/api/cases/s1-rf-italy/human-review/transition", {
       requestId: created.json.request.id,
       status: "resolved",
-      note: "Проверка завершена."
+      note: "Проверка завершена.",
+      resolution: {
+        summary: "Оператор завершил проверку и подтвердил следующий безопасный шаг."
+      }
     }, app, {
       "x-active-holidays-internal-token": INTERNAL_API_TOKEN
     });
@@ -239,6 +242,36 @@ describe("human review HTTP surface", () => {
     });
     expect(invalid.status).toBe(409);
     expect(invalid.json.error).toBe("human_review_invalid_transition");
+  });
+
+  it("returns a recomputed canonical result when operator resolves a scenario handoff", async () => {
+    const created = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
+      channel: "email",
+      contact: "resolution@example.com",
+      message: "Нужно проверить human-review-only сценарий и вернуть честный итог.",
+      scenarioId: "human-review"
+    });
+
+    expect(created.status).toBe(200);
+    expect(created.json.request.handoff.scenarioId).toBe("human-review");
+
+    const resolved = await requestJson("POST", "/api/cases/s2-tr-spb/human-review/transition", {
+      requestId: created.json.request.id,
+      status: "resolved",
+      note: "Оператор проверил кейс. Автоматический совет не выдаём.",
+      resolution: {
+        summary: "Проверка завершена: кейс остаётся только для ручного сопровождения."
+      }
+    }, app, {
+      "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+    });
+
+    expect(resolved.status).toBe(200);
+    expect(resolved.json.request.status).toBe("resolved");
+    expect(resolved.json.request.resolution.summary).toContain("Проверка завершена");
+    expect(resolved.json.result.version).toBe("rdc.v1");
+    expect(resolved.json.result.caseId).toBe("s2-tr-spb");
+    expect(resolved.json.decisionRecordId).toMatch(/^dec_s2-tr-spb_\d+$/);
   });
 
   it("rejects transition requests without the internal token", async () => {

@@ -1,11 +1,16 @@
 import type { Express } from "express";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
 import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
 
 let app: Express;
+let humanReviewTempDir: string;
+const previousHumanReviewsFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
 
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
@@ -60,7 +65,23 @@ class MockSocket extends Duplex {
 }
 
 beforeAll(async () => {
+  humanReviewTempDir = await mkdtemp(path.join(tmpdir(), "ah-scenario-lab-hr-"));
+  process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+    humanReviewTempDir,
+    "human-reviews.json"
+  );
   app = await createApp();
+});
+
+afterAll(async () => {
+  if (previousHumanReviewsFile) {
+    process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousHumanReviewsFile;
+  } else {
+    delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+  }
+  if (humanReviewTempDir) {
+    await rm(humanReviewTempDir, { recursive: true, force: true });
+  }
 });
 
 async function requestJson(
@@ -126,9 +147,29 @@ async function postJson(path: string, body?: unknown) {
   return requestJson("POST", path, body);
 }
 
+async function withFreshEvidence<T>(run: () => Promise<T>): Promise<T> {
+  const catalogs = structuredClone(await loadCatalogs());
+  for (const record of catalogs.ruleEvidence) {
+    if (record.evidenceStatus === "valid") {
+      record.lastVerifiedAt = "2026-04-30T00:00:00.000Z";
+    }
+  }
+  for (const source of catalogs.sources) {
+    source.lastCheckedAt = "2026-04-30T00:00:00.000Z";
+  }
+  const restore = replaceCatalogsForTest(catalogs);
+  try {
+    return await run();
+  } finally {
+    restore();
+  }
+}
+
 describe("scenario lab HTTP surface", () => {
   it("returns evidence-aware concierge scenarios for a recoverable case", async () => {
-    const response = await getJson("/api/cases/s1-rf-italy/scenario-lab");
+    const response = await withFreshEvidence(() =>
+      getJson("/api/cases/s1-rf-italy/scenario-lab")
+    );
 
     expect(response.status).toBe(200);
     expect(response.json.scenarios.length).toBeGreaterThanOrEqual(2);
@@ -202,23 +243,25 @@ describe("scenario lab HTTP surface", () => {
   });
 
   it("creates a scenario fork, compares it with the baseline, and records the decision", async () => {
-    const compare = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
-      title: "S1 — страховка и комплект документов готовы",
-      signals: [
-        {
-          id: "insurance_ok",
-          value: true,
-          source: "override",
-          capturedAt: "2026-04-18T10:00:00.000Z"
-        },
-        {
-          id: "documents_ready_count",
-          value: 7,
-          source: "override",
-          capturedAt: "2026-04-18T10:00:00.000Z"
-        }
-      ]
-    });
+    const compare = await withFreshEvidence(() =>
+      postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+        title: "S1 — страховка и комплект документов готовы",
+        signals: [
+          {
+            id: "insurance_ok",
+            value: true,
+            source: "override",
+            capturedAt: "2026-04-18T10:00:00.000Z"
+          },
+          {
+            id: "documents_ready_count",
+            value: 7,
+            source: "override",
+            capturedAt: "2026-04-18T10:00:00.000Z"
+          }
+        ]
+      })
+    );
 
     expect(compare.status).toBe(200);
     expect(compare.json.rootCaseId).toBe("s1-rf-italy");
@@ -316,5 +359,103 @@ describe("scenario lab HTTP surface", () => {
     expect(response.json.scenarios[0].safetyStatus).toBe("human_review_only");
     expect(response.json.scenarios[0].plan.humanReviewRequired).toBe(true);
     expect(response.json.scenarios[0].nextAction.targetScreen).toBe("human-review");
+  });
+
+  it("creates a deterministic human-review handoff from a human-review-only scenario", async () => {
+    const lab = await getJson("/api/cases/s3-us-spb-business/scenario-lab");
+    const scenarioId = lab.json.scenarios[0].id;
+
+    const created = await postJson("/api/cases/s3-us-spb-business/human-review", {
+      channel: "email",
+      contact: "scenario-user@example.com",
+      message: "Передайте этот сценарий менеджеру без автоматических обещаний.",
+      scenarioId
+    });
+
+    expect(created.status).toBe(200);
+    expect(created.json.reused).toBe(false);
+    expect(created.json.request.handoff).toMatchObject({
+      source: "scenario_lab",
+      scenarioId,
+      scenarioTitle: lab.json.scenarios[0].title,
+      safetyStatus: "human_review_only",
+      evidenceStatus: lab.json.scenarios[0].evidenceStatus,
+      freshnessStatus: lab.json.scenarios[0].freshnessStatus
+    });
+    expect(created.json.request.handoff.createdFromDecisionId).toEqual(expect.any(String));
+    expect(created.json.request.handoff.humanReviewReason).toEqual(
+      lab.json.scenarios[0].humanReviewReason
+    );
+    expect(created.json.request.handoff.operatorNextAction).toContain("ручн");
+    expect(
+      created.json.request.events.some(
+        (event: { type: string }) => event.type === "handoff_created"
+      )
+    ).toBe(true);
+
+    const duplicate = await postJson("/api/cases/s3-us-spb-business/human-review", {
+      channel: "telegram",
+      contact: "@scenario_user",
+      message: "Повторная отправка того же сценария должна переиспользовать кейс.",
+      scenarioId
+    });
+
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.json.reused).toBe(true);
+    expect(duplicate.json.request.id).toBe(created.json.request.id);
+    expect(duplicate.json.request.handoff.scenarioId).toBe(scenarioId);
+  });
+
+  it("rejects human-review handoff for a safe automatic scenario", async () => {
+    const response = await withFreshEvidence(async () => {
+      const lab = await getJson("/api/cases/s1-rf-italy/scenario-lab");
+      const safe = lab.json.scenarios.find(
+        (scenario: { safetyStatus: string }) => scenario.safetyStatus === "safe_automatic"
+      );
+      expect(safe).toBeTruthy();
+      if (!safe) return { status: 500, json: { error: "missing_safe_scenario" } };
+
+      return postJson("/api/cases/s1-rf-italy/human-review", {
+        channel: "email",
+        contact: "safe-scenario@example.com",
+        message: "Этот безопасный сценарий не должен создавать handoff.",
+        scenarioId: safe.id
+      });
+    });
+
+    expect(response.status).toBe(409);
+    expect(response.json.error).toBe("scenario_handoff_not_required");
+  });
+
+  it("preserves stale evidence reason in scenario handoff", async () => {
+    const catalogs = structuredClone(await loadCatalogs());
+    const staleRecord = catalogs.ruleEvidence.find(
+      (record) => record.ruleId === "R02" && record.countryOrScope === "RU->IT"
+    );
+    expect(staleRecord).toBeDefined();
+    if (!staleRecord) return;
+    staleRecord.lastVerifiedAt = "2025-01-01T00:00:00.000Z";
+
+    const restore = replaceCatalogsForTest(catalogs);
+    try {
+      const lab = await getJson("/api/cases/s1-rf-italy/scenario-lab");
+      const scenarioId = lab.json.scenarios[0].id;
+      const response = await postJson("/api/cases/s1-rf-italy/human-review", {
+        channel: "email",
+        contact: "stale-evidence@example.com",
+        message: "Проверьте сценарий с устаревшими источниками вручную.",
+        scenarioId
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.json.request.handoff.scenarioId).toBe(scenarioId);
+      expect(response.json.request.handoff.safetyStatus).toBe("evidence_blocked");
+      expect(response.json.request.handoff.evidenceStatus).toBe("stale");
+      expect(response.json.request.handoff.freshnessStatus).toBe("stale");
+      expect(response.json.request.handoff.blockingReason).toContain("R02");
+      expect(response.json.request.handoff.humanReviewReason).toContain("EVIDENCE_GATE");
+    } finally {
+      restore();
+    }
   });
 });
