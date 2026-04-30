@@ -10,6 +10,7 @@ import {
 import { productTypeSchema } from "./product";
 import { resultPayloadSchema } from "./result";
 import { verdictSchema } from "./verdict";
+import { humanReviewLearningIngestResponseSchema } from "./humanReviewLearning";
 
 export const humanReviewOpsCapabilitiesSchema = z.object({
   terminalResolve: z.literal("transition_only"),
@@ -115,6 +116,37 @@ export const humanReviewOpsActionSchema = z.object({
 });
 export type HumanReviewOpsAction = z.infer<typeof humanReviewOpsActionSchema>;
 
+export const humanReviewOpsActionRequestSchema = z
+  .object({
+    actionId: z.string().min(1),
+    transitionStatus: humanReviewOpsActionSchema.shape.transitionStatus,
+    note: z.string().min(1).max(2000).optional(),
+    resolution: z
+      .object({
+        summary: z.string().min(1).max(2000)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .superRefine((payload, ctx) => {
+    if (payload.transitionStatus === "resolved" && !payload.resolution) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "resolution is required when resolving from ops workbench"
+      });
+    }
+    if (payload.transitionStatus !== "resolved" && payload.resolution) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "resolution is only allowed for resolved ops workbench actions"
+      });
+    }
+  });
+export type HumanReviewOpsActionRequest = z.infer<typeof humanReviewOpsActionRequestSchema>;
+
 const allowedOpsActionStatusesByRequestStatus: Record<
   HumanReviewStatus,
   readonly HumanReviewStatus[]
@@ -184,4 +216,13 @@ export const humanReviewOpsDetailResponseSchema = z.object({
 });
 export type HumanReviewOpsDetailResponse = z.infer<
   typeof humanReviewOpsDetailResponseSchema
+>;
+
+export const humanReviewOpsActionResponseSchema = humanReviewOpsDetailResponseSchema.extend({
+  action: humanReviewOpsActionSchema,
+  decisionRecordId: z.string().min(1).nullable(),
+  learningFeedback: humanReviewLearningIngestResponseSchema.nullable()
+});
+export type HumanReviewOpsActionResponse = z.infer<
+  typeof humanReviewOpsActionResponseSchema
 >;
