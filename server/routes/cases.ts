@@ -5,6 +5,7 @@ import {
   caseSignalsSchema,
   humanReviewCreateRequestSchema,
   humanReviewCreateResponseSchema,
+  humanReviewCasePacketResponseSchema,
   humanReviewResponseSchema,
   humanReviewTransitionRequestSchema,
   humanReviewTransitionResponseSchema,
@@ -21,6 +22,7 @@ import {
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore, HumanReviewHandoffConflictError } from "../lib/caseStore";
 import { buildDecisionScenarioLab } from "../lib/decisionScenarioLab";
+import { buildHumanReviewCasePacket } from "../lib/humanReviewCasePacket";
 import {
   buildRecommendationDetail,
   buildRecommendationShortlist,
@@ -352,6 +354,21 @@ export function casesRouter(): Router {
     const caseData = requireCase(getId(req));
     const request = getCaseStore().latestHumanReviewFor(caseData.id);
     res.json(humanReviewResponseSchema.parse({ request }));
+  });
+
+  router.get("/:id/human-review/packet", validateParams(caseIdParams), (req, res) => {
+    const caseData = requireCase(getId(req));
+    const request = getCaseStore().activeHumanReviewFor(caseData.id);
+    if (!request) {
+      throw new HttpError(
+        404,
+        `Для кейса ${caseData.id} нет активного запроса ручной проверки.`,
+        "human_review_packet_not_found"
+      );
+    }
+    const result = computeResult(caseData);
+    const packet = buildHumanReviewCasePacket({ caseData, request, result });
+    res.json(humanReviewCasePacketResponseSchema.parse({ packet }));
   });
 
   router.post(

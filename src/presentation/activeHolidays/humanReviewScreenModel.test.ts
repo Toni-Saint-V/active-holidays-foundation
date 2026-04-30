@@ -3,6 +3,7 @@ import type {
   AuditTrail,
   DecisionLogEntry,
   HumanReviewRequest,
+  HumanReviewCasePacket,
   ResultPayload
 } from "@shared/contracts";
 import { buildHumanReviewScreenModel } from "./humanReviewScreenModel";
@@ -134,6 +135,72 @@ function createRequest(overrides: Partial<HumanReviewRequest> = {}): HumanReview
   };
 }
 
+function createPacket(overrides: Partial<HumanReviewCasePacket> = {}): HumanReviewCasePacket {
+  const result = createResult();
+  const request = createRequest();
+  return {
+    version: "human-review-packet.v1",
+    generatedAt: "2026-04-21T00:35:00.000Z",
+    case: {
+      id: result.caseId,
+      title: "S5 · страховка",
+      productType: result.productType,
+      updatedAt: "2026-04-21T00:45:00.000Z"
+    },
+    request,
+	    submittedSnapshot: request.snapshot,
+	    currentResult: {
+	      verdict: result.verdict,
+	      confidence: result.trust.confidence,
+	      computedAt: result.computedAt,
+	      nextAction: result.nextAction
+	    },
+	    resultDrift: {
+	      changed: false,
+	      verdictChanged: false,
+	      confidenceDelta: 0,
+	      computedAtChanged: false,
+	      lastCheckedAtChanged: false,
+	      nextActionChanged: false
+	    },
+    reviewReason: "Оператор должен проверить evidence gate.",
+    evidence: {
+      evidenceStatus: "conflicting",
+      freshnessStatus: "fresh",
+      blockingReason: "Источники конфликтуют.",
+      humanReviewReason: "Evidence gate требует ручной проверки.",
+      lastCheckedAt: "2026-04-21T00:00:00.000Z"
+    },
+    scenario: {
+      id: "human-review",
+      title: "Передать кейс в ручную проверку",
+      safetyStatus: "evidence_blocked",
+      evidenceStatus: "conflicting",
+      freshnessStatus: "fresh",
+	      blockingReason: "Источники конфликтуют.",
+	      humanReviewReason: "Evidence gate требует ручной проверки.",
+	      operatorNextAction: "Оператор должен проверить evidence gate до любого вывода.",
+	      nextActionLabel: "Открыть ручную проверку"
+	    },
+    operatorChecklist: [
+      {
+        id: "evidence-gate",
+        title: "Проверить доказательную базу",
+        detail: "Источники конфликтуют.",
+        priority: "critical",
+        source: "evidence"
+      }
+    ],
+    documentsToInspect: [],
+    riskSummary: {
+      criticalRisk: null,
+      risks: []
+    },
+    doNotAutoDecideNotes: ["Не обещать пользователю результат до решения оператора."],
+    ...overrides
+  };
+}
+
 function createAudit(): { trail: AuditTrail; decisions: DecisionLogEntry[] } {
   return {
     trail: createResult().auditTrail,
@@ -199,5 +266,25 @@ describe("buildHumanReviewScreenModel", () => {
     expect(model.mode).toBe("loading");
     expect(model.loadingState?.title).toContain("Проверяем");
     expect(model.submitForm).toBeNull();
+  });
+
+  it("adapts the operator handoff packet without changing UI composition", () => {
+    const model = buildHumanReviewScreenModel({
+      result: createResult(),
+      caseUpdatedAt: "2026-04-21T00:45:00.000Z",
+      request: createRequest(),
+      packet: createPacket(),
+      audit: null,
+      humanReviewStatus: "ready"
+    });
+
+    expect(model.packetSection).toMatchObject({
+      heading: "Пакет для оператора",
+      reviewReason: "Оператор должен проверить evidence gate.",
+      evidenceLabel: "Источники: конфликтуют, актуальность: актуальные",
+      scenarioLabel: "Передать кейс в ручную проверку · заблокирован доказательной базой"
+    });
+    expect(model.packetSection?.checklist[0]?.priority).toBe("critical");
+    expect(model.packetSection?.doNotAutoDecideNotes[0]).toContain("Не обещать");
   });
 });

@@ -1,6 +1,11 @@
 import { z } from "zod";
+import { nextActionSchema } from "./action";
+import { productTypeSchema } from "./product";
+import { documentsReadinessItemSchema } from "./result";
 import { evidenceStatusSchema } from "./evidence";
+import { riskSchema } from "./risk";
 import { resultPayloadSchema } from "./result";
+import { scenarioSafetyStatusSchema } from "./scenario";
 import { freshnessStatusSchema } from "./trust";
 import { verdictSchema } from "./verdict";
 
@@ -163,6 +168,86 @@ export const humanReviewResponseSchema = z.object({
   request: humanReviewRequestSchema.nullable()
 });
 export type HumanReviewResponse = z.infer<typeof humanReviewResponseSchema>;
+
+export const humanReviewCasePacketChecklistPrioritySchema = z.enum([
+  "critical",
+  "high",
+  "medium"
+]);
+export type HumanReviewCasePacketChecklistPriority = z.infer<
+  typeof humanReviewCasePacketChecklistPrioritySchema
+>;
+
+export const humanReviewCasePacketSchema = z.object({
+  version: z.literal("human-review-packet.v1"),
+  generatedAt: z.string().datetime(),
+  case: z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    productType: productTypeSchema,
+    updatedAt: z.string().datetime()
+  }),
+  request: humanReviewRequestSchema,
+  submittedSnapshot: humanReviewSnapshotSchema,
+  currentResult: z.object({
+    verdict: verdictSchema,
+    confidence: z.number().min(0).max(1),
+    computedAt: z.string().datetime(),
+    nextAction: nextActionSchema
+  }),
+  resultDrift: z.object({
+    changed: z.boolean(),
+    verdictChanged: z.boolean(),
+    confidenceDelta: z.number(),
+    computedAtChanged: z.boolean(),
+    lastCheckedAtChanged: z.boolean(),
+    nextActionChanged: z.boolean()
+  }),
+  reviewReason: z.string().min(1),
+  evidence: z.object({
+    evidenceStatus: evidenceStatusSchema,
+    freshnessStatus: freshnessStatusSchema,
+    blockingReason: z.string().min(1).nullable(),
+    humanReviewReason: z.string().min(1).nullable(),
+    lastCheckedAt: z.string().datetime()
+  }),
+  scenario: z
+    .object({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      safetyStatus: scenarioSafetyStatusSchema,
+      evidenceStatus: evidenceStatusSchema,
+      freshnessStatus: freshnessStatusSchema,
+      blockingReason: z.string().min(1).nullable(),
+      humanReviewReason: z.string().min(1),
+      operatorNextAction: z.string().min(1),
+      nextActionLabel: z.string().min(1)
+    })
+    .nullable(),
+  operatorChecklist: z.array(
+    z.object({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      detail: z.string().min(1),
+      priority: humanReviewCasePacketChecklistPrioritySchema,
+      source: z.enum(["evidence", "documents", "risk", "scenario", "request"])
+    })
+  ),
+  documentsToInspect: z.array(documentsReadinessItemSchema),
+  riskSummary: z.object({
+    criticalRisk: riskSchema.nullable(),
+    risks: z.array(riskSchema)
+  }),
+  doNotAutoDecideNotes: z.array(z.string().min(1))
+});
+export type HumanReviewCasePacket = z.infer<typeof humanReviewCasePacketSchema>;
+
+export const humanReviewCasePacketResponseSchema = z.object({
+  packet: humanReviewCasePacketSchema
+});
+export type HumanReviewCasePacketResponse = z.infer<
+  typeof humanReviewCasePacketResponseSchema
+>;
 
 export function isHumanReviewTerminalStatus(status: HumanReviewStatus): status is HumanReviewTerminalStatus {
   return status === "resolved" || status === "cancelled";

@@ -2,6 +2,7 @@ import type {
   AuditTrail,
   DecisionLogEntry,
   HumanReviewChannel,
+  HumanReviewCasePacket,
   HumanReviewRequest,
   ResultPayload,
   RuleResult
@@ -112,6 +113,17 @@ export type HumanReviewScreenModel = {
         }>;
       }
     | null;
+  packetSection:
+    | {
+        heading: string;
+        reviewReason: string;
+        evidenceLabel: string;
+        scenarioLabel: string | null;
+        checklist: HumanReviewCasePacket["operatorChecklist"];
+        documentsToInspect: HumanReviewCasePacket["documentsToInspect"];
+        doNotAutoDecideNotes: string[];
+      }
+    | null;
 };
 
 function openRequest(request: HumanReviewRequest | null): HumanReviewRequest | null {
@@ -155,16 +167,39 @@ function warningRows(ruleResults: RuleResult[]) {
     }));
 }
 
+const EVIDENCE_STATUS_LABELS: Record<HumanReviewCasePacket["evidence"]["evidenceStatus"], string> = {
+  valid: "проверены",
+  stale: "устарели",
+  missing: "не хватает",
+  conflicting: "конфликтуют",
+  manual_only: "только ручная проверка"
+};
+
+const FRESHNESS_STATUS_LABELS: Record<HumanReviewCasePacket["evidence"]["freshnessStatus"], string> = {
+  fresh: "актуальные",
+  stale: "устарели",
+  unknown: "неизвестна"
+};
+
+const SCENARIO_SAFETY_LABELS: Record<NonNullable<HumanReviewCasePacket["scenario"]>["safetyStatus"], string> = {
+  safe_automatic: "можно обработать автоматически",
+  degraded_usable: "можно использовать с ограничениями",
+  evidence_blocked: "заблокирован доказательной базой",
+  human_review_only: "только ручная проверка"
+};
+
 export function buildHumanReviewScreenModel({
   result,
   caseUpdatedAt,
   request,
+  packet,
   audit,
   humanReviewStatus
 }: {
   result: ResultPayload;
   caseUpdatedAt: string;
   request: HumanReviewRequest | null;
+  packet?: HumanReviewCasePacket | null;
   audit: AuditSnapshot | null;
   humanReviewStatus: "idle" | "loading" | "ready" | "error";
 }): HumanReviewScreenModel {
@@ -314,6 +349,21 @@ export function buildHumanReviewScreenModel({
               label: `${formatDate(entry.recordedAt)} · ${entry.summary}`
             }))
           }
-        : null
+        : null,
+    packetSection: packet
+      ? {
+          heading: "Пакет для оператора",
+          reviewReason: packet.reviewReason,
+          evidenceLabel: `Источники: ${
+            EVIDENCE_STATUS_LABELS[packet.evidence.evidenceStatus]
+          }, актуальность: ${FRESHNESS_STATUS_LABELS[packet.evidence.freshnessStatus]}`,
+          scenarioLabel: packet.scenario
+            ? `${packet.scenario.title} · ${SCENARIO_SAFETY_LABELS[packet.scenario.safetyStatus]}`
+            : null,
+          checklist: packet.operatorChecklist,
+          documentsToInspect: packet.documentsToInspect,
+          doNotAutoDecideNotes: packet.doNotAutoDecideNotes
+        }
+      : null
   };
 }
