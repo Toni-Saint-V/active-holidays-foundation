@@ -26,6 +26,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run build` — client build
 - `npm run test` — unit tests
 - `npm run typecheck` — TypeScript check
+- `npm run verify:local` — local merge gate while GitHub Actions are unavailable
 - `npm run verify:agent-stack` — OpenAI Responses API + LangGraph + Tavily + memory DB smoke check
 - `npm run verify:engine` — deterministic scenario drift gate
 - `npm run autonomous:next` — select the current safe autonomous task
@@ -194,6 +195,8 @@ Key entrypoints:
 
 ## Verification Baseline
 
+- GitHub Actions are not an automatic PR/push gate while the account is locked by billing. Treat remote CI red checks with `steps: []` and `runner_name: ""` as billing lock, not code failure.
+- Before merging PRs, run `npm run verify:local` and paste the command result into the PR body.
 - run `npm run typecheck`, `npm run test`, and `npm run build` before closing substantial work
 - run `npm run verify:engine` for engine/rule/result-contract changes
 - run `npm run skills:verify` plus the existing Codex checks after changing `.codex/skills`
