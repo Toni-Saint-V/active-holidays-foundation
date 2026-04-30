@@ -6,6 +6,7 @@ import { createApp } from "../index";
 import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
+import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 
@@ -78,6 +79,8 @@ beforeAll(async () => {
   app = await createApp();
   markValidEvidenceFresh();
 });
+
+installStableRouteTestClock();
 
 async function requestJson(
   method: "GET" | "POST",

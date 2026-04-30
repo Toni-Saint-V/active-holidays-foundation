@@ -7,6 +7,7 @@ import path from "node:path";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
 import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 let humanReviewTempDir: string;
@@ -72,6 +73,8 @@ beforeAll(async () => {
   );
   app = await createApp();
 });
+
+installStableRouteTestClock();
 
 afterAll(async () => {
   if (previousHumanReviewsFile) {
