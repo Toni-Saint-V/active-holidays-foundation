@@ -118,6 +118,8 @@ function createRequest(overrides: Partial<HumanReviewRequest> = {}): HumanReview
       nextActionLabel: "Передать кейс менеджеру",
       summary: "Автомат не может честно подтвердить маршрут."
     },
+    handoff: null,
+    resolution: null,
     events: [
       {
         id: "event-1",

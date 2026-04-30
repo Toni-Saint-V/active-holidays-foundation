@@ -15,10 +15,11 @@ import {
   type Case,
   type CaseSignals,
   type DecisionKind,
+  type HumanReviewHandoff,
   type HumanReviewSnapshot
 } from "@shared/contracts";
 import { getCatalogsOrThrow } from "../lib/catalogs";
-import { getCaseStore } from "../lib/caseStore";
+import { getCaseStore, HumanReviewHandoffConflictError } from "../lib/caseStore";
 import { buildDecisionScenarioLab } from "../lib/decisionScenarioLab";
 import {
   buildRecommendationDetail,
@@ -68,9 +69,9 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
   };
 }
 
-function computeResult(caseData: Case) {
+function computeResult(caseData: Case, catalogs = orchestratorCatalogs()) {
   return runDecision(
-    { case: caseData, catalogs: orchestratorCatalogs() },
+    { case: caseData, catalogs },
     { now: () => new Date() }
   );
 }
@@ -89,6 +90,73 @@ function buildHumanReviewSnapshot(caseData: Case): HumanReviewSnapshot {
       result.verdict === "HUMAN_REVIEW"
         ? "Автомат не подтвердил маршрут. Нужна ручная проверка."
         : `Следующий шаг по кейсу: ${result.nextAction.label}.`
+  };
+}
+
+function buildScenarioHumanReviewHandoff(
+  caseData: Case,
+  scenarioId: string,
+  catalogs: OrchestratorCatalogs,
+  result = computeResult(caseData, catalogs)
+): HumanReviewHandoff {
+  const lab = buildDecisionScenarioLab(caseData, catalogs, result);
+  const scenario = lab.scenarios.find((candidate) => candidate.id === scenarioId);
+  if (!scenario) {
+    throw new HttpError(
+      404,
+      `Сценарий ${scenarioId} не найден для кейса ${caseData.id}.`,
+      "scenario_not_found"
+    );
+  }
+
+  const requiresHumanReview =
+    scenario.safetyStatus === "evidence_blocked" ||
+    scenario.safetyStatus === "human_review_only" ||
+    scenario.plan.humanReviewRequired ||
+    scenario.nextAction.type === "send_for_review";
+  if (!requiresHumanReview) {
+    throw new HttpError(
+      409,
+      "Этот сценарий можно отработать без ручной проверки; handoff не создаётся.",
+      "scenario_handoff_not_required"
+    );
+  }
+
+  const humanReviewReason =
+    scenario.humanReviewReason ??
+    scenario.plan.humanReviewReason ??
+    scenario.blockingReason ??
+    scenario.nextAction.detail;
+  const operatorNextAction = [
+    "Оператор должен проверить причины блокировки сценария.",
+    `Причина: ${humanReviewReason}`,
+    `Следующий безопасный шаг для пользователя: ${scenario.nextAction.label}.`
+  ].join(" ");
+  const decisionRecord = getCaseStore().snapshotDecisionRecord({
+    case: caseData,
+    catalogs,
+    result,
+    summary: `База для handoff сценария ${scenario.id} в ручную проверку.`,
+    kind: "recompute",
+    changedSignalIds: []
+  });
+
+  return {
+    source: "scenario_lab",
+    scenarioId: scenario.id,
+    scenarioTitle: scenario.title,
+    safetyStatus:
+      scenario.safetyStatus === "evidence_blocked"
+        ? "evidence_blocked"
+        : "human_review_only",
+    evidenceStatus: scenario.evidenceStatus,
+    freshnessStatus: scenario.freshnessStatus,
+    blockingReason: scenario.blockingReason,
+    humanReviewReason,
+    operatorNextAction,
+    userNextActionLabel: scenario.nextAction.label,
+    triggeredBy: scenario.nextAction.triggeredBy,
+    createdFromDecisionId: decisionRecord.decisionId
   };
 }
 
@@ -293,12 +361,25 @@ export function casesRouter(): Router {
     (req, res) => {
       const caseData = requireCase(getId(req));
       const payload = humanReviewCreateRequestSchema.parse(req.body);
-      const response = getCaseStore().createOrReuseHumanReview({
-        caseId: caseData.id,
-        request: payload,
-        snapshot: buildHumanReviewSnapshot(caseData)
-      });
-      res.json(humanReviewCreateResponseSchema.parse(response));
+      const catalogs = orchestratorCatalogs();
+      const result = computeResult(caseData, catalogs);
+      const handoff = payload.scenarioId
+        ? buildScenarioHumanReviewHandoff(caseData, payload.scenarioId, catalogs, result)
+        : null;
+      try {
+        const response = getCaseStore().createOrReuseHumanReview({
+          caseId: caseData.id,
+          request: payload,
+          snapshot: buildHumanReviewSnapshot(caseData),
+          handoff
+        });
+        res.json(humanReviewCreateResponseSchema.parse(response));
+      } catch (error) {
+        if (error instanceof HumanReviewHandoffConflictError) {
+          throw new HttpError(409, error.message, "human_review_handoff_conflict");
+        }
+        throw error;
+      }
     }
   );
 
@@ -331,9 +412,33 @@ export function casesRouter(): Router {
           requestId: payload.requestId,
           status: payload.status,
           changedBy: "system",
-          note: payload.note ?? null
+          note: payload.note ?? null,
+          resolution: payload.resolution ?? null
         });
-        res.json(humanReviewTransitionResponseSchema.parse({ request: next }));
+        if (payload.status === "resolved") {
+          const { result, record } = recordDecision(
+            caseData,
+            `Ручная проверка ${payload.requestId} завершена; результат пересчитан без новых предположений.`,
+            "recompute",
+            { changedSignalIds: [] }
+          );
+          res.json(
+            humanReviewTransitionResponseSchema.parse({
+              request: next,
+              result,
+              decisionRecordId: record.decisionId
+            })
+          );
+          return;
+        }
+
+        res.json(
+          humanReviewTransitionResponseSchema.parse({
+            request: next,
+            result: null,
+            decisionRecordId: null
+          })
+        );
       } catch (error) {
         throw new HttpError(
           409,

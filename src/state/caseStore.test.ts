@@ -125,6 +125,8 @@ function createHumanReviewRequest(
       nextActionLabel: "Передать кейс менеджеру",
       summary: "Автомат не может честно закрыть неоднозначность."
     },
+    handoff: null,
+    resolution: null,
     events: [
       {
         id: "event-1",

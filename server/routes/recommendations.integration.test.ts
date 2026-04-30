@@ -29,14 +29,8 @@ let app: Express;
 let server: Server;
 let baseUrl = "";
 const previousApiKey = process.env.OPENAI_API_KEY;
-const insuranceSourceIds = [
-  "src_alfa_insurance",
-  "src_ingos",
-  "src_sogaz",
-  "src_tinkoff",
-  "src_rosgosstrakh"
-];
-let originalInsuranceSourceChecks: Map<string, string> | null = null;
+let originalSourceChecks: Map<string, string> | null = null;
+let originalRuleEvidenceChecks: Map<number, string | null> | null = null;
 
 beforeAll(async () => {
   delete process.env.OPENAI_API_KEY;
@@ -51,15 +45,19 @@ beforeAll(async () => {
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
   const catalogs = getCatalogsOrThrow();
-  originalInsuranceSourceChecks = new Map(
-    catalogs.sources
-      .filter((source) => insuranceSourceIds.includes(source.id))
-      .map((source) => [source.id, source.lastCheckedAt])
+  originalSourceChecks = new Map(
+    catalogs.sources.map((source) => [source.id, source.lastCheckedAt])
+  );
+  originalRuleEvidenceChecks = new Map(
+    catalogs.ruleEvidence.map((record, index) => [index, record.lastVerifiedAt])
   );
   const refreshedAt = new Date().toISOString();
   for (const source of catalogs.sources) {
-    if (insuranceSourceIds.includes(source.id)) {
-      source.lastCheckedAt = refreshedAt;
+    source.lastCheckedAt = refreshedAt;
+  }
+  for (const record of catalogs.ruleEvidence) {
+    if (record.evidenceStatus === "valid") {
+      record.lastVerifiedAt = refreshedAt;
     }
   }
   createResponseMock.mockReset();
@@ -67,13 +65,21 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (!originalInsuranceSourceChecks) return;
   const catalogs = getCatalogsOrThrow();
-  for (const source of catalogs.sources) {
-    const original = originalInsuranceSourceChecks.get(source.id);
-    if (original) source.lastCheckedAt = original;
+  if (originalSourceChecks) {
+    for (const source of catalogs.sources) {
+      const original = originalSourceChecks.get(source.id);
+      if (original) source.lastCheckedAt = original;
+    }
   }
-  originalInsuranceSourceChecks = null;
+  if (originalRuleEvidenceChecks) {
+    for (const [index, original] of originalRuleEvidenceChecks) {
+      const record = catalogs.ruleEvidence[index];
+      if (record) record.lastVerifiedAt = original;
+    }
+  }
+  originalSourceChecks = null;
+  originalRuleEvidenceChecks = null;
 });
 
 afterAll(async () => {
