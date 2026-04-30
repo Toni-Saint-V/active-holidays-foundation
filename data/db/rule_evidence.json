@@ -1,0 +1,156 @@
+[
+  {
+    "ruleId": "R02",
+    "countryOrScope": "RU->IT",
+    "sourceUrlOrRef": "src_italy_consulate_spb",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing source catalog entry supports the Italy visa-rule assumptions already present in visa_rules.json."
+  },
+  {
+    "ruleId": "R02",
+    "countryOrScope": "US->RU",
+    "sourceUrlOrRef": "src_russia_mfa_us",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing source catalog entry supports the US to Russia visa-rule assumptions already present in visa_rules.json."
+  },
+  {
+    "ruleId": "R04",
+    "countryOrScope": "global",
+    "sourceUrlOrRef": "repo:case-signal:slot_available_weeks",
+    "sourceKind": "internal_note",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 14,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "This rule uses an explicit case signal and deterministic comparison; it does not add a new external fact."
+  },
+  {
+    "ruleId": "R06",
+    "countryOrScope": "US->RU",
+    "sourceUrlOrRef": "src_sanctions_watch",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 7,
+    "automationClass": "manual_only",
+    "evidenceStatus": "manual_only",
+    "rationale": "Sanctions exposure already requires human review; this evidence must not allow automated clearance."
+  },
+  {
+    "ruleId": "R07",
+    "countryOrScope": "RU->IT",
+    "sourceUrlOrRef": "src_italy_consulate_spb",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing country restriction entry for RU to IT references this source."
+  },
+  {
+    "ruleId": "R07",
+    "countryOrScope": "US->RU",
+    "sourceUrlOrRef": "src_sanctions_watch",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 7,
+    "automationClass": "assisted",
+    "evidenceStatus": "valid",
+    "rationale": "Travel advisory context is present in repo restrictions, but automated clearance should remain assisted at most."
+  },
+  {
+    "ruleId": "R08",
+    "countryOrScope": "US->RU",
+    "sourceUrlOrRef": "src_russia_mfa_us",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 14,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing country restriction entry for US to RU references this source."
+  },
+  {
+    "ruleId": "R09",
+    "countryOrScope": "global",
+    "sourceUrlOrRef": "repo:case-signal:insurance_ok",
+    "sourceKind": "internal_note",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "This rule uses the explicit insurance_ok case signal; it does not add a new external insurance claim."
+  },
+  {
+    "ruleId": "R10",
+    "countryOrScope": "global",
+    "sourceUrlOrRef": "repo:case-signals:documents_ready_count/documents_required_count",
+    "sourceKind": "internal_note",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "This rule uses explicit case document counters and deterministic arithmetic."
+  },
+  {
+    "ruleId": "R11",
+    "countryOrScope": "RU->IT",
+    "sourceUrlOrRef": "repo:rule:R11",
+    "sourceKind": "internal_note",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "This is a repo-local path strategy heuristic, not an official visa/legal claim; the auditable source is the versioned rule definition."
+  },
+  {
+    "ruleId": "R12",
+    "countryOrScope": "TR->RU",
+    "sourceUrlOrRef": "src_russia_mfa_tr",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-30T01:40:10.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "conflicting",
+    "rationale": "Manual live review found that the official KDMID inbound page does not support a general TR->RU visa-free 60-day route for ordinary passports; it lists electronic visa entry up to 30 days and visa-free only for special categories."
+  },
+  {
+    "ruleId": "R14",
+    "countryOrScope": "US->RU",
+    "sourceUrlOrRef": "src_russia_mfa_us",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing visa rule for US to RU includes registrationRequired and references this source."
+  },
+  {
+    "ruleId": "R17",
+    "countryOrScope": "product:residency_es",
+    "sourceUrlOrRef": "src_spain_uge",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing residency program and source catalog entry support the DNV rule assumptions."
+  },
+  {
+    "ruleId": "R22",
+    "countryOrScope": "product:residency_es",
+    "sourceUrlOrRef": "src_spain_consulate",
+    "sourceKind": "official",
+    "lastVerifiedAt": "2026-04-23T12:25:00.000Z",
+    "freshnessWindowDays": 30,
+    "automationClass": "safe_auto",
+    "evidenceStatus": "valid",
+    "rationale": "Existing source catalog entry supports the consular-jurisdiction context already encoded in the rule."
+  }
+]

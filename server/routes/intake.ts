@@ -37,17 +37,23 @@ export function intakeRouter(): Router {
     const caseId = Array.isArray(raw) ? raw[0] ?? "" : raw ?? "";
     const caseData = ensureCase(caseId);
     const catalogs = getCatalogsOrThrow();
-    const preview = previewVerdict({
-      case: caseData,
-      catalogs: {
-        paths: catalogs.paths,
-        visaRules: catalogs.visaRules,
-        restrictions: catalogs.restrictions,
-        sources: catalogs.sources,
-        residencyPrograms: catalogs.residencyPrograms,
-        insuranceProducts: catalogs.insuranceProducts
+    const preview = previewVerdict(
+      {
+        case: caseData,
+        catalogs: {
+          paths: catalogs.paths,
+          visaRules: catalogs.visaRules,
+          restrictions: catalogs.restrictions,
+          sources: catalogs.sources,
+          ruleEvidence: catalogs.ruleEvidence,
+          residencyPrograms: catalogs.residencyPrograms,
+          insuranceProducts: catalogs.insuranceProducts
+        }
+      },
+      {
+        now: () => new Date()
       }
-    });
+    );
     res.json(preview);
   });
 

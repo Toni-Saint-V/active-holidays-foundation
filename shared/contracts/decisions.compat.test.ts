@@ -10,6 +10,9 @@ import {
   type DecisionLogEntry,
   type DecisionRecord
 } from "./decisions";
+import { resultPayloadSchema } from "./result";
+import { runDecision, type OrchestratorCatalogs } from "../domain/engine";
+import { loadCatalogs } from "../../server/lib/catalogs";
 
 const LEGACY: DecisionLogEntry = {
   id: "log_s1_init",
@@ -97,6 +100,44 @@ describe("decisionRecordSchema", () => {
   it("rejects a record with an invalid fingerprint", () => {
     const bad = { ...RECORD, inputFingerprint: "not-a-hash" };
     const parsed = decisionRecordSchema.safeParse(bad);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects evidence-captured records whose result misses trust evidence fields", async () => {
+    const catalogs = await loadCatalogs();
+    const caseData = catalogs.cases.find((entry) => entry.id === "s1-rf-italy");
+    expect(caseData).toBeDefined();
+    if (!caseData) return;
+    const orchestrator: OrchestratorCatalogs = {
+      paths: catalogs.paths,
+      visaRules: catalogs.visaRules,
+      restrictions: catalogs.restrictions,
+      sources: catalogs.sources,
+      ruleEvidence: catalogs.ruleEvidence,
+      residencyPrograms: catalogs.residencyPrograms,
+      insuranceProducts: catalogs.insuranceProducts
+    };
+    const result = runDecision({ case: caseData, catalogs: orchestrator });
+    const legacyResult = structuredClone(result) as Record<string, unknown> & {
+      trust: Record<string, unknown>;
+    };
+    delete legacyResult.trust.evidenceStatus;
+    delete legacyResult.trust.freshnessStatus;
+    delete legacyResult.trust.blockingReason;
+    delete legacyResult.trust.humanReviewReason;
+    expect(resultPayloadSchema.safeParse(legacyResult).success).toBe(false);
+
+    const parsed = decisionRecordSchema.safeParse({
+      ...RECORD,
+      replayableSnapshot: {
+        case: caseData,
+        catalogs: orchestrator,
+        now: result.computedAt,
+        evidenceContractCaptured: true
+      },
+      result: legacyResult
+    });
+
     expect(parsed.success).toBe(false);
   });
 });

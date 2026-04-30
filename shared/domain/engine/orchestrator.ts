@@ -10,6 +10,10 @@ import type {
   ProductType,
   ResidencyProgramDefinition,
   ResultPayload,
+  EvidenceSourceKind,
+  RuleEvidenceDecision,
+  RuleEvidenceRecord,
+  RuleResult,
   Source,
   VisaRule
 } from "@shared/contracts";
@@ -38,12 +42,16 @@ import { computeVerdict } from "./verdict";
 import { generateWhy } from "./why";
 import { resolveAction } from "../action";
 import { createAuditBuilder } from "../audit";
+import { applyEvidenceGate, resolveEvidenceScope } from "../evidence/gate";
+import { evaluateRuleEvidence } from "../evidence/evaluate";
+import { sourceFreshnessThresholdDaysByTier } from "../evidence/sourceFreshness";
 
 export type OrchestratorCatalogs = {
   paths: PathDefinition[];
   visaRules: VisaRule[];
   restrictions: CountryRestriction[];
   sources: Source[];
+  ruleEvidence: RuleEvidenceRecord[];
   residencyPrograms: ResidencyProgramDefinition[];
   insuranceProducts: InsuranceProductDefinition[];
 };
@@ -263,11 +271,118 @@ function buildAssumptions(productType: ProductType, signals: CaseSignals): Resul
   return assumptions;
 }
 
+const EVIDENCE_STATUS_PRIORITY: Record<RuleEvidenceDecision["evidenceStatus"], number> = {
+  conflicting: 5,
+  manual_only: 4,
+  missing: 3,
+  stale: 2,
+  valid: 1
+};
+
+function strongestEvidenceStatus(
+  decisions: RuleEvidenceDecision[]
+): RuleEvidenceDecision["evidenceStatus"] {
+  return decisions
+    .map((decision) => decision.evidenceStatus)
+    .sort((a, b) => EVIDENCE_STATUS_PRIORITY[b] - EVIDENCE_STATUS_PRIORITY[a])[0] ?? "valid";
+}
+
+function buildTrustEvidenceSnapshot(
+  decisions: RuleEvidenceDecision[],
+  blockedRuleIds: string[],
+  verdict: ResultPayload["verdict"]
+): Pick<
+  ResultPayload["trust"],
+  "evidenceStatus" | "freshnessStatus" | "blockingReason" | "humanReviewReason"
+> {
+  const blocked = decisions.filter((decision) => decision.blocksAutomation);
+  const blockingReason =
+    blocked.length === 0
+      ? null
+      : blocked
+          .map(
+            (decision) =>
+              `${decision.ruleId}: ${decision.evidenceStatus}, automation=${decision.automationClass}`
+          )
+          .join("; ");
+  return {
+    evidenceStatus: strongestEvidenceStatus(decisions),
+    freshnessStatus:
+      decisions.length === 0 || decisions.some((decision) => decision.evidenceStatus === "missing")
+        ? "unknown"
+        : decisions.some((decision) => decision.evidenceStatus === "stale")
+          ? "stale"
+          : "fresh",
+    blockingReason,
+    humanReviewReason:
+      verdict === "HUMAN_REVIEW" && blockedRuleIds.length > 0
+        ? `Evidence gate требует ручной проверки: ${blockedRuleIds.join(", ")}.`
+        : null
+  };
+}
+
+type OfferSourceEvidenceEntry = {
+  offerId: string;
+  ruleResult: RuleResult;
+  record: RuleEvidenceRecord;
+};
+
+type OfferSourceEvidenceDecision = {
+  entry: OfferSourceEvidenceEntry;
+  decision: RuleEvidenceDecision;
+};
+
+function buildOfferSourceEvidence(input: {
+  productType: ProductType;
+  signals: CaseSignals;
+  offers: Offer[];
+  sources: Source[];
+}): { entries: OfferSourceEvidenceEntry[] } {
+  if (input.productType !== "insurance_adult") {
+    return { entries: [] };
+  }
+
+  const entries = input.offers.filter(isInsuranceOffer).map((offer): OfferSourceEvidenceEntry => {
+    const ruleId = `OFFER_SOURCE:${offer.id}`;
+    const source = input.sources.find((item) => item.id === offer.sourceId);
+    const sourceKind: EvidenceSourceKind = source?.tier ?? "operator";
+    return {
+      offerId: offer.id,
+      ruleResult: {
+        ruleId,
+        fired: true,
+        category: "insurance_compliance",
+        priority: 100,
+        productType: "insurance_adult",
+        output: { type: "advisory", pathIds: [offer.id], severity: "low" },
+        consumedSignals: ["destination"],
+        explanation: `Проверяем источник страхового продукта ${offer.id}.`
+      },
+      record: {
+        ruleId,
+        countryOrScope: resolveEvidenceScope(input.productType, input.signals),
+        sourceUrlOrRef: offer.sourceId,
+        sourceKind,
+        lastVerifiedAt: source?.lastCheckedAt ?? null,
+        freshnessWindowDays: sourceFreshnessThresholdDaysByTier[sourceKind],
+        automationClass: "safe_auto",
+        evidenceStatus: "valid",
+        rationale: `Страховой продукт ${offer.id} опирается на sourceId ${offer.sourceId}.`
+      }
+    };
+  });
+
+  return {
+    entries
+  };
+}
+
 export function runDecision(
   input: { case: Case; catalogs: OrchestratorCatalogs },
   options: RunOptions = {}
 ): ResultPayload {
-  const nowFn = options.now ?? STABLE_NOW;
+  const semanticNow = new Date((options.now ?? STABLE_NOW)().getTime());
+  const nowFn = () => new Date(semanticNow.getTime());
   const audit = createAuditBuilder(nowFn);
   const productType = input.case.productType;
 
@@ -302,7 +417,7 @@ export function runDecision(
     "evaluateRules",
     `Выполняем правила для ${productType}.`
   );
-  const ruleResults = evaluateRules({
+  let ruleResults = evaluateRules({
     productType,
     signals: validSignals,
     visaRules,
@@ -338,6 +453,85 @@ export function runDecision(
     primary
       ? `Основное предложение: ${primary.id}, альтернатив: ${alternatives.length}.`
       : `Подходящего основного предложения нет, кандидатов: ${alternatives.length}.`
+  );
+
+  const finishEvidence = audit.start(
+    "evaluateEvidence",
+    "Проверяем evidence для релевантных сработавших правил."
+  );
+  const offerSourceEvidence = buildOfferSourceEvidence({
+    productType,
+    signals: validSignals,
+    offers: rankedOffers,
+    sources: input.catalogs.sources
+  });
+  const primaryOfferSourceEvidence = primary
+    ? offerSourceEvidence.entries.filter((entry) => entry.offerId === primary.id)
+    : [];
+  const offerSourceDecisions: OfferSourceEvidenceDecision[] = offerSourceEvidence.entries.map(
+    (entry) => ({
+      entry,
+      decision: evaluateRuleEvidence({
+        ruleId: entry.ruleResult.ruleId,
+        countryOrScope: entry.record.countryOrScope,
+        records: [entry.record],
+        sources: input.catalogs.sources,
+        now: nowFn()
+      })
+    })
+  );
+  const blockedOfferIds = new Set(
+    offerSourceDecisions
+      .filter(({ decision }) => decision.blocksAutomation)
+      .map(({ entry }) => entry.offerId)
+  );
+  const evidenceGate = applyEvidenceGate({
+    productType,
+    signals: validSignals,
+    ruleResults: ruleResults.concat(
+      primaryOfferSourceEvidence.map((entry) => entry.ruleResult)
+    ),
+    ruleEvidence: input.catalogs.ruleEvidence.concat(
+      primaryOfferSourceEvidence.map((entry) => entry.record)
+    ),
+    sources: input.catalogs.sources,
+    pathId: focusPathId,
+    now: nowFn()
+  });
+  ruleResults = evidenceGate.ruleResults.filter(
+    (result) => !result.ruleId.startsWith("OFFER_SOURCE:")
+  );
+  const excludedOfferEvidenceNotes = offerSourceDecisions
+    .filter(
+      ({ decision, entry }) =>
+        decision.blocksAutomation && entry.offerId !== primary?.id
+    )
+    .map(({ decision, entry }) =>
+      JSON.stringify({
+        type: "excludedOfferEvidence",
+        offerId: entry.offerId,
+        ruleId: decision.ruleId,
+        countryOrScope: decision.countryOrScope,
+        evidenceStatus: decision.evidenceStatus,
+        automationClass: decision.automationClass,
+        sourceUrlOrRef: decision.sourceUrlOrRef,
+        sourceKind: decision.sourceKind,
+        lastVerifiedAt: decision.lastVerifiedAt,
+        freshnessWindowDays: decision.freshnessWindowDays,
+        rationale: decision.rationale
+      })
+    );
+  finishEvidence(
+    evidenceGate.blockedRuleIds.length > 0
+      ? `Evidence gate заблокировал правил: ${evidenceGate.blockedRuleIds.length}.`
+      : `Evidence проверен для правил: ${evidenceGate.decisions.length}.`,
+    evidenceGate.decisions
+      .map(
+        (decision) =>
+          `${decision.ruleId}:${decision.evidenceStatus}:${decision.automationClass}`
+      )
+      .concat(excludedOfferEvidenceNotes),
+    evidenceGate.blockedRuleIds
   );
 
   const finishRisks = audit.start(
@@ -428,6 +622,11 @@ export function runDecision(
     preview: !!options.preview
   });
   const isHumanReview = verdict === "HUMAN_REVIEW";
+  const trustEvidence = buildTrustEvidenceSnapshot(
+    evidenceGate.decisions,
+    evidenceGate.blockedRuleIds,
+    verdict
+  );
 
   const payload: ResultPayload = {
     version: "rdc.v1",
@@ -436,7 +635,9 @@ export function runDecision(
     computedAt: nowFn().toISOString(),
     verdict,
     primaryPath: isHumanReview ? null : primary,
-    alternativePaths: isHumanReview ? [] : alternatives,
+    alternativePaths: isHumanReview
+      ? []
+      : alternatives.filter((offer) => !blockedOfferIds.has(offer.id)),
     criticalRisk: isHumanReview ? null : criticalRisk,
     risks: isHumanReview ? [] : risks,
     nextAction,
@@ -451,6 +652,7 @@ export function runDecision(
       confidenceBreakdown: isHumanReview
         ? { value: 0, base: confidence.base, capsApplied: ["human_review"], factors: [] }
         : confidence,
+      ...trustEvidence,
       volatilityScore: isHumanReview ? 0 : volatilityScore,
       sources: isHumanReview
         ? []

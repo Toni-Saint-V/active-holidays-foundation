@@ -20,11 +20,11 @@
   {
     "id": "src_russia_mfa_tr",
     "label": "МИД России: безвизовый режим с Турцией",
-    "url": "https://www.mid.ru/ru/countries/turkey",
+    "url": "https://www.kdmid.ru/cons/visas/conditions-of-entry-foreign-citizens-in-russian-federation/",
     "tier": "official",
-    "lastCheckedAt": "2026-04-16T09:00:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.1,
-    "summary": "Официальная памятка о порядке пребывания граждан Турции до 60 дней."
+    "summary": "Официальная страница КД МИД РФ: граждане Турции могут въезжать в РФ по электронной визе до 30 дней; безвиз действует только для отдельных категорий."
   },
   {
     "id": "src_russia_mfa_us",
@@ -101,46 +101,46 @@
   {
     "id": "src_alfa_insurance",
     "label": "АльфаСтрахование — страховка для выезжающих",
-    "url": "https://www.alfastrah.ru/",
+    "url": "https://www.alfastrah.ru/upload/docs/viezd_za_granicu_pravila_strahovaniya_grazdan_viezj_za_rubej05072024.pdf",
     "tier": "operator",
-    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.2,
-    "summary": "Шенгенские продукты АльфаСтрахование с лимитами 30 000 и 50 000€."
+    "summary": "Официальные правила АльфаСтрахование по страхованию граждан, выезжающих за рубеж."
   },
   {
     "id": "src_ingos",
     "label": "Ингосстрах — Шенген Актив",
-    "url": "https://www.ingos.ru/",
+    "url": "https://www.ingos.ru/travel/abroad/calc/shengen",
     "tier": "operator",
-    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.25,
-    "summary": "Полис для путешествующих с активным отдыхом."
+    "summary": "Официальный калькулятор Ингосстраха для поездки в Шенгенский союз и визовых поездок."
   },
   {
     "id": "src_sogaz",
     "label": "СОГАЗ Путешественник Премиум",
-    "url": "https://www.sogaz.ru/",
+    "url": "https://www.sogaz.ru/travel/abroad/",
     "tier": "operator",
-    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.2,
-    "summary": "Полис с максимальным покрытием и быстрым выплатным циклом."
+    "summary": "Официальная страница СОГАЗ по онлайн-страхованию для путешествий за границу."
   },
   {
     "id": "src_tinkoff",
     "label": "Т-Банк Страхование — Базовый",
-    "url": "https://www.tbank.ru/",
+    "url": "https://www.tbank.ru/insurance/travel/",
     "tier": "operator",
-    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.3,
-    "summary": "Базовый продукт без Schengen-сертификации."
+    "summary": "Официальная страница Т-Страхования по медицинской страховке для путешествий за границу."
   },
   {
     "id": "src_rosgosstrakh",
     "label": "Росгосстрах — Семейный Шенген",
-    "url": "https://www.rgs.ru/",
+    "url": "https://www.rgs.ru/travels/strakhovka-dlya-shengena",
     "tier": "operator",
-    "lastCheckedAt": "2026-04-23T12:25:00.000Z",
+    "lastCheckedAt": "2026-04-30T01:40:10.000Z",
     "volatilityScore": 0.2,
-    "summary": "Семейный шенгенский полис с хрониками и беременностью."
+    "summary": "Официальная страница Росгосстраха по туристической страховке для шенгенской визы."
   }
 ]

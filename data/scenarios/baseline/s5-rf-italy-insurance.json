@@ -2,10 +2,10 @@
   "caseId": "s5-rf-italy-insurance",
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
-  "resultFingerprint": "0fefdd0f01707dd83a0e1b9c401fb086189e4cf4cbe8fa1cfcba4ab45b7b0be3",
-  "catalogFingerprint": "0ec5b3179da255f64cea54403d4cac2de2d7b8675ade889b85c7346c52853455",
+  "resultFingerprint": "67d8c26dc55843595b4d8a12648bf89470b6b14cd2a585e2fe4d8f46ba62c082",
+  "catalogFingerprint": "76ca3cf436c5269aac3783341cf76f316bb089022b1e92056aa957f076a5221f",
   "verdict": "GO_WITH_CONDITIONS",
   "nextActionType": "request_medical_questionnaire",
   "primaryPathId": "alfa_plus",
-  "confidence": 0.73
+  "confidence": 0.74
 }

@@ -2,10 +2,10 @@
   "caseId": "s2-tr-spb",
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
-  "resultFingerprint": "14a6eb9d77880a9461b84e2d7c81f6ba28a331a2c794484be630cd4dd0d73860",
-  "catalogFingerprint": "0ec5b3179da255f64cea54403d4cac2de2d7b8675ade889b85c7346c52853455",
-  "verdict": "GO_WITH_CONDITIONS",
-  "nextActionType": "start_application",
-  "primaryPathId": "turkey_visa_free_spb",
-  "confidence": 0.74
+  "resultFingerprint": "f9e5eb4a627f7c5cf7d8c9a08dd8ef468576b5283ab5d6583b3ecafbdad17682",
+  "catalogFingerprint": "76ca3cf436c5269aac3783341cf76f316bb089022b1e92056aa957f076a5221f",
+  "verdict": "HUMAN_REVIEW",
+  "nextActionType": "send_for_review",
+  "primaryPathId": null,
+  "confidence": 0
 }

@@ -30,6 +30,7 @@ automation/yepcode/**/.env.*
 reports/autonomous/
 reports/design/
 reports/presentations/
+reports.zip
 .playwright-cli/
 tmp/
 research_*/

@@ -50,6 +50,7 @@ describe("recommendation boundary ownership", () => {
       visaRules: catalogs.visaRules,
       restrictions: catalogs.restrictions,
       sources: catalogs.sources,
+      ruleEvidence: catalogs.ruleEvidence,
       residencyPrograms: catalogs.residencyPrograms,
       insuranceProducts: catalogs.insuranceProducts
     };

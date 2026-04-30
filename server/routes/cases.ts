@@ -62,13 +62,17 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
     visaRules: catalogs.visaRules,
     restrictions: catalogs.restrictions,
     sources: catalogs.sources,
+    ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
     insuranceProducts: catalogs.insuranceProducts
   };
 }
 
 function computeResult(caseData: Case) {
-  return runDecision({ case: caseData, catalogs: orchestratorCatalogs() });
+  return runDecision(
+    { case: caseData, catalogs: orchestratorCatalogs() },
+    { now: () => new Date() }
+  );
 }
 
 function buildHumanReviewSnapshot(caseData: Case): HumanReviewSnapshot {
@@ -98,7 +102,10 @@ function recordDecision(
   }
 ) {
   const catalogs = orchestratorCatalogs();
-  const result = runDecision({ case: caseData, catalogs });
+  const result = runDecision(
+    { case: caseData, catalogs },
+    { now: () => new Date() }
+  );
   const record = getCaseStore().snapshotDecisionRecord({
     case: caseData,
     catalogs,

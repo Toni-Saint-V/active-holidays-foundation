@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { verdictSchema } from "./verdict";
 import { auditTrailSchema } from "./audit";
-import { resultPayloadSchema } from "./result";
+import { legacyResultPayloadSchema, resultPayloadSchema } from "./result";
 import {
   engineFingerprintSchema,
   engineVersionSchema,
@@ -34,9 +34,7 @@ export type DecisionLogEntry = z.infer<typeof decisionLogEntrySchema>;
 export const decisionsLogSchema = z.array(decisionLogEntrySchema);
 export type DecisionsLog = z.infer<typeof decisionsLogSchema>;
 
-// Full production ledger record. Captured on every non-deduped recompute so
-// replay, drift checks, and audit trails have bit-stable inputs.
-export const decisionRecordSchema = z.object({
+const decisionRecordBaseSchema = z.object({
   decisionId: z.string().min(1),
   caseId: z.string().min(1),
   engineVersion: engineVersionSchema,
@@ -47,7 +45,7 @@ export const decisionRecordSchema = z.object({
   catalogFingerprint: engineFingerprintSchema,
   resultFingerprint: engineFingerprintSchema,
   replayableSnapshot: replayableSnapshotSchema.nullable(),
-  result: resultPayloadSchema.nullable(),
+  result: z.unknown().nullable(),
   auditTrail: auditTrailSchema.nullable(),
   verdict: verdictSchema,
   confidence: z.number().min(0).max(1),
@@ -56,6 +54,46 @@ export const decisionRecordSchema = z.object({
   changedSignalIds: z.array(z.string()).default([]),
   changedPreferenceIds: z.array(z.string()).default([])
 });
+
+function canUseLegacyResult(
+  record: z.infer<typeof decisionRecordBaseSchema>
+): boolean {
+  return (
+    record.replayableSnapshot === null ||
+    record.replayableSnapshot.evidenceContractCaptured === false
+  );
+}
+
+function parseDecisionRecordResult(
+  record: z.infer<typeof decisionRecordBaseSchema>
+) {
+  if (record.result === null) return null;
+  return canUseLegacyResult(record)
+    ? legacyResultPayloadSchema.parse(record.result)
+    : resultPayloadSchema.parse(record.result);
+}
+
+// Full production ledger record. Captured on every non-deduped recompute so
+// replay, drift checks, and audit trails have bit-stable inputs. Historical
+// records may use ResultPayload trust compat only when they predate the
+// evidence contract; current evidence-captured records stay strict.
+export const decisionRecordSchema = decisionRecordBaseSchema
+  .superRefine((record, ctx) => {
+    if (record.result === null) return;
+    const parsed = canUseLegacyResult(record)
+      ? legacyResultPayloadSchema.safeParse(record.result)
+      : resultPayloadSchema.safeParse(record.result);
+    if (parsed.success) return;
+    ctx.addIssue({
+      code: "custom",
+      path: ["result"],
+      message: parsed.error.message
+    });
+  })
+  .transform((record) => ({
+    ...record,
+    result: parseDecisionRecordResult(record)
+  }));
 export type DecisionRecord = z.infer<typeof decisionRecordSchema>;
 
 export const decisionRecordsSchema = z.array(decisionRecordSchema);

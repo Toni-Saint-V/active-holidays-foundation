@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { evidenceStatusSchema } from "./evidence";
 import { sourceRefSchema } from "./sources";
 
 export const confidenceFactorSchema = z.object({
@@ -27,11 +28,33 @@ export const confidenceBreakdownSchema = z.object({
 });
 export type ConfidenceBreakdown = z.infer<typeof confidenceBreakdownSchema>;
 
-export const trustSchema = z.object({
+const TRUST_EVIDENCE_LEGACY_DEFAULTS = {
+  evidenceStatus: "missing",
+  freshnessStatus: "unknown",
+  blockingReason: "Историческая запись создана до evidence gate; источник доверия неизвестен.",
+  humanReviewReason: null
+} as const;
+
+const strictTrustSchema = z.object({
   confidence: z.number().min(0).max(1),
   confidenceBreakdown: confidenceBreakdownSchema,
+  evidenceStatus: evidenceStatusSchema,
+  freshnessStatus: z.enum(["fresh", "stale", "unknown"]),
+  blockingReason: z.string().min(1).nullable(),
+  humanReviewReason: z.string().min(1).nullable(),
   volatilityScore: z.number().min(0).max(1),
   sources: z.array(sourceRefSchema),
   lastCheckedAt: z.string().datetime()
 });
+
+export const trustSchema = strictTrustSchema;
 export type Trust = z.infer<typeof trustSchema>;
+
+export const legacyTrustSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const trust = value as Record<string, unknown>;
+  return {
+    ...TRUST_EVIDENCE_LEGACY_DEFAULTS,
+    ...trust
+  };
+}, strictTrustSchema);

@@ -8,4 +8,5 @@ export * from "./confidence";
 export * from "./action";
 export * from "./engine";
 export * from "./audit";
+export * from "./evidence";
 export * from "./ai";

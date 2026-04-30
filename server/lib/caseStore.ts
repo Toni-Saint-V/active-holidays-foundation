@@ -268,7 +268,8 @@ export class CaseStore {
     const snapshot: ReplayableSnapshot = structuredClone({
       case: input.case,
       catalogs: input.catalogs,
-      now: input.result.computedAt
+      now: input.result.computedAt,
+      evidenceContractCaptured: true
     });
 
     const record: DecisionRecord = {
