@@ -14,6 +14,7 @@ import type {
   SignalId,
   ScenarioLabPayload,
   HumanReviewChannel,
+  HumanReviewCasePacket,
   HumanReviewRequest
 } from "@shared/contracts";
 import { apiClient, type ScenarioCard } from "@/lib/apiClient";
@@ -39,6 +40,7 @@ type CaseStoreState = {
   intakePreview: IntakePreview | null;
   audit: AuditSnapshot | null;
   activeHumanReview: HumanReviewRequest | null;
+  activeHumanReviewPacket: HumanReviewCasePacket | null;
   humanReviewCaseId: string | null;
   humanReviewRequestToken: number;
   sources: Source[];
@@ -58,6 +60,7 @@ type CaseStoreState = {
   refreshIntake: (id: string) => Promise<void>;
   loadAudit: (id: string) => Promise<void>;
   loadHumanReview: (id: string) => Promise<void>;
+  loadHumanReviewPacket: (id: string) => Promise<void>;
   submitHumanReview: (
     id: string,
     payload: { channel: HumanReviewChannel; contact: string; message: string }
@@ -103,6 +106,7 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
   intakePreview: null,
   audit: null,
   activeHumanReview: null,
+  activeHumanReviewPacket: null,
   humanReviewCaseId: null,
   humanReviewRequestToken: 0,
   sources: [],
@@ -133,6 +137,7 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
   async loadCase(id) {
     const currentLab = get().activeScenarioLab;
     const currentReview = get().activeHumanReview;
+    const currentPacket = get().activeHumanReviewPacket;
     const nextHumanReviewToken = get().humanReviewRequestToken + 1;
     set({
       status: "loading",
@@ -141,6 +146,7 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
       scenarioLabError: null,
       activeScenarioLab: currentLab?.caseId === id ? currentLab : null,
       activeHumanReview: currentReview?.caseId === id ? currentReview : null,
+      activeHumanReviewPacket: currentPacket?.case.id === id ? currentPacket : null,
       humanReviewCaseId: id,
       humanReviewRequestToken: nextHumanReviewToken,
       humanReviewStatus: currentReview?.caseId === id ? get().humanReviewStatus : "idle",
@@ -351,6 +357,7 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
         state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
           ? {
               activeHumanReview: request,
+              activeHumanReviewPacket: request ? state.activeHumanReviewPacket : null,
               humanReviewStatus: "ready",
               humanReviewError: null
             }
@@ -363,6 +370,39 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
               humanReviewStatus: "error",
               humanReviewError:
                 error instanceof Error ? error.message : "Не удалось загрузить ручную проверку."
+            }
+          : {}
+      );
+    }
+  },
+
+  async loadHumanReviewPacket(id) {
+    const requestToken = get().humanReviewRequestToken + 1;
+    set({
+      humanReviewStatus: "loading",
+      humanReviewError: null,
+      humanReviewCaseId: id,
+      humanReviewRequestToken: requestToken
+    });
+    try {
+      const packet = await apiClient.humanReviewCasePacket(id);
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              activeHumanReviewPacket: packet,
+              humanReviewStatus: "ready",
+              humanReviewError: null
+            }
+          : {}
+      );
+    } catch (error) {
+      set((state) =>
+        state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
+          ? {
+              activeHumanReviewPacket: null,
+              humanReviewStatus: "error",
+              humanReviewError:
+                error instanceof Error ? error.message : "Не удалось загрузить пакет оператора."
             }
           : {}
       );
@@ -383,6 +423,7 @@ export const useCaseStore = create<CaseStoreState>((set, get) => ({
         state.humanReviewCaseId === id && state.humanReviewRequestToken === requestToken
           ? {
               activeHumanReview: response.request,
+              activeHumanReviewPacket: null,
               humanReviewStatus: "ready",
               humanReviewError: null
             }

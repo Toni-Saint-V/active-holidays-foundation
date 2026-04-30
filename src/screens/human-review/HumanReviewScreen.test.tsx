@@ -101,10 +101,14 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
           capsApplied: [],
           factors: []
         },
-        volatilityScore: 0.1,
-        sources: [],
-        lastCheckedAt: "2026-04-21T00:00:00.000Z"
-      },
+	        volatilityScore: 0.1,
+	        evidenceStatus: "valid",
+	        freshnessStatus: "fresh",
+	        blockingReason: null,
+	        humanReviewReason: null,
+	        sources: [],
+	        lastCheckedAt: "2026-04-21T00:00:00.000Z"
+	      },
       assumptions: [],
       auditTrail: {
         version: "rdc.v1",
@@ -126,9 +130,10 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
         preview: false
       },
       preview: false
-    },
-    activeHumanReview: null,
-    scenarios: [
+	    },
+	    activeHumanReview: null,
+	    activeHumanReviewPacket: null,
+	    scenarios: [
       {
         caseId: "case-a",
         productType: "travel",
@@ -143,9 +148,10 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
     audit: null,
     bootstrap: vi.fn().mockResolvedValue(undefined),
     loadCase: vi.fn().mockResolvedValue(undefined),
-    loadAudit: vi.fn().mockResolvedValue(undefined),
-    loadHumanReview: vi.fn().mockResolvedValue(undefined),
-    submitHumanReview: vi.fn().mockResolvedValue({ reused: false }),
+	    loadAudit: vi.fn().mockResolvedValue(undefined),
+	    loadHumanReview: vi.fn().mockResolvedValue(undefined),
+	    loadHumanReviewPacket: vi.fn().mockResolvedValue(undefined),
+	    submitHumanReview: vi.fn().mockResolvedValue({ reused: false }),
     status: "ready",
     errorMessage: null,
     humanReviewStatus: "ready",
