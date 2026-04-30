@@ -62,8 +62,16 @@ export type TransitionHumanReviewInput = {
   status: HumanReviewStatus;
   changedBy: HumanReviewActor;
   note?: string | null;
-  resolution?: Pick<HumanReviewResolution, "summary"> | null;
+  resolution?: {
+    summary: HumanReviewResolution["summary"];
+    postDecisionRecordId?: HumanReviewResolution["postDecisionRecordId"];
+  } | null;
   now?: Date;
+};
+
+export type AttachHumanReviewDecisionRecordInput = {
+  requestId: string;
+  postDecisionRecordId: string;
 };
 
 export type CaseStoreOptions = {
@@ -497,7 +505,8 @@ export class CaseStore {
         ? {
             summary: input.resolution.summary,
             resolvedAt: now,
-            changedBy: input.changedBy
+            changedBy: input.changedBy,
+            postDecisionRecordId: input.resolution.postDecisionRecordId ?? null
           }
         : existing.resolution;
     const next: HumanReviewRequest = {
@@ -517,6 +526,42 @@ export class CaseStore {
           note: input.note ?? null
         }
       ]
+    };
+    this.persistHumanReviewSnapshot(
+      this.humanReviews.map((request) =>
+        request.id === next.id ? structuredClone(next) : structuredClone(request)
+      )
+    );
+    this.replaceHumanReview(next);
+    return structuredClone(next);
+  }
+
+  attachHumanReviewDecisionRecord(
+    input: AttachHumanReviewDecisionRecordInput
+  ): HumanReviewRequest {
+    const existing = this.humanReviewById.get(input.requestId);
+    if (!existing) {
+      throw new Error(`HumanReviewRequest ${input.requestId} не найден.`);
+    }
+    if (existing.status !== "resolved" || !existing.resolution) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} не закрыт и не может получить decision record.`
+      );
+    }
+    if (existing.resolution.postDecisionRecordId === input.postDecisionRecordId) {
+      return structuredClone(existing);
+    }
+    if (existing.resolution.postDecisionRecordId) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} уже связан с decision record ${existing.resolution.postDecisionRecordId}.`
+      );
+    }
+    const next: HumanReviewRequest = {
+      ...existing,
+      resolution: {
+        ...existing.resolution,
+        postDecisionRecordId: input.postDecisionRecordId
+      }
     };
     this.persistHumanReviewSnapshot(
       this.humanReviews.map((request) =>

@@ -93,7 +93,7 @@ describe("human review ops workbench contracts", () => {
       generatedAt: "2026-04-30T09:01:00.000Z",
       capabilities: {
         terminalResolve: "transition_only",
-        learningFeedback: "unavailable"
+        learningFeedback: "available"
       },
       queue: [
         {
@@ -130,7 +130,7 @@ describe("human review ops workbench contracts", () => {
       throw new Error("Expected a ready queue entry.");
     }
     expect(first.currentVerdict).toBe("HUMAN_REVIEW");
-    expect(parsed.capabilities.learningFeedback).toBe("unavailable");
+    expect(parsed.capabilities.learningFeedback).toBe("available");
   });
 
   it("accepts orphaned queue entries without forcing the whole queue to fail", () => {
@@ -138,7 +138,7 @@ describe("human review ops workbench contracts", () => {
       generatedAt: "2026-04-30T09:01:00.000Z",
       capabilities: {
         terminalResolve: "transition_only",
-        learningFeedback: "unavailable"
+        learningFeedback: "available"
       },
       queue: [
         {
@@ -168,12 +168,12 @@ describe("human review ops workbench contracts", () => {
     expect(parsed.queue[0]?.itemStatus).toBe("orphaned_case");
   });
 
-  it("models detail without DecisionResult or invented learning claims", () => {
+  it("models detail without DecisionResult or catalog-mutation learning claims", () => {
     const parsed = humanReviewOpsDetailResponseSchema.parse({
       generatedAt: "2026-04-30T09:01:00.000Z",
       capabilities: {
         terminalResolve: "transition_only",
-        learningFeedback: "unavailable"
+        learningFeedback: "available"
       },
       detail: {
         request: {
@@ -229,15 +229,15 @@ describe("human review ops workbench contracts", () => {
           recompute: null
         },
         learning: {
-          source: "unavailable",
-          summary: null
+          source: "learning_api",
+          summary: "Learning feedback is captured after terminal operator resolution."
         },
         operatorNextActions: []
       }
     });
 
     expect("decisionResult" in parsed.detail).toBe(false);
-    expect(parsed.detail.learning.source).toBe("unavailable");
+    expect(parsed.detail.learning.source).toBe("learning_api");
     expect(parsed.detail.resolution).not.toBeNull();
     expect(parsed.detail.resolution?.recompute).toBeNull();
     expect(parsed.detail.operatorNextActions).toEqual([]);
@@ -248,7 +248,7 @@ describe("human review ops workbench contracts", () => {
       generatedAt: "2026-04-30T09:01:00.000Z",
       capabilities: {
         terminalResolve: "transition_only",
-        learningFeedback: "unavailable"
+        learningFeedback: "available"
       },
       detail: {
         request: {
@@ -304,8 +304,8 @@ describe("human review ops workbench contracts", () => {
           recompute: null
         },
         learning: {
-          source: "unavailable",
-          summary: null
+          source: "learning_api",
+          summary: "Learning feedback is captured after terminal operator resolution."
         },
         operatorNextActions: [
           {

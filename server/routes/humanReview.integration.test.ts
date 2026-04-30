@@ -174,7 +174,7 @@ describe("human review HTTP surface", () => {
 
       expect(response.status).toBe(200);
       expect(response.json.queue).toEqual([]);
-      expect(response.json.capabilities.learningFeedback).toBe("unavailable");
+      expect(response.json.capabilities.learningFeedback).toBe("available");
     } finally {
       if (previous) {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previous;
@@ -220,7 +220,7 @@ describe("human review HTTP surface", () => {
     expect(detail.json.detail.request.id).toBe(created.json.request.id);
     expect(detail.json.detail.currentResult.verdict).toBe("HUMAN_REVIEW");
     expect(detail.json.detail.blockingReasons.length).toBeGreaterThan(0);
-    expect(detail.json.detail.learning.source).toBe("unavailable");
+    expect(detail.json.detail.learning.source).toBe("learning_api");
     const moveInReview = detail.json.detail.operatorNextActions.find(
       (action: { id: string }) => action.id === "move_in_review"
     );
@@ -534,6 +534,377 @@ describe("human review HTTP surface", () => {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previous;
       } else {
         delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("captures learning feedback when operator resolves a review and keeps repeated resolve idempotent", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-learning-"));
+    const previousReviewFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+    const previousLearningFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        isolatedTempDir,
+        "human-reviews.json"
+      );
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = path.join(
+        isolatedTempDir,
+        "human-review-learning.json"
+      );
+      const isolatedApp = await createApp();
+
+      const created = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/human-review",
+        {
+          channel: "email",
+          contact: "learning@example.com",
+          message: "Нужно разобрать конфликт источников и сохранить learning feedback."
+        },
+        isolatedApp
+      );
+      expect(created.status).toBe(200);
+
+      const resolved = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/human-review/transition",
+        {
+          requestId: created.json.request.id,
+          status: "resolved",
+          note: "Оператор проверил конфликт источников.",
+          resolution: {
+            summary: "Причина закрытия: источники конфликтуют, автоматический совет не выдаём."
+          }
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(resolved.status).toBe(200);
+      expect(resolved.json.learningFeedback.event.ingestedVia).toBe("terminal_resolution");
+      expect(resolved.json.learningFeedback.event.rootCause).toBe("conflicting_evidence");
+      expect(resolved.json.learningFeedback.inserted).toBe(true);
+
+      const laterRecompute = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/recompute",
+        {},
+        isolatedApp
+      );
+      expect(laterRecompute.status).toBe(200);
+
+      const repeated = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/human-review/transition",
+        {
+          requestId: created.json.request.id,
+          status: "resolved",
+          note: "Оператор проверил конфликт источников.",
+          resolution: {
+            summary: "Причина закрытия: источники конфликтуют, автоматический совет не выдаём."
+          }
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(repeated.status).toBe(200);
+      expect(repeated.json.request.id).toBe(created.json.request.id);
+      expect(repeated.json.decisionRecordId).toBe(resolved.json.decisionRecordId);
+      expect(repeated.json.learningFeedback.inserted).toBe(false);
+      expect(repeated.json.learningFeedback.event.eventId).toBe(
+        resolved.json.learningFeedback.event.eventId
+      );
+
+      const events = await requestJson(
+        "GET",
+        "/api/human-review/learning/events",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(events.status).toBe(200);
+      expect(events.json.totalEvents).toBe(1);
+      expect(events.json.limit).toBe(50);
+      expect(events.json.offset).toBe(0);
+      expect(events.json.events).toHaveLength(1);
+      expect(events.json.events[0].sourceCatalogMutation.applied).toBe(false);
+    } finally {
+      if (previousReviewFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      if (previousLearningFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = previousLearningFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps manual learning ingest idempotent and rejects conflicting replay payloads", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-ingest-"));
+    const previousReviewFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+    const previousLearningFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+
+    const event = {
+      version: "human-review-learning.v1",
+      ingestedVia: "admin_import",
+      ingestReason: "Verified test import.",
+      ingestedAt: "2026-04-30T10:01:00.000Z",
+      requestId: "hr_manual_1",
+      caseId: "case_manual",
+      capturedAt: "2026-04-30T10:01:00.000Z",
+      resolvedAt: "2026-04-30T10:00:00.000Z",
+      eventId: "hrl_hr_manual_1_2026-04-30T10:00:00.000Z",
+      resolutionSummary: "Оператор закрыл проверку после ручного разбора.",
+      rootCause: "missing_evidence",
+      rootCauseLabel: "Не хватает доказательной базы",
+      fixedSignals: [],
+      evidenceGaps: [],
+      verdictDelta: {
+        before: "HUMAN_REVIEW",
+        after: "HUMAN_REVIEW",
+        changed: false
+      },
+      actionDelta: {
+        beforeLabel: "Передать кейс менеджеру",
+        afterLabel: "Передать кейс менеджеру",
+        beforeType: "send_for_review",
+        afterType: "send_for_review",
+        changed: false
+      },
+      confidenceDelta: 0,
+      postDecisionRecordId: null,
+      sourceCatalogMutation: {
+        allowed: false,
+        applied: false
+      }
+    };
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        isolatedTempDir,
+        "human-reviews.json"
+      );
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = path.join(
+        isolatedTempDir,
+        "human-review-learning.json"
+      );
+      const isolatedApp = await createApp();
+
+      const first = await requestJson(
+        "POST",
+        "/api/human-review/learning/ingest",
+        { mode: "admin_import", reason: "Verified test import.", event },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(first.status).toBe(200);
+      expect(first.json.inserted).toBe(true);
+      expect(first.json.event.ingestedVia).toBe("admin_import");
+      expect(first.json.event.ingestReason).toBe("Verified test import.");
+
+      const duplicate = await requestJson(
+        "POST",
+        "/api/human-review/learning/ingest",
+        { mode: "admin_import", reason: "Verified test import.", event },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(duplicate.status).toBe(200);
+      expect(duplicate.json.inserted).toBe(false);
+
+      const conflict = await requestJson(
+        "POST",
+        "/api/human-review/learning/ingest",
+        {
+          event: {
+            ...event,
+            resolutionSummary: "Другой payload с тем же eventId."
+          },
+          mode: "admin_import",
+          reason: "Verified test import."
+        },
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(conflict.status).toBe(409);
+      expect(conflict.json.error).toBe("human_review_learning_conflict");
+    } finally {
+      if (previousReviewFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      if (previousLearningFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = previousLearningFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns deterministic learning aggregates and top blockers", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-aggregates-"));
+    const previousReviewFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+    const previousLearningFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        isolatedTempDir,
+        "human-reviews.json"
+      );
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = path.join(
+        isolatedTempDir,
+        "human-review-learning.json"
+      );
+      const isolatedApp = await createApp();
+
+      for (const [index, rootCause] of ["stale_evidence", "stale_evidence", "missing_signal"].entries()) {
+        const resolvedAt = `2026-04-30T10:0${index}:00.000Z`;
+        const requestId = `hr_aggregate_${index}`;
+        const event = {
+          version: "human-review-learning.v1",
+          ingestedVia: "admin_import",
+          ingestReason: "Verified aggregate test import.",
+          ingestedAt: resolvedAt,
+          eventId: `hrl_${requestId}_${resolvedAt}`,
+          requestId,
+          caseId: `case_aggregate_${index}`,
+          capturedAt: resolvedAt,
+          resolvedAt,
+          resolutionSummary: "Оператор закрыл проверку.",
+          rootCause,
+          rootCauseLabel: rootCause === "stale_evidence" ? "Источники устарели" : "Не хватает сигнала",
+          fixedSignals: rootCause === "missing_signal" ? ["income"] : [],
+          evidenceGaps: [
+            {
+              id: "EVIDENCE_GATE:visa_rule",
+              label: "Evidence gate заблокировал visa_rule.",
+              detail: "Повторяющийся blocker.",
+              severity: "high",
+              ruleId: "visa_rule"
+            }
+          ],
+          verdictDelta: {
+            before: "HUMAN_REVIEW",
+            after: "HUMAN_REVIEW",
+            changed: false
+          },
+          actionDelta: {
+            beforeLabel: "Передать кейс менеджеру",
+            afterLabel: index === 2 ? "Обновить данные" : "Передать кейс менеджеру",
+            beforeType: "send_for_review",
+            afterType: index === 2 ? "upload_missing_docs" : "send_for_review",
+            changed: index === 2
+          },
+          confidenceDelta: 0,
+          postDecisionRecordId: null,
+          sourceCatalogMutation: {
+            allowed: false,
+            applied: false
+          }
+        };
+
+        const response = await requestJson(
+          "POST",
+          "/api/human-review/learning/ingest",
+          { mode: "admin_import", reason: "Verified aggregate test import.", event },
+          isolatedApp,
+          { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const summary = await requestJson(
+        "GET",
+        "/api/human-review/learning/summary",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(summary.status).toBe(200);
+      expect(summary.json.totalEvents).toBe(3);
+      expect(summary.json.rootCauseCounts.stale_evidence).toBe(2);
+      expect(summary.json.actionDeltaCounts.changed).toBe(1);
+      expect(summary.json.sourceCatalogMutationsApplied).toBe(0);
+
+      const blockers = await requestJson(
+        "GET",
+        "/api/human-review/learning/top-blockers",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(blockers.status).toBe(200);
+      expect(blockers.json.blockers[0]).toMatchObject({
+        id: "EVIDENCE_GATE:visa_rule",
+        count: 3,
+        severity: "high",
+        dominantRootCause: "stale_evidence",
+        rootCauseCounts: expect.objectContaining({
+          stale_evidence: 2,
+          missing_signal: 1
+        })
+      });
+    } finally {
+      if (previousReviewFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      if (previousLearningFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = previousLearningFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("starts with an empty learning log when persisted learning storage is corrupted", async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-learning-corrupt-"));
+    const corruptFile = path.join(tempDir, "human-review-learning.json");
+    const previousReviewFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+    const previousLearningFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        tempDir,
+        "human-reviews.json"
+      );
+      await writeFile(corruptFile, "{broken json", "utf8");
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = corruptFile;
+
+      const corruptedApp = await createApp();
+      const response = await requestJson(
+        "GET",
+        "/api/human-review/learning/events",
+        undefined,
+        corruptedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.json.totalEvents).toBe(0);
+      expect(response.json.events).toEqual([]);
+
+      const entries = await readdir(tempDir);
+      expect(entries.some((entry) => entry.startsWith("human-review-learning.json.corrupt-"))).toBe(true);
+    } finally {
+      if (previousReviewFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      if (previousLearningFile) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE = previousLearningFile;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEW_LEARNING_FILE;
       }
       await rm(tempDir, { recursive: true, force: true });
     }

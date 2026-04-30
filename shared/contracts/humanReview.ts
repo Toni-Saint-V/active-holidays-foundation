@@ -5,6 +5,7 @@ import { documentsReadinessItemSchema } from "./result";
 import { evidenceStatusSchema } from "./evidence";
 import { riskSchema } from "./risk";
 import { resultPayloadSchema } from "./result";
+import { humanReviewLearningIngestResponseSchema } from "./humanReviewLearning";
 import { scenarioSafetyStatusSchema } from "./scenario";
 import { freshnessStatusSchema } from "./trust";
 import { verdictSchema } from "./verdict";
@@ -69,7 +70,8 @@ export type HumanReviewHandoff = z.infer<typeof humanReviewHandoffSchema>;
 export const humanReviewResolutionSchema = z.object({
   summary: z.string().min(1).max(2000),
   resolvedAt: z.string().datetime(),
-  changedBy: humanReviewActorSchema
+  changedBy: humanReviewActorSchema,
+  postDecisionRecordId: z.string().min(1).nullable().default(null)
 });
 export type HumanReviewResolution = z.infer<typeof humanReviewResolutionSchema>;
 
@@ -204,7 +206,8 @@ export type HumanReviewTransitionRequest = z.infer<typeof humanReviewTransitionR
 export const humanReviewTransitionResponseSchema = z.object({
   request: humanReviewRequestSchema,
   result: resultPayloadSchema.nullable().optional(),
-  decisionRecordId: z.string().min(1).nullable().optional()
+  decisionRecordId: z.string().min(1).nullable().optional(),
+  learningFeedback: humanReviewLearningIngestResponseSchema.nullable().optional()
 });
 export type HumanReviewTransitionResponse = z.infer<typeof humanReviewTransitionResponseSchema>;
 

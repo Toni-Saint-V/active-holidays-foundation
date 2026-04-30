@@ -13,7 +13,7 @@ import { verdictSchema } from "./verdict";
 
 export const humanReviewOpsCapabilitiesSchema = z.object({
   terminalResolve: z.literal("transition_only"),
-  learningFeedback: z.literal("unavailable")
+  learningFeedback: z.literal("available")
 });
 export type HumanReviewOpsCapabilities = z.infer<typeof humanReviewOpsCapabilitiesSchema>;
 
@@ -100,8 +100,8 @@ export const humanReviewOpsResolutionSchema = z
 export type HumanReviewOpsResolution = z.infer<typeof humanReviewOpsResolutionSchema>;
 
 export const humanReviewOpsLearningSummarySchema = z.object({
-  source: z.literal("unavailable"),
-  summary: z.null()
+  source: z.literal("learning_api"),
+  summary: z.string().min(1)
 });
 export type HumanReviewOpsLearningSummary = z.infer<
   typeof humanReviewOpsLearningSummarySchema

@@ -9,7 +9,7 @@ const queueBase: HumanReviewOpsQueueResponse = {
   generatedAt: "2026-04-30T09:01:00.000Z",
   capabilities: {
     terminalResolve: "transition_only",
-    learningFeedback: "unavailable"
+    learningFeedback: "available"
   },
   queue: []
 };
@@ -131,8 +131,8 @@ const detailBase: HumanReviewOpsDetailResponse["detail"] = {
   ],
   resolution: null,
   learning: {
-    source: "unavailable",
-    summary: null
+    source: "learning_api",
+    summary: "Learning feedback is captured after terminal operator resolution."
   },
   operatorNextActions: [
     {
@@ -145,7 +145,7 @@ const detailBase: HumanReviewOpsDetailResponse["detail"] = {
 };
 
 describe("buildHumanReviewOpsWorkbenchScreenModel", () => {
-  it("shows a precise empty state without implying automation learning is available", () => {
+  it("shows a precise empty state without implying catalog mutation is available", () => {
     const model = buildHumanReviewOpsWorkbenchScreenModel({
       queue: queueBase,
       detail: null
@@ -154,7 +154,7 @@ describe("buildHumanReviewOpsWorkbenchScreenModel", () => {
     expect(model.mode).toBe("empty");
     expect(model.emptyState?.title).toContain("Нет активных");
     expect(model.capabilityNotes).toContain(
-      "Автоматическое обучение по решениям оператора пока не подключено."
+      "После закрытия система сохраняет learning feedback для операционной аналитики."
     );
   });
 
@@ -195,7 +195,7 @@ describe("buildHumanReviewOpsWorkbenchScreenModel", () => {
     expect(model.detailPanel?.primaryAction?.id).toBe("move_in_review");
     expect(model.detailPanel?.primaryAction?.transitionStatus).toBe("in_review");
     expect(model.detailPanel?.learningNote).toBe(
-      "Автоматическое обучение по этому закрытию пока не подключено."
+      "Learning feedback is captured after terminal operator resolution."
     );
   });
 
@@ -213,7 +213,8 @@ describe("buildHumanReviewOpsWorkbenchScreenModel", () => {
             resolution: {
               summary: "Проверка завершена.",
               resolvedAt: "2026-04-30T09:10:00.000Z",
-              changedBy: "ops"
+              changedBy: "ops",
+              postDecisionRecordId: null
             }
           },
           resolution: {
@@ -247,7 +248,8 @@ describe("buildHumanReviewOpsWorkbenchScreenModel", () => {
             resolution: {
               summary: "Проверка завершена.",
               resolvedAt: "2026-04-30T09:10:00.000Z",
-              changedBy: "ops"
+              changedBy: "ops",
+              postDecisionRecordId: null
             }
           },
           resolution: {
