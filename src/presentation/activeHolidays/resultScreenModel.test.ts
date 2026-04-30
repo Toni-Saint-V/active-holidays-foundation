@@ -126,6 +126,11 @@ function createScenarioLab(): ScenarioLabPayload {
         title: "Добрать обязательные документы",
         summary: "Сценарий усиливает текущий маршрут без смены основного пути.",
         recommended: true,
+        safetyStatus: "safe_automatic",
+        evidenceStatus: "valid",
+        freshnessStatus: "fresh",
+        blockingReason: null,
+        humanReviewReason: null,
         nextAction: {
           type: "upload_missing_docs",
           priority: "blocking",
@@ -150,6 +155,32 @@ function createScenarioLab(): ScenarioLabPayload {
             itemsToCollect: []
           },
           whyChanged: ["Чеклист становится полным."]
+        },
+        delta: {
+          verdict: { before: "GO", after: "GO", changed: false },
+          confidence: { before: 0.74, after: 0.82, delta: 0.08 },
+          documents: {
+            readyCountBefore: 5,
+            readyCountAfter: 7,
+            readyCountDelta: 2,
+            requiredCountBefore: 7,
+            requiredCountAfter: 7,
+            scoreBefore: 0.71,
+            scoreAfter: 1,
+            scoreDelta: 0.29
+          },
+          risks: { resolved: [], added: [], remaining: [] },
+          nextAction: {
+            beforeType: "upload_missing_docs",
+            afterType: "upload_missing_docs",
+            beforeLabel: "Собрать документы",
+            afterLabel: "Перейти к документам",
+            changed: true
+          },
+          evidenceStatus: { before: "valid", after: "valid", changed: false },
+          freshnessStatus: { before: "fresh", after: "fresh", changed: false },
+          blockingReason: { before: null, after: null, changed: false },
+          humanReviewReason: { before: null, after: null, changed: false }
         },
         plan: {
           headline: "После этого сценария следующий шаг — перейти к документам.",
@@ -308,5 +339,39 @@ describe("buildResultScreenModel", () => {
     expect(model.compareCard?.title).toBe("Рекомендованный сценарий");
     expect(model.workSection.rows[0]?.title).toBe("Рекомендованный сценарий");
     expect(model.ai.summary).toContain("Рекомендованный сценарий");
+  });
+
+  it("keeps a defensive compare fallback for pre-validated legacy scenario objects", () => {
+    const scenarioLab = createScenarioLab();
+    const legacyScenario = {
+      ...scenarioLab.scenarios[0]
+    } as Record<string, unknown>;
+    delete legacyScenario.safetyStatus;
+    delete legacyScenario.evidenceStatus;
+    delete legacyScenario.freshnessStatus;
+    delete legacyScenario.blockingReason;
+    delete legacyScenario.humanReviewReason;
+    delete legacyScenario.delta;
+    scenarioLab.scenarios = [legacyScenario as ScenarioLabPayload["scenarios"][number]];
+
+    const model = buildResultScreenModel({
+      result: createBaseResult({
+        documents: {
+          score: 1,
+          readyCount: 7,
+          requiredCount: 7,
+          items: []
+        }
+      }),
+      scenarioLab
+    });
+
+    expect(model.compareCard).toEqual({
+      title: "Добрать обязательные документы",
+      summary: "Сценарий усиливает текущий маршрут без смены основного пути."
+    });
+    expect(model.evidence.find((item) => item.id === "scenario")?.label).toBe(
+      "Есть сценарий усиления"
+    );
   });
 });

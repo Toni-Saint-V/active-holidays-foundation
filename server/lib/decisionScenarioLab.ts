@@ -8,9 +8,11 @@ import {
   type ScenarioActionPlan,
   type ScenarioCandidate,
   type ScenarioCandidateType,
+  type ScenarioConciergeDelta,
   type ScenarioDocumentsDelta,
   type ScenarioIssue,
   type ScenarioLabPayload,
+  type ScenarioSafetyStatus,
   type ProductType,
   type SignalId
 } from "@shared/contracts";
@@ -43,6 +45,12 @@ const scenarioDraftBuilders: Record<ProductType, (caseData: Case) => ScenarioDra
   residency_es: buildResidencySignalFixes,
   insurance_adult: () => []
 };
+
+const evidenceBlockedStatuses = new Set<ResultPayload["trust"]["evidenceStatus"]>([
+  "conflicting",
+  "missing",
+  "stale"
+]);
 
 function offerLabel(offer: Offer | null): string | null {
   if (!offer) return null;
@@ -125,6 +133,71 @@ function riskLabels(result: ResultPayload): string[] {
   return [...labels];
 }
 
+function buildConciergeDelta(
+  before: ResultPayload,
+  after: ResultPayload
+): ScenarioConciergeDelta {
+  const beforeRisks = riskLabels(before);
+  const afterRisks = riskLabels(after);
+
+  return {
+    verdict: {
+      before: before.verdict,
+      after: after.verdict,
+      changed: before.verdict !== after.verdict
+    },
+    confidence: {
+      before: before.trust.confidence,
+      after: after.trust.confidence,
+      delta: Math.round((after.trust.confidence - before.trust.confidence) * 100) / 100
+    },
+    documents: {
+      readyCountBefore: before.documents.readyCount,
+      readyCountAfter: after.documents.readyCount,
+      readyCountDelta: after.documents.readyCount - before.documents.readyCount,
+      requiredCountBefore: before.documents.requiredCount,
+      requiredCountAfter: after.documents.requiredCount,
+      scoreBefore: before.documents.score,
+      scoreAfter: after.documents.score,
+      scoreDelta: Math.round((after.documents.score - before.documents.score) * 100) / 100
+    },
+    risks: {
+      resolved: beforeRisks.filter((label) => !afterRisks.includes(label)),
+      added: afterRisks.filter((label) => !beforeRisks.includes(label)),
+      remaining: afterRisks
+    },
+    nextAction: {
+      beforeType: before.nextAction.type,
+      afterType: after.nextAction.type,
+      beforeLabel: before.nextAction.label,
+      afterLabel: after.nextAction.label,
+      changed:
+        before.nextAction.type !== after.nextAction.type ||
+        before.nextAction.label !== after.nextAction.label
+    },
+    evidenceStatus: {
+      before: before.trust.evidenceStatus,
+      after: after.trust.evidenceStatus,
+      changed: before.trust.evidenceStatus !== after.trust.evidenceStatus
+    },
+    freshnessStatus: {
+      before: before.trust.freshnessStatus,
+      after: after.trust.freshnessStatus,
+      changed: before.trust.freshnessStatus !== after.trust.freshnessStatus
+    },
+    blockingReason: {
+      before: before.trust.blockingReason,
+      after: after.trust.blockingReason,
+      changed: before.trust.blockingReason !== after.trust.blockingReason
+    },
+    humanReviewReason: {
+      before: before.trust.humanReviewReason,
+      after: after.trust.humanReviewReason,
+      changed: before.trust.humanReviewReason !== after.trust.humanReviewReason
+    }
+  };
+}
+
 function documentsDelta(before: ResultPayload, after: ResultPayload): ScenarioDocumentsDelta {
   return {
     readyCountBefore: before.documents.readyCount,
@@ -141,6 +214,31 @@ function humanReviewRequired(result: ResultPayload): boolean {
     result.nextAction.type === "send_for_review" ||
     result.ruleResults.some((rule) => rule.fired && rule.output.type === "human_review_trigger")
   );
+}
+
+function scenarioSafetyStatus(
+  before: ResultPayload,
+  after: ResultPayload
+): ScenarioSafetyStatus {
+  if (evidenceBlockedStatuses.has(after.trust.evidenceStatus)) {
+    return "evidence_blocked";
+  }
+
+  if (after.trust.evidenceStatus === "manual_only" || humanReviewRequired(after)) {
+    return "human_review_only";
+  }
+
+  const beforeRisks = riskLabels(before);
+  const afterRisks = riskLabels(after);
+  const addedRisk = afterRisks.some((label) => !beforeRisks.includes(label));
+  const verdictDegraded = verdictRank[after.verdict] < verdictRank[before.verdict];
+  const confidenceDegraded = before.trust.confidence - after.trust.confidence >= 0.03;
+
+  if (verdictDegraded || confidenceDegraded || addedRisk) {
+    return "degraded_usable";
+  }
+
+  return "safe_automatic";
 }
 
 function buildWhyChanged(
@@ -265,6 +363,21 @@ function isHelpfulScenario(
     return true;
   }
 
+  if (
+    draft.type === "path_switch" &&
+    after.verdict !== "HUMAN_REVIEW" &&
+    (before.primaryPath?.id ?? null) !== (after.primaryPath?.id ?? null) &&
+    (
+      before.verdict !== after.verdict ||
+      Math.abs(after.trust.confidence - before.trust.confidence) >= 0.03 ||
+      before.documents.score !== after.documents.score ||
+      before.nextAction.type !== after.nextAction.type ||
+      riskLabels(before).join("|") !== riskLabels(after).join("|")
+    )
+  ) {
+    return true;
+  }
+
   const beforeRisks = new Set(riskLabels(before));
   const afterRisks = new Set(riskLabels(after));
   return [...beforeRisks].some((label) => !afterRisks.has(label));
@@ -275,12 +388,19 @@ function scenarioFromDraft(
   after: ResultPayload,
   draft: ScenarioDraft
 ): ScenarioCandidate {
+  const delta = buildConciergeDelta(before, after);
+
   return {
     id: draft.id,
     type: draft.type,
     title: draft.title,
     summary: draft.summary,
     recommended: false,
+    safetyStatus: scenarioSafetyStatus(before, after),
+    evidenceStatus: after.trust.evidenceStatus,
+    freshnessStatus: after.trust.freshnessStatus,
+    blockingReason: after.trust.blockingReason,
+    humanReviewReason: after.trust.humanReviewReason,
     nextAction: after.nextAction,
     comparison: {
       verdictBefore: before.verdict,
@@ -300,6 +420,7 @@ function scenarioFromDraft(
       documents: documentsDelta(before, after),
       whyChanged: buildWhyChanged(before, after, draft)
     },
+    delta,
     plan: buildPlan(draft, after, before)
   };
 }
@@ -518,10 +639,44 @@ function buildAlternativePathScenarios(caseData: Case, result: ResultPayload): S
   }));
 }
 
+function humanReviewScenarioSafetyStatus(result: ResultPayload): ScenarioSafetyStatus {
+  return evidenceBlockedStatuses.has(result.trust.evidenceStatus)
+    ? "evidence_blocked"
+    : "human_review_only";
+}
+
+function humanReviewScenarioNextAction(result: ResultPayload, reason: string): ResultPayload["nextAction"] {
+  return {
+    type: "send_for_review",
+    priority: "human_review",
+    label: "Открыть ручную проверку",
+    detail: reason,
+    targetScreen: "human-review",
+    triggeredBy: result.ruleResults
+      .filter((rule) => rule.fired && rule.output.type === "human_review_trigger")
+      .map((rule) => rule.ruleId)
+      .concat("no_helpful_scenarios")
+  };
+}
+
 function buildHumanReviewScenario(result: ResultPayload): ScenarioCandidate {
   const reason =
     result.ruleResults.find((rule) => rule.fired && rule.output.type === "human_review_trigger")
       ?.explanation ?? result.nextAction.detail;
+  const nextAction = humanReviewScenarioNextAction(result, reason);
+  const scenarioResult: ResultPayload = {
+    ...result,
+    verdict: "HUMAN_REVIEW",
+    primaryPath: null,
+    alternativePaths: [],
+    nextAction,
+    trust: {
+      ...result.trust,
+      confidence: 0,
+      humanReviewReason: result.trust.humanReviewReason ?? reason
+    }
+  };
+  const delta = buildConciergeDelta(result, scenarioResult);
 
   return {
     id: "human-review",
@@ -529,22 +684,17 @@ function buildHumanReviewScenario(result: ResultPayload): ScenarioCandidate {
     title: "Передать кейс в ручную проверку",
     summary: "Если автоматический пересчёт не даёт нормальный исход, не рисуем оптимизм и зовём человека.",
     recommended: true,
-    nextAction: {
-      type: "send_for_review",
-      priority: "human_review",
-      label: "Открыть ручную проверку",
-      detail: reason,
-      targetScreen: "human-review",
-      triggeredBy: result.ruleResults
-        .filter((rule) => rule.fired && rule.output.type === "human_review_trigger")
-        .map((rule) => rule.ruleId)
-        .concat("no_helpful_scenarios")
-    },
+    safetyStatus: humanReviewScenarioSafetyStatus(result),
+    evidenceStatus: result.trust.evidenceStatus,
+    freshnessStatus: result.trust.freshnessStatus,
+    blockingReason: result.trust.blockingReason,
+    humanReviewReason: result.trust.humanReviewReason ?? reason,
+    nextAction,
     comparison: {
       verdictBefore: result.verdict,
       verdictAfter: "HUMAN_REVIEW",
       confidenceBefore: result.trust.confidence,
-      confidenceAfter: result.trust.confidence,
+      confidenceAfter: scenarioResult.trust.confidence,
       primaryPathBefore: {
         id: result.primaryPath?.id ?? null,
         label: offerLabel(result.primaryPath)
@@ -563,6 +713,7 @@ function buildHumanReviewScenario(result: ResultPayload): ScenarioCandidate {
       },
       whyChanged: [reason]
     },
+    delta,
     plan: {
       headline: "Кейс упирается в факторы, которые автомат не должен трактовать сам.",
       firstSteps: ["Подготовить всё, что уже известно по кейсу, без попытки “додавить” автомат."],
@@ -575,7 +726,15 @@ function buildHumanReviewScenario(result: ResultPayload): ScenarioCandidate {
 }
 
 function rankScenario(candidate: ScenarioCandidate): number {
+  const safetyRank: Record<ScenarioSafetyStatus, number> = {
+    safe_automatic: 300,
+    degraded_usable: 150,
+    evidence_blocked: 0,
+    human_review_only: 0
+  };
+
   return (
+    safetyRank[candidate.safetyStatus ?? "degraded_usable"] +
     verdictRank[candidate.comparison.verdictAfter] * 100 +
     Math.round(candidate.comparison.confidenceAfter * 100) +
     candidate.comparison.resolvedRisks.length * 10 +

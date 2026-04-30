@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
+import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
 
 let app: Express;
 
@@ -126,6 +127,68 @@ async function postJson(path: string, body?: unknown) {
 }
 
 describe("scenario lab HTTP surface", () => {
+  it("returns evidence-aware concierge scenarios for a recoverable case", async () => {
+    const response = await getJson("/api/cases/s1-rf-italy/scenario-lab");
+
+    expect(response.status).toBe(200);
+    expect(response.json.scenarios.length).toBeGreaterThanOrEqual(2);
+    expect(response.json.scenarios.length).toBeLessThanOrEqual(4);
+
+    const recommended = response.json.scenarios.find(
+      (scenario: { id: string }) => scenario.id === response.json.recommendedScenarioId
+    );
+    expect(recommended).toBeTruthy();
+    expect(recommended.safetyStatus).toBe("safe_automatic");
+    expect(recommended.evidenceStatus).toBe("valid");
+    expect(recommended.freshnessStatus).toBe("fresh");
+    expect(recommended.blockingReason).toBeNull();
+    expect(recommended.humanReviewReason).toBeNull();
+    expect(recommended.delta.nextAction.changed).toEqual(expect.any(Boolean));
+    expect(recommended.delta.evidenceStatus.after).toBe("valid");
+    expect(recommended.delta.freshnessStatus.after).toBe("fresh");
+    expect(recommended.plan.firstSteps.join(" ")).toMatch(/[А-Яа-яЁё]/);
+  });
+
+  it("blocks unsafe scenario concierge output when evidence is stale", async () => {
+    const catalogs = structuredClone(await loadCatalogs());
+    const staleRecord = catalogs.ruleEvidence.find(
+      (record) => record.ruleId === "R02" && record.countryOrScope === "RU->IT"
+    );
+    expect(staleRecord).toBeDefined();
+    if (!staleRecord) return;
+    staleRecord.lastVerifiedAt = "2025-01-01T00:00:00.000Z";
+
+    const restore = replaceCatalogsForTest(catalogs);
+    try {
+      const response = await getJson("/api/cases/s1-rf-italy/scenario-lab");
+
+      expect(response.status).toBe(200);
+      expect(response.json.humanReviewEscalation.required).toBe(true);
+      expect(response.json.scenarios).toHaveLength(1);
+      expect(response.json.scenarios[0].safetyStatus).toBe("evidence_blocked");
+      expect(response.json.scenarios[0].evidenceStatus).toBe("stale");
+      expect(response.json.scenarios[0].freshnessStatus).toBe("stale");
+      expect(response.json.scenarios[0].blockingReason).toContain("R02");
+      expect(response.json.scenarios[0].humanReviewReason).toContain("EVIDENCE_GATE");
+      expect(response.json.scenarios[0].delta.blockingReason.after).toContain("R02");
+    } finally {
+      restore();
+    }
+  });
+
+  it("keeps conflicting evidence as a human-review-only concierge path", async () => {
+    const response = await getJson("/api/cases/s2-tr-spb/scenario-lab");
+
+    expect(response.status).toBe(200);
+    expect(response.json.noHelpfulScenarios).toBe(true);
+    expect(response.json.scenarios).toHaveLength(1);
+    expect(response.json.scenarios[0].type).toBe("human_review");
+    expect(response.json.scenarios[0].safetyStatus).toBe("evidence_blocked");
+    expect(response.json.scenarios[0].evidenceStatus).toBe("conflicting");
+    expect(response.json.scenarios[0].humanReviewReason).toContain("Evidence gate");
+    expect(response.json.scenarios[0].delta.evidenceStatus.after).toBe("conflicting");
+  });
+
   it("rejects empty compare requests instead of creating noop forks", async () => {
     const compare = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {});
 
@@ -241,5 +304,17 @@ describe("scenario lab HTTP surface", () => {
         (step: { kind: string }) => step.kind === "review"
       )
     ).toBe(true);
+  });
+
+  it("uses an honest human-review-only fallback when no automatic scenario can help", async () => {
+    const response = await getJson("/api/cases/s3-us-spb-business/scenario-lab");
+
+    expect(response.status).toBe(200);
+    expect(response.json.noHelpfulScenarios).toBe(true);
+    expect(response.json.recommendedScenarioId).toBe("human-review");
+    expect(response.json.scenarios).toHaveLength(1);
+    expect(response.json.scenarios[0].safetyStatus).toBe("human_review_only");
+    expect(response.json.scenarios[0].plan.humanReviewRequired).toBe(true);
+    expect(response.json.scenarios[0].nextAction.targetScreen).toBe("human-review");
   });
 });

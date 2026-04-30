@@ -50,4 +50,23 @@ describe("buildDecisionScenarioLab", () => {
 
     expect(lab.scenarios.some((scenario) => scenario.type === "path_switch")).toBe(false);
   });
+
+  it("marks no-helpful fallback scenarios as human-review-only even when the base result is not review", async () => {
+    const catalogs = await loadCatalogs();
+    const caseData = catalogs.cases.find((entry) => entry.id === "s5-rf-italy-insurance");
+    expect(caseData).toBeDefined();
+    if (!caseData) return;
+
+    const result = runDecision({ case: caseData, catalogs });
+    const lab = buildDecisionScenarioLab(caseData, catalogs, result);
+
+    expect(result.verdict).not.toBe("HUMAN_REVIEW");
+    expect(lab.noHelpfulScenarios).toBe(true);
+    expect(lab.scenarios[0]?.type).toBe("human_review");
+    expect(lab.scenarios[0]?.safetyStatus).toBe("human_review_only");
+    expect(lab.scenarios[0]?.comparison.confidenceAfter).toBe(0);
+    expect(lab.scenarios[0]?.delta?.verdict.after).toBe("HUMAN_REVIEW");
+    expect(lab.scenarios[0]?.delta?.confidence.after).toBe(0);
+    expect(lab.scenarios[0]?.delta?.nextAction.afterType).toBe("send_for_review");
+  });
 });

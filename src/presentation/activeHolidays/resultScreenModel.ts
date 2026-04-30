@@ -190,6 +190,39 @@ function ctaSubcopy(result: ResultPayload): string {
   }
 }
 
+function scenarioEvidenceLabel(
+  result: ResultPayload,
+  recommendedScenario: ScenarioLabPayload["scenarios"][number] | null
+): string {
+  if (result.verdict === "HUMAN_REVIEW") return "Нужен оператор";
+  if (!recommendedScenario) return "Маршрут зафиксирован";
+
+  switch (recommendedScenario.safetyStatus) {
+    case "evidence_blocked":
+      return "Источники блокируют сценарий";
+    case "human_review_only":
+      return "Только ручная проверка";
+    case "degraded_usable":
+      return "Есть запасной сценарий";
+    case "safe_automatic":
+      return "Есть безопасный сценарий";
+    default:
+      return "Есть сценарий усиления";
+  }
+}
+
+function scenarioEvidenceTone(
+  result: ResultPayload,
+  recommendedScenario: ScenarioLabPayload["scenarios"][number] | null
+): "manual" | "info" | "result" {
+  if (result.verdict === "HUMAN_REVIEW") return "manual";
+  if (!recommendedScenario) return "result";
+  return recommendedScenario.safetyStatus === "evidence_blocked" ||
+    recommendedScenario.safetyStatus === "human_review_only"
+    ? "manual"
+    : "info";
+}
+
 function evidenceSignals(
   result: ResultPayload,
   recommendedScenario: ScenarioLabPayload["scenarios"][number] | null,
@@ -211,18 +244,8 @@ function evidenceSignals(
     },
     {
       id: "scenario",
-      label:
-        result.verdict === "HUMAN_REVIEW"
-          ? "Нужен оператор"
-          : recommendedScenario
-            ? "Есть сценарий усиления"
-            : "Маршрут зафиксирован",
-      tone:
-        result.verdict === "HUMAN_REVIEW"
-          ? "manual"
-          : recommendedScenario
-            ? "manual"
-            : "result"
+      label: scenarioEvidenceLabel(result, recommendedScenario),
+      tone: scenarioEvidenceTone(result, recommendedScenario)
     }
   ];
 }
@@ -255,6 +278,33 @@ function aiInsight(
   }
 
   if (recommendedScenario) {
+    if (
+      recommendedScenario.safetyStatus === "evidence_blocked" ||
+      recommendedScenario.safetyStatus === "human_review_only"
+    ) {
+      return {
+        summary: `AI: сценарий «${recommendedScenario.title}» нельзя запускать автоматически`,
+        reasons: [
+          recommendedScenario.blockingReason ??
+            recommendedScenario.humanReviewReason ??
+            "Движок требует ручной проверки до любого следующего шага.",
+          "Сценарий остаётся видимым как причина остановки, а не как совет к действию."
+        ],
+        action: "Следующий шаг: открыть ручную проверку и передать материалы менеджеру."
+      };
+    }
+
+    if (recommendedScenario.safetyStatus === "degraded_usable") {
+      return {
+        summary: `AI: «${recommendedScenario.title}» — запасной сценарий, не улучшение`,
+        reasons: [
+          "Он может быть применим, но уступает текущему маршруту по части результата.",
+          "Сравнение нужно читать как fallback, а не как рекомендацию заменить основной путь."
+        ],
+        action: "Следующий шаг: сравнить сценарий с текущим маршрутом перед любым переключением."
+      };
+    }
+
     return {
       summary: `AI: проверьте сценарий «${recommendedScenario.title}» — он может усилить путь`,
       reasons: [
@@ -303,13 +353,27 @@ function documentRows(
   }
 
   if (recommendedScenario) {
+    const status =
+      recommendedScenario.safetyStatus === "evidence_blocked"
+        ? "стоп"
+        : recommendedScenario.safetyStatus === "human_review_only"
+          ? "проверка"
+          : recommendedScenario.safetyStatus === "degraded_usable"
+            ? "запасной"
+            : "сценарий";
+    const tone =
+      recommendedScenario.safetyStatus === "evidence_blocked" ||
+      recommendedScenario.safetyStatus === "human_review_only"
+        ? "manual"
+        : "info";
+
     return [
       {
         id: recommendedScenario.id,
         title: recommendedScenario.title,
         meta: recommendedScenario.summary,
-        status: "сценарий",
-        tone: "info"
+        status,
+        tone
       }
     ];
   }

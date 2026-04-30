@@ -1,11 +1,79 @@
 import { z } from "zod";
 import { nextActionSchema } from "./action";
+import { evidenceStatusSchema } from "./evidence";
 import { signalIdSchema } from "./signals";
 import {
   documentsReadinessItemSchema,
   resultPayloadSchema
 } from "./result";
 import { verdictSchema } from "./verdict";
+
+export const scenarioSafetyStatusSchema = z.enum([
+  "safe_automatic",
+  "degraded_usable",
+  "evidence_blocked",
+  "human_review_only"
+]);
+export type ScenarioSafetyStatus = z.infer<typeof scenarioSafetyStatusSchema>;
+
+const scenarioFreshnessStatusSchema = z.enum(["fresh", "stale", "unknown"]);
+
+const scenarioValueDeltaSchema = <T extends z.ZodTypeAny>(schema: T) =>
+  z.object({
+    before: schema,
+    after: schema,
+    changed: z.boolean()
+  });
+
+export const scenarioNumericDeltaSchema = z.object({
+  before: z.number(),
+  after: z.number(),
+  delta: z.number()
+});
+export type ScenarioNumericDelta = z.infer<typeof scenarioNumericDeltaSchema>;
+
+export const scenarioNextActionDeltaSchema = z.object({
+  beforeType: nextActionSchema.shape.type,
+  afterType: nextActionSchema.shape.type,
+  beforeLabel: z.string().min(1),
+  afterLabel: z.string().min(1),
+  changed: z.boolean()
+});
+export type ScenarioNextActionDelta = z.infer<typeof scenarioNextActionDeltaSchema>;
+
+export const scenarioRiskDeltaSchema = z.object({
+  resolved: z.array(z.string().min(1)),
+  added: z.array(z.string().min(1)),
+  remaining: z.array(z.string().min(1))
+});
+export type ScenarioRiskDelta = z.infer<typeof scenarioRiskDeltaSchema>;
+
+export const scenarioDocumentsReadinessDeltaSchema = z.object({
+  readyCountBefore: z.number().int().min(0),
+  readyCountAfter: z.number().int().min(0),
+  readyCountDelta: z.number().int(),
+  requiredCountBefore: z.number().int().min(0),
+  requiredCountAfter: z.number().int().min(0),
+  scoreBefore: z.number().min(0).max(1),
+  scoreAfter: z.number().min(0).max(1),
+  scoreDelta: z.number()
+});
+export type ScenarioDocumentsReadinessDelta = z.infer<
+  typeof scenarioDocumentsReadinessDeltaSchema
+>;
+
+export const scenarioConciergeDeltaSchema = z.object({
+  verdict: scenarioValueDeltaSchema(verdictSchema),
+  confidence: scenarioNumericDeltaSchema,
+  documents: scenarioDocumentsReadinessDeltaSchema,
+  risks: scenarioRiskDeltaSchema,
+  nextAction: scenarioNextActionDeltaSchema,
+  evidenceStatus: scenarioValueDeltaSchema(evidenceStatusSchema),
+  freshnessStatus: scenarioValueDeltaSchema(scenarioFreshnessStatusSchema),
+  blockingReason: scenarioValueDeltaSchema(z.string().min(1).nullable()),
+  humanReviewReason: scenarioValueDeltaSchema(z.string().min(1).nullable())
+});
+export type ScenarioConciergeDelta = z.infer<typeof scenarioConciergeDeltaSchema>;
 
 export const scenarioIssueSchema = z.object({
   id: z.string().min(1),
@@ -71,8 +139,14 @@ export const scenarioCandidateSchema = z.object({
   title: z.string().min(1),
   summary: z.string().min(1),
   recommended: z.boolean(),
+  safetyStatus: scenarioSafetyStatusSchema,
+  evidenceStatus: evidenceStatusSchema,
+  freshnessStatus: scenarioFreshnessStatusSchema,
+  blockingReason: z.string().min(1).nullable(),
+  humanReviewReason: z.string().min(1).nullable(),
   nextAction: nextActionSchema,
   comparison: scenarioComparisonSchema,
+  delta: scenarioConciergeDeltaSchema,
   plan: scenarioActionPlanSchema
 });
 export type ScenarioCandidate = z.infer<typeof scenarioCandidateSchema>;
