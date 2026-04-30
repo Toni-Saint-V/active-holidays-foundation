@@ -3,7 +3,9 @@ import {
   type HumanReviewLearningEvent,
   type HumanReviewLearningRootCause,
   type HumanReviewLearningSummaryResponse,
-  type HumanReviewLearningTopBlocker
+  type HumanReviewLearningTopBlocker,
+  type HumanReviewTrustCalibration,
+  type HumanReviewTrustCalibrationAction
 } from "@shared/contracts";
 
 export class HumanReviewLearningConflictError extends Error {
@@ -51,6 +53,15 @@ function emptyRootCauseCounts(): Record<HumanReviewLearningRootCause, number> {
   return Object.fromEntries(
     humanReviewLearningRootCauseSchema.options.map((rootCause) => [rootCause, 0])
   ) as Record<HumanReviewLearningRootCause, number>;
+}
+
+function emptyCalibrationActionCounts(): Record<HumanReviewTrustCalibrationAction, number> {
+  return {
+    fail_closed_until_evidence_refresh: 0,
+    fail_closed_until_signal_capture: 0,
+    manual_policy_review_only: 0,
+    informational_operator_note: 0
+  };
 }
 
 const severityRank: Record<HumanReviewLearningTopBlocker["severity"], number> = {
@@ -116,6 +127,17 @@ export class HumanReviewLearningStore {
       .map((event) => structuredClone(event));
   }
 
+  calibrations(): HumanReviewTrustCalibration[] {
+    return this.list()
+      .map((event) => event.trustCalibration)
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) ||
+          a.calibrationId.localeCompare(b.calibrationId)
+      )
+      .map((calibration) => structuredClone(calibration));
+  }
+
   page(input: { limit: number; offset: number }): {
     totalEvents: number;
     events: HumanReviewLearningEvent[];
@@ -134,11 +156,13 @@ export class HumanReviewLearningStore {
 
   summary(now = new Date()): HumanReviewLearningSummaryResponse {
     const rootCauseCounts = emptyRootCauseCounts();
+    const calibrationActionCounts = emptyCalibrationActionCounts();
     let verdictChanged = 0;
     let actionChanged = 0;
 
     for (const event of this.events) {
       rootCauseCounts[event.rootCause] += 1;
+      calibrationActionCounts[event.trustCalibration.action] += 1;
       if (event.verdictDelta.changed) verdictChanged += 1;
       if (event.actionDelta.changed) actionChanged += 1;
     }
@@ -155,6 +179,7 @@ export class HumanReviewLearningStore {
         changed: actionChanged,
         unchanged: this.events.length - actionChanged
       },
+      calibrationActionCounts,
       sourceCatalogMutationsApplied: 0
     };
   }

@@ -75,7 +75,8 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
     sources: catalogs.sources,
     ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
-    insuranceProducts: catalogs.insuranceProducts
+    insuranceProducts: catalogs.insuranceProducts,
+    humanReviewCalibrations: getHumanReviewLearningStore().calibrations()
   };
 }
 

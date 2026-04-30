@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { actionTypeSchema } from "./action";
+import { evidenceStatusSchema } from "./evidence";
+import { freshnessStatusSchema } from "./trust";
 import { verdictSchema } from "./verdict";
 
 export const humanReviewLearningRootCauseSchema = z.enum([
@@ -91,7 +93,142 @@ export type HumanReviewLearningSourceCatalogMutation = z.infer<
   typeof humanReviewLearningSourceCatalogMutationSchema
 >;
 
-export const humanReviewLearningEventSchema = z
+export const humanReviewTrustCalibrationActionSchema = z.enum([
+  "fail_closed_until_evidence_refresh",
+  "fail_closed_until_signal_capture",
+  "manual_policy_review_only",
+  "informational_operator_note"
+]);
+export type HumanReviewTrustCalibrationAction = z.infer<
+  typeof humanReviewTrustCalibrationActionSchema
+>;
+
+export const humanReviewTrustCalibrationSchema = z
+  .object({
+    version: z.literal("human-review-trust-calibration.v1"),
+    calibrationId: z.string().min(1),
+    eventId: z.string().min(1),
+    requestId: z.string().min(1),
+    caseId: z.string().min(1),
+    rootCause: humanReviewLearningRootCauseSchema,
+    action: humanReviewTrustCalibrationActionSchema,
+    status: z.enum(["active", "informational"]),
+    evidenceStatus: evidenceStatusSchema,
+    freshnessStatus: freshnessStatusSchema,
+    confidenceDelta: z.number(),
+    applyToFutureAutomation: z.boolean(),
+    reason: z.string().min(1).max(1000),
+    createdAt: z.string().datetime(),
+    sourceCatalogMutation: humanReviewLearningSourceCatalogMutationSchema
+  })
+  .strict()
+  .superRefine((calibration, ctx) => {
+    const expectedAction = calibrationActionForRootCause(calibration.rootCause);
+    if (calibration.action !== expectedAction) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["action"],
+        message: "Trust calibration action must match the root cause."
+      });
+    }
+    if (calibration.applyToFutureAutomation && calibration.status !== "active") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "Future automation calibration must be active."
+      });
+    }
+    if (!calibration.applyToFutureAutomation && calibration.status !== "informational") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "Non-applicable calibration must be informational."
+      });
+    }
+  });
+export type HumanReviewTrustCalibration = z.infer<
+  typeof humanReviewTrustCalibrationSchema
+>;
+
+function calibrationActionForRootCause(
+  rootCause: HumanReviewLearningRootCause
+): HumanReviewTrustCalibrationAction {
+  switch (rootCause) {
+    case "missing_evidence":
+    case "stale_evidence":
+    case "conflicting_evidence":
+      return "fail_closed_until_evidence_refresh";
+    case "missing_signal":
+      return "fail_closed_until_signal_capture";
+    case "policy_ambiguity":
+      return "manual_policy_review_only";
+    case "operator_override_only":
+      return "informational_operator_note";
+  }
+}
+
+function defaultCalibrationEvidenceStatus(
+  rootCause: HumanReviewLearningRootCause
+): z.infer<typeof evidenceStatusSchema> {
+  switch (rootCause) {
+    case "conflicting_evidence":
+      return "conflicting";
+    case "stale_evidence":
+      return "stale";
+    case "missing_evidence":
+    case "missing_signal":
+      return "missing";
+    case "policy_ambiguity":
+      return "manual_only";
+    case "operator_override_only":
+      return "valid";
+  }
+}
+
+function defaultCalibrationFreshnessStatus(
+  rootCause: HumanReviewLearningRootCause
+): z.infer<typeof freshnessStatusSchema> {
+  if (rootCause === "stale_evidence") return "stale";
+  if (rootCause === "operator_override_only" || rootCause === "policy_ambiguity") {
+    return "fresh";
+  }
+  return "unknown";
+}
+
+function legacyCalibration(value: Record<string, unknown>): HumanReviewTrustCalibration {
+  const rootCause = humanReviewLearningRootCauseSchema.parse(value.rootCause);
+  const requestId = String(value.requestId ?? "");
+  const caseId = String(value.caseId ?? "");
+  const resolvedAt = String(value.resolvedAt ?? value.capturedAt ?? value.ingestedAt ?? "");
+  const eventId = String(value.eventId ?? `hrl_${requestId}_${resolvedAt}`);
+  const action = calibrationActionForRootCause(rootCause);
+  const applyToFutureAutomation = action !== "informational_operator_note";
+  return {
+    version: "human-review-trust-calibration.v1",
+    calibrationId: `hrc_${requestId}_${resolvedAt}`,
+    eventId,
+    requestId,
+    caseId,
+    rootCause,
+    action,
+    status: applyToFutureAutomation ? "active" : "informational",
+    evidenceStatus: defaultCalibrationEvidenceStatus(rootCause),
+    freshnessStatus: defaultCalibrationFreshnessStatus(rootCause),
+    confidenceDelta: typeof value.confidenceDelta === "number" ? value.confidenceDelta : 0,
+    applyToFutureAutomation,
+    reason:
+      typeof value.resolutionSummary === "string" && value.resolutionSummary.length > 0
+        ? value.resolutionSummary
+        : "Legacy learning event imported without explicit trust calibration.",
+    createdAt: resolvedAt,
+    sourceCatalogMutation: {
+      allowed: false,
+      applied: false
+    }
+  };
+}
+
+const rawHumanReviewLearningEventSchema = z
   .object({
     version: z.literal("human-review-learning.v1"),
     ingestedVia: z.enum(["terminal_resolution", "admin_import"]),
@@ -111,6 +248,7 @@ export const humanReviewLearningEventSchema = z
     actionDelta: humanReviewLearningActionDeltaSchema,
     confidenceDelta: z.number(),
     postDecisionRecordId: z.string().min(1).nullable(),
+    trustCalibration: humanReviewTrustCalibrationSchema,
     sourceCatalogMutation: humanReviewLearningSourceCatalogMutationSchema
   })
   .strict()
@@ -123,8 +261,53 @@ export const humanReviewLearningEventSchema = z
         message: "Learning eventId must be deterministic for requestId and resolvedAt."
       });
     }
+    if (event.trustCalibration.eventId !== event.eventId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["trustCalibration", "eventId"],
+        message: "Trust calibration must reference its learning event."
+      });
+    }
+    if (event.trustCalibration.requestId !== event.requestId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["trustCalibration", "requestId"],
+        message: "Trust calibration requestId must match the learning event."
+      });
+    }
+    if (event.trustCalibration.caseId !== event.caseId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["trustCalibration", "caseId"],
+        message: "Trust calibration caseId must match the learning event."
+      });
+    }
+    if (event.trustCalibration.rootCause !== event.rootCause) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["trustCalibration", "rootCause"],
+        message: "Trust calibration rootCause must match the learning event."
+      });
+    }
+    if (event.trustCalibration.confidenceDelta !== event.confidenceDelta) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["trustCalibration", "confidenceDelta"],
+        message: "Trust calibration confidenceDelta must match the learning event."
+      });
+    }
   });
-export type HumanReviewLearningEvent = z.infer<typeof humanReviewLearningEventSchema>;
+
+export const humanReviewLearningEventSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const event = value as Record<string, unknown>;
+  if (event.trustCalibration) return value;
+  return {
+    ...event,
+    trustCalibration: legacyCalibration(event)
+  };
+}, rawHumanReviewLearningEventSchema);
+export type HumanReviewLearningEvent = z.output<typeof rawHumanReviewLearningEventSchema>;
 
 export const humanReviewLearningEventsSchema = z.array(humanReviewLearningEventSchema);
 export type HumanReviewLearningEvents = z.infer<typeof humanReviewLearningEventsSchema>;
@@ -173,6 +356,13 @@ const rootCauseCountsShape = {
   operator_override_only: z.number().int().min(0)
 } satisfies Record<HumanReviewLearningRootCause, z.ZodNumber>;
 
+const calibrationActionCountsShape = {
+  fail_closed_until_evidence_refresh: z.number().int().min(0),
+  fail_closed_until_signal_capture: z.number().int().min(0),
+  manual_policy_review_only: z.number().int().min(0),
+  informational_operator_note: z.number().int().min(0)
+} satisfies Record<HumanReviewTrustCalibrationAction, z.ZodNumber>;
+
 export const humanReviewLearningSummaryResponseSchema = z.object({
   generatedAt: z.string().datetime(),
   totalEvents: z.number().int().min(0),
@@ -185,6 +375,7 @@ export const humanReviewLearningSummaryResponseSchema = z.object({
     changed: z.number().int().min(0),
     unchanged: z.number().int().min(0)
   }),
+  calibrationActionCounts: z.object(calibrationActionCountsShape),
   sourceCatalogMutationsApplied: z.literal(0)
 });
 export type HumanReviewLearningSummaryResponse = z.infer<
@@ -224,4 +415,80 @@ export const humanReviewLearningTopBlockersResponseSchema = z.object({
 });
 export type HumanReviewLearningTopBlockersResponse = z.infer<
   typeof humanReviewLearningTopBlockersResponseSchema
+>;
+
+export const humanReviewTrustCalibrationRecommendationSchema = z
+  .object({
+    id: z.string().min(1),
+    blockerId: z.string().min(1),
+    label: z.string().min(1),
+    rootCause: humanReviewLearningRootCauseSchema,
+    rootCauseCounts: z.object(rootCauseCountsShape),
+    occurrences: z.number().int().min(1),
+    severity: humanReviewLearningBlockerSeveritySchema,
+    lastSeenAt: z.string().datetime(),
+    confidenceImpact: z
+      .object({
+        averageDelta: z.number(),
+        negativeEvents: z.number().int().min(0)
+      })
+      .strict(),
+    action: humanReviewTrustCalibrationActionSchema,
+    actionLabel: z.string().min(1),
+    rationale: z.string().min(1),
+    sourceEventIds: z.array(z.string().min(1)).min(1),
+    safety: z
+      .object({
+        mode: z.literal("proposal_only"),
+        sourceCatalogMutation: humanReviewLearningSourceCatalogMutationSchema
+      })
+      .strict()
+  })
+  .strict()
+  .superRefine((recommendation, ctx) => {
+    if (recommendation.occurrences !== recommendation.sourceEventIds.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["occurrences"],
+        message: "Occurrences must match sourceEventIds length."
+      });
+    }
+  });
+export type HumanReviewTrustCalibrationRecommendation = z.infer<
+  typeof humanReviewTrustCalibrationRecommendationSchema
+>;
+
+export const humanReviewTrustCalibrationResponseSchema = z
+  .object({
+    generatedAt: z.string().datetime(),
+    totalEvents: z.number().int().min(0),
+    minOccurrences: z.number().int().min(1),
+    recommendations: z.array(humanReviewTrustCalibrationRecommendationSchema),
+    emptyState: z
+      .object({
+        title: z.string().min(1),
+        detail: z.string().min(1)
+      })
+      .strict()
+      .nullable()
+  })
+  .strict()
+  .superRefine((response, ctx) => {
+    if (response.recommendations.length === 0 && response.emptyState === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emptyState"],
+        message: "Empty calibration responses must explain why no recommendation is available."
+      });
+    }
+    if (response.recommendations.length > 0 && response.emptyState !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emptyState"],
+        message: "Non-empty calibration responses must not include an empty state."
+      });
+    }
+  });
+export type HumanReviewTrustCalibrationResponse = z.infer<
+  typeof humanReviewTrustCalibrationResponseSchema
 >;

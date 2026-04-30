@@ -15,6 +15,7 @@ import type {
   RuleEvidenceRecord,
   RuleResult,
   Source,
+  HumanReviewTrustCalibration,
   VisaRule
 } from "@shared/contracts";
 import {
@@ -54,6 +55,7 @@ export type OrchestratorCatalogs = {
   ruleEvidence: RuleEvidenceRecord[];
   residencyPrograms: ResidencyProgramDefinition[];
   insuranceProducts: InsuranceProductDefinition[];
+  humanReviewCalibrations?: HumanReviewTrustCalibration[];
 };
 
 type RunOptions = {
@@ -290,7 +292,8 @@ function strongestEvidenceStatus(
 function buildTrustEvidenceSnapshot(
   decisions: RuleEvidenceDecision[],
   blockedRuleIds: string[],
-  verdict: ResultPayload["verdict"]
+  verdict: ResultPayload["verdict"],
+  humanReviewReasons: string[] = []
 ): Pick<
   ResultPayload["trust"],
   "evidenceStatus" | "freshnessStatus" | "blockingReason" | "humanReviewReason"
@@ -315,9 +318,123 @@ function buildTrustEvidenceSnapshot(
           : "fresh",
     blockingReason,
     humanReviewReason:
-      verdict === "HUMAN_REVIEW" && blockedRuleIds.length > 0
-        ? `Evidence gate требует ручной проверки: ${blockedRuleIds.join(", ")}.`
-        : null
+      verdict !== "HUMAN_REVIEW"
+        ? null
+        : blockedRuleIds.length > 0
+          ? `Evidence gate требует ручной проверки: ${blockedRuleIds.join(", ")}.`
+          : humanReviewReasons[0] ?? null
+  };
+}
+
+function buildEvidenceStateSnapshot(
+  decisions: RuleEvidenceDecision[]
+): Pick<
+  ResultPayload["trust"],
+  "evidenceStatus" | "freshnessStatus" | "blockingReason"
+> {
+  const blocked = decisions.filter((decision) => decision.blocksAutomation);
+  const blockingReason =
+    blocked.length === 0
+      ? null
+      : blocked
+          .map(
+            (decision) =>
+              `${decision.ruleId}: ${decision.evidenceStatus}, automation=${decision.automationClass}`
+          )
+          .join("; ");
+  return {
+    evidenceStatus: strongestEvidenceStatus(decisions),
+    freshnessStatus:
+      decisions.length === 0 || decisions.some((decision) => decision.evidenceStatus === "missing")
+        ? "unknown"
+        : decisions.some((decision) => decision.evidenceStatus === "stale")
+          ? "stale"
+          : "fresh",
+    blockingReason
+  };
+}
+
+function calibrationStillApplies(input: {
+  calibration: HumanReviewTrustCalibration;
+  productType: ProductType;
+  signals: CaseSignals;
+  ruleResults: RuleResult[];
+  evidenceState: Pick<ResultPayload["trust"], "evidenceStatus" | "freshnessStatus">;
+}): boolean {
+  const calibration = input.calibration;
+  if (!calibration.applyToFutureAutomation) return false;
+
+  switch (calibration.action) {
+    case "fail_closed_until_evidence_refresh":
+      return (
+        input.evidenceState.evidenceStatus !== "valid" ||
+        input.evidenceState.freshnessStatus !== "fresh"
+      );
+    case "fail_closed_until_signal_capture":
+      return mandatorySignalIds(input.productType).some(
+        (signalId) => !hasSignal(input.signals, signalId)
+      );
+    case "manual_policy_review_only":
+      return input.ruleResults.some(
+        (result) => result.fired && result.output.type === "human_review_trigger"
+      );
+    case "informational_operator_note":
+      return false;
+  }
+}
+
+function calibrationRuleResult(
+  calibration: HumanReviewTrustCalibration,
+  productType: ProductType
+): RuleResult {
+  return {
+    ruleId: `HUMAN_REVIEW_CALIBRATION:${calibration.calibrationId}`,
+    fired: true,
+    category: "advisory",
+    priority: 100,
+    productType,
+    output: { type: "human_review_trigger" },
+    consumedSignals: [],
+    explanation:
+      `Ранее закрытая ручная проверка ${calibration.requestId} требует оставить кейс на ручной проверке. ` +
+      calibration.reason
+  };
+}
+
+function applyHumanReviewCalibration(input: {
+  caseId: string;
+  productType: ProductType;
+  signals: CaseSignals;
+  ruleResults: RuleResult[];
+  evidenceState: Pick<ResultPayload["trust"], "evidenceStatus" | "freshnessStatus">;
+  calibrations: HumanReviewTrustCalibration[];
+}): {
+  ruleResults: RuleResult[];
+  activeCalibrations: HumanReviewTrustCalibration[];
+  observedCalibrations: HumanReviewTrustCalibration[];
+} {
+  const observedCalibrations = input.calibrations
+    .filter((calibration) => calibration.caseId === input.caseId)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const activeCalibrations = observedCalibrations.filter((calibration) =>
+    calibrationStillApplies({
+      calibration,
+      productType: input.productType,
+      signals: input.signals,
+      ruleResults: input.ruleResults,
+      evidenceState: input.evidenceState
+    })
+  );
+
+  return {
+    ruleResults: input.ruleResults.concat(
+      activeCalibrations.map((calibration) =>
+        calibrationRuleResult(calibration, input.productType)
+      )
+    ),
+    activeCalibrations,
+    observedCalibrations
   };
 }
 
@@ -534,6 +651,44 @@ export function runDecision(
     evidenceGate.blockedRuleIds
   );
 
+  const evidenceState = buildEvidenceStateSnapshot(evidenceGate.decisions);
+  let calibrated: {
+    ruleResults: RuleResult[];
+    activeCalibrations: HumanReviewTrustCalibration[];
+    observedCalibrations: HumanReviewTrustCalibration[];
+  } = {
+    ruleResults,
+    activeCalibrations: [],
+    observedCalibrations: []
+  };
+  if ((input.catalogs.humanReviewCalibrations?.length ?? 0) > 0) {
+    const finishHumanReviewCalibration = audit.start(
+      "evaluateHumanReviewCalibration",
+      `Проверяем ${input.catalogs.humanReviewCalibrations?.length ?? 0} calibration-сигналов human review.`
+    );
+    calibrated = applyHumanReviewCalibration({
+      caseId: input.case.id,
+      productType,
+      signals: validSignals,
+      ruleResults,
+      evidenceState,
+      calibrations: input.catalogs.humanReviewCalibrations ?? []
+    });
+    ruleResults = calibrated.ruleResults;
+    finishHumanReviewCalibration(
+      calibrated.activeCalibrations.length > 0
+        ? `Активных fail-closed calibration-сигналов: ${calibrated.activeCalibrations.length}.`
+        : `Активных fail-closed calibration-сигналов нет; найдено по кейсу: ${calibrated.observedCalibrations.length}.`,
+      calibrated.observedCalibrations.map(
+        (calibration) =>
+          `${calibration.calibrationId}:${calibration.action}:${calibration.status}`
+      ),
+      calibrated.activeCalibrations.map(
+        (calibration) => `HUMAN_REVIEW_CALIBRATION:${calibration.calibrationId}`
+      )
+    );
+  }
+
   const finishRisks = audit.start(
     "computeRisks",
     "Собираем риски из сработавших правил."
@@ -625,7 +780,8 @@ export function runDecision(
   const trustEvidence = buildTrustEvidenceSnapshot(
     evidenceGate.decisions,
     evidenceGate.blockedRuleIds,
-    verdict
+    verdict,
+    calibrated.activeCalibrations.map((calibration) => calibration.reason)
   );
 
   const payload: ResultPayload = {

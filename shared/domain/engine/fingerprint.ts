@@ -12,6 +12,7 @@ import type {
   RuleEvidenceRecord,
   ResultPayload,
   Source,
+  HumanReviewTrustCalibration,
   VisaRule
 } from "@shared/contracts";
 import type { OrchestratorCatalogs } from "./orchestrator";
@@ -179,7 +180,16 @@ function normalizeInsurance(
   return sortByKey(items, (item) => item.id);
 }
 
+function normalizeHumanReviewCalibrations(
+  items: readonly HumanReviewTrustCalibration[] = []
+): HumanReviewTrustCalibration[] {
+  return sortByKey(items, (item) => item.calibrationId);
+}
+
 function normalizeCatalogs(catalogs: OrchestratorCatalogs) {
+  const humanReviewCalibrations = normalizeHumanReviewCalibrations(
+    catalogs.humanReviewCalibrations
+  );
   return {
     paths: normalizePaths(catalogs.paths),
     visaRules: normalizeVisaRules(catalogs.visaRules),
@@ -187,7 +197,8 @@ function normalizeCatalogs(catalogs: OrchestratorCatalogs) {
     sources: normalizeSources(catalogs.sources),
     ruleEvidence: normalizeRuleEvidence(catalogs.ruleEvidence),
     residencyPrograms: normalizeResidency(catalogs.residencyPrograms),
-    insuranceProducts: normalizeInsurance(catalogs.insuranceProducts)
+    insuranceProducts: normalizeInsurance(catalogs.insuranceProducts),
+    ...(humanReviewCalibrations.length > 0 ? { humanReviewCalibrations } : {})
   };
 }
 
