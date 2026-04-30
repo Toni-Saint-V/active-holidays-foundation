@@ -16,6 +16,7 @@ export * from "./audit";
 export * from "./case";
 export * from "./humanReview";
 export * from "./humanReviewOps";
+export * from "./humanReviewLearning";
 export * from "./result";
 export * from "./scenario";
 export * from "./intake";

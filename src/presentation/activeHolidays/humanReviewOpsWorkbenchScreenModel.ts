@@ -85,8 +85,8 @@ function capabilityNotes(queue: HumanReviewOpsQueueResponse): string[] {
   if (queue.capabilities.terminalResolve === "transition_only") {
     notes.push("Закрытие сейчас фиксирует только статус проверки.");
   }
-  if (queue.capabilities.learningFeedback === "unavailable") {
-    notes.push("Автоматическое обучение по решениям оператора пока не подключено.");
+  if (queue.capabilities.learningFeedback === "available") {
+    notes.push("После закрытия система сохраняет learning feedback для операционной аналитики.");
   }
   return notes;
 }
@@ -185,7 +185,7 @@ export function buildHumanReviewOpsWorkbenchScreenModel(input: {
                     : "Пересчёт выполнен."
               }
             : null,
-          learningNote: "Автоматическое обучение по этому закрытию пока не подключено.",
+          learningNote: input.detail.detail.learning.summary,
           primaryAction,
           secondaryActions: actions.slice(1)
         }

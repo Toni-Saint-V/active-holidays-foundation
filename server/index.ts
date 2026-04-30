@@ -7,6 +7,11 @@ import {
   loadPersistedHumanReviews,
   savePersistedHumanReviews
 } from "./lib/humanReviewPersistence";
+import {
+  loadPersistedHumanReviewLearningEvents,
+  savePersistedHumanReviewLearningEvents
+} from "./lib/humanReviewLearningPersistence";
+import { initializeHumanReviewLearningStore } from "./lib/humanReviewLearningStore";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { casesRouter } from "./routes/cases";
@@ -22,9 +27,14 @@ export async function createApp(): Promise<express.Express> {
   const app = express();
   const catalogs = await loadCatalogs();
   const humanReviews = await loadPersistedHumanReviews();
+  const humanReviewLearningEvents = await loadPersistedHumanReviewLearningEvents();
   initializeCaseStore(catalogs, {
     humanReviews,
     persistHumanReviews: savePersistedHumanReviews
+  });
+  initializeHumanReviewLearningStore({
+    events: humanReviewLearningEvents,
+    persistEvents: savePersistedHumanReviewLearningEvents
   });
 
   app.use(cors());

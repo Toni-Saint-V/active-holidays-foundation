@@ -17,12 +17,20 @@ import {
   type CaseSignals,
   type DecisionKind,
   type HumanReviewHandoff,
+  type HumanReviewRequest,
+  type ResultPayload,
   type HumanReviewSnapshot
 } from "@shared/contracts";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { getCaseStore, HumanReviewHandoffConflictError } from "../lib/caseStore";
 import { buildDecisionScenarioLab } from "../lib/decisionScenarioLab";
 import { buildHumanReviewCasePacket } from "../lib/humanReviewCasePacket";
+import {
+  buildHumanReviewLearningEvent,
+  humanReviewLearningEventId
+} from "../lib/humanReviewLearning";
+import { getHumanReviewLearningStore } from "../lib/humanReviewLearningStore";
+import { extractHumanReviewBlockers } from "../lib/humanReviewBlockers";
 import {
   buildRecommendationDetail,
   buildRecommendationShortlist,
@@ -186,6 +194,22 @@ function recordDecision(
     changedPreferenceIds: delta.changedPreferenceIds
   });
   return { result, record };
+}
+
+function captureLearningFeedback(input: {
+  requestBefore: HumanReviewRequest;
+  requestAfter: HumanReviewRequest;
+  result: ResultPayload;
+  decisionRecordId: string | null;
+}) {
+  const event = buildHumanReviewLearningEvent({
+    requestBefore: input.requestBefore,
+    requestAfter: input.requestAfter,
+    postResult: input.result,
+    blockers: extractHumanReviewBlockers(input.result),
+    postDecisionRecordId: input.decisionRecordId
+  });
+  return getHumanReviewLearningStore().ingest(event);
 }
 
 export function casesRouter(): Router {
@@ -423,39 +447,76 @@ export function casesRouter(): Router {
           "human_review_case_mismatch"
         );
       }
+      if (request.status === "resolved" && payload.status === "resolved") {
+        if (
+          !request.resolution ||
+          !payload.resolution ||
+          request.resolution.summary !== payload.resolution.summary
+        ) {
+          throw new HttpError(
+            409,
+            "Повторное закрытие resolved HumanReviewRequest допустимо только с тем же resolution payload.",
+            "human_review_invalid_transition"
+          );
+        }
+        const store = getHumanReviewLearningStore();
+        const existingEvent = store.get(humanReviewLearningEventId(request));
+        const terminalRecordId = request.resolution.postDecisionRecordId;
+        const terminalRecord = terminalRecordId
+          ? getCaseStore().getRecord(terminalRecordId)
+          : null;
+        const terminalResult = terminalRecord?.result ?? null;
+        if (existingEvent) {
+          res.json(
+            humanReviewTransitionResponseSchema.parse({
+              request,
+              result: terminalResult,
+              decisionRecordId: terminalRecordId,
+              learningFeedback: {
+                event: existingEvent,
+                inserted: false
+              }
+            })
+          );
+          return;
+        }
+        if (!terminalResult) {
+          res.json(
+            humanReviewTransitionResponseSchema.parse({
+              request,
+              result: null,
+              decisionRecordId: terminalRecordId,
+              learningFeedback: null
+            })
+          );
+          return;
+        }
+        const learningFeedback = captureLearningFeedback({
+          requestBefore: request,
+          requestAfter: request,
+          result: terminalResult,
+          decisionRecordId: terminalRecordId
+        });
+        res.json(
+          humanReviewTransitionResponseSchema.parse({
+            request,
+            result: terminalResult,
+            decisionRecordId: terminalRecordId,
+            learningFeedback
+          })
+        );
+        return;
+      }
 
+      let next: HumanReviewRequest;
       try {
-        const next = getCaseStore().transitionHumanReview({
+        next = getCaseStore().transitionHumanReview({
           requestId: payload.requestId,
           status: payload.status,
           changedBy: "system",
           note: payload.note ?? null,
           resolution: payload.resolution ?? null
         });
-        if (payload.status === "resolved") {
-          const { result, record } = recordDecision(
-            caseData,
-            `Ручная проверка ${payload.requestId} завершена; результат пересчитан без новых предположений.`,
-            "recompute",
-            { changedSignalIds: [] }
-          );
-          res.json(
-            humanReviewTransitionResponseSchema.parse({
-              request: next,
-              result,
-              decisionRecordId: record.decisionId
-            })
-          );
-          return;
-        }
-
-        res.json(
-          humanReviewTransitionResponseSchema.parse({
-            request: next,
-            result: null,
-            decisionRecordId: null
-          })
-        );
       } catch (error) {
         throw new HttpError(
           409,
@@ -465,6 +526,52 @@ export function casesRouter(): Router {
           "human_review_invalid_transition"
         );
       }
+
+      if (payload.status === "resolved") {
+        const terminalRecord = recordDecision(
+          caseData,
+          `Ручная проверка ${payload.requestId} завершена; результат пересчитан без новых предположений.`,
+          "recompute",
+          { changedSignalIds: [] }
+        );
+        next = getCaseStore().attachHumanReviewDecisionRecord({
+          requestId: next.id,
+          postDecisionRecordId: terminalRecord.record.decisionId
+        });
+        try {
+          const learningFeedback = captureLearningFeedback({
+            requestBefore: request,
+            requestAfter: next,
+            result: terminalRecord.result,
+            decisionRecordId: terminalRecord.record.decisionId
+          });
+          res.json(
+            humanReviewTransitionResponseSchema.parse({
+              request: next,
+              result: terminalRecord.result,
+              decisionRecordId: terminalRecord.record.decisionId,
+              learningFeedback
+            })
+          );
+          return;
+        } catch (error) {
+          throw new HttpError(
+            500,
+            error instanceof Error
+              ? error.message
+              : "Ручная проверка закрыта, но learning feedback не был сохранён.",
+            "human_review_learning_capture_failed"
+          );
+        }
+      }
+
+      res.json(
+        humanReviewTransitionResponseSchema.parse({
+          request: next,
+          result: null,
+          decisionRecordId: null
+        })
+      );
     }
   );
 

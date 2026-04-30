@@ -1,6 +1,11 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
 import {
+  humanReviewLearningEventsResponseSchema,
+  humanReviewLearningIngestRequestSchema,
+  humanReviewLearningIngestResponseSchema,
+  humanReviewLearningSummaryResponseSchema,
+  humanReviewLearningTopBlockersResponseSchema,
   humanReviewOpsDetailResponseSchema,
   humanReviewOpsQueueResponseSchema
 } from "@shared/contracts";
@@ -13,11 +18,19 @@ import {
   buildHumanReviewOpsQueueItem,
   HUMAN_REVIEW_OPS_CAPABILITIES
 } from "../lib/humanReviewOps";
+import {
+  getHumanReviewLearningStore,
+  HumanReviewLearningConflictError
+} from "../lib/humanReviewLearningStore";
 import { HttpError } from "../middleware/errorHandler";
 import { requireInternalApiToken } from "../middleware/internalApi";
-import { validateParams } from "../middleware/validate";
+import { validateBody, validateParams } from "../middleware/validate";
 
 const requestIdParams = z.object({ requestId: z.string().min(1) });
+const learningEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0)
+});
 
 function getRequestId(req: Request): string {
   const raw = req.params.requestId;
@@ -82,6 +95,57 @@ export function humanReviewWorkbenchRouter(): Router {
       })
     );
   });
+
+  router.get("/learning/summary", requireInternalApiToken, (_req, res) => {
+    res.json(
+      humanReviewLearningSummaryResponseSchema.parse(
+        getHumanReviewLearningStore().summary()
+      )
+    );
+  });
+
+  router.get("/learning/events", requireInternalApiToken, (req, res) => {
+    const query = learningEventsQuerySchema.parse(req.query);
+    const page = getHumanReviewLearningStore().page(query);
+    res.json(
+      humanReviewLearningEventsResponseSchema.parse({
+        generatedAt: new Date().toISOString(),
+        totalEvents: page.totalEvents,
+        limit: query.limit,
+        offset: query.offset,
+        events: page.events
+      })
+    );
+  });
+
+  router.get("/learning/top-blockers", requireInternalApiToken, (_req, res) => {
+    res.json(
+      humanReviewLearningTopBlockersResponseSchema.parse(
+        getHumanReviewLearningStore().topBlockers()
+      )
+    );
+  });
+
+  router.post(
+    "/learning/ingest",
+    requireInternalApiToken,
+    validateBody(humanReviewLearningIngestRequestSchema),
+    (req, res) => {
+      const payload = humanReviewLearningIngestRequestSchema.parse(req.body);
+      try {
+        res.json(
+          humanReviewLearningIngestResponseSchema.parse(
+            getHumanReviewLearningStore().ingest(payload.event)
+          )
+        );
+      } catch (error) {
+        if (error instanceof HumanReviewLearningConflictError) {
+          throw new HttpError(409, error.message, "human_review_learning_conflict");
+        }
+        throw error;
+      }
+    }
+  );
 
   router.get(
     "/ops/requests/:requestId",

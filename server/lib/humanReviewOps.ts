@@ -1,7 +1,6 @@
 import type {
   Case,
   HumanReviewOpsAction,
-  HumanReviewOpsBlocker,
   HumanReviewOpsCapabilities,
   HumanReviewOpsDetail,
   HumanReviewOpsOrphanQueueItem,
@@ -10,10 +9,11 @@ import type {
   ResultPayload
 } from "@shared/contracts";
 import { allowedHumanReviewTransitions, isHumanReviewTerminalStatus } from "@shared/contracts";
+import { extractHumanReviewBlockers } from "./humanReviewBlockers";
 
 export const HUMAN_REVIEW_OPS_CAPABILITIES: HumanReviewOpsCapabilities = {
   terminalResolve: "transition_only",
-  learningFeedback: "unavailable"
+  learningFeedback: "available"
 };
 
 function statusEventLabel(status: HumanReviewRequest["status"]): string {
@@ -31,70 +31,6 @@ function statusEventLabel(status: HumanReviewRequest["status"]): string {
   }
 }
 
-function evidenceGateSourceRuleId(ruleId: string): string | null {
-  return ruleId.startsWith("EVIDENCE_GATE:") ? ruleId.replace("EVIDENCE_GATE:", "") : null;
-}
-
-function warningSeverity(
-  severity: "critical" | "high" | "medium" | "low" | undefined
-): HumanReviewOpsBlocker["severity"] {
-  return severity ?? "medium";
-}
-
-export function extractHumanReviewOpsBlockers(result: ResultPayload): HumanReviewOpsBlocker[] {
-  const blockers: HumanReviewOpsBlocker[] = [];
-
-  for (const rule of result.ruleResults) {
-    if (!rule.fired) continue;
-    if (rule.output.type === "human_review_trigger") {
-      const sourceRuleId = evidenceGateSourceRuleId(rule.ruleId);
-      blockers.push({
-        id: rule.ruleId,
-        type: sourceRuleId ? "evidence_gate" : "human_review_trigger",
-        ruleId: sourceRuleId ?? rule.ruleId,
-        label: sourceRuleId
-          ? `Evidence gate заблокировал ${sourceRuleId}.`
-          : "Правило требует ручной проверки.",
-        detail: rule.explanation,
-        severity: "high",
-        triggeredBy: rule.consumedSignals.slice()
-      });
-      continue;
-    }
-
-    if (rule.output.type === "warning") {
-      blockers.push({
-        id: rule.ruleId,
-        type: "warning",
-        ruleId: rule.ruleId,
-        label: rule.explanation.split(".")[0] || "Предупреждение по кейсу",
-        detail: rule.explanation,
-        severity: warningSeverity(rule.output.severity),
-        triggeredBy: rule.consumedSignals.slice()
-      });
-    }
-  }
-
-  if (result.verdict === "HUMAN_REVIEW") {
-    const detail =
-      result.trust.humanReviewReason ?? result.trust.blockingReason ?? result.nextAction.detail;
-    const hasSameDetail = blockers.some((blocker) => blocker.detail === detail);
-    if (!hasSameDetail) {
-      blockers.push({
-        id: `trust:${result.caseId}:${result.computedAt}`,
-        type: "trust",
-        ruleId: null,
-        label: "Доверие к автоматическому решению недостаточно.",
-        detail,
-        severity: result.trust.evidenceStatus === "conflicting" ? "critical" : "high",
-        triggeredBy: result.nextAction.triggeredBy.slice()
-      });
-    }
-  }
-
-  return blockers;
-}
-
 function ageMinutes(createdAt: string, now: Date): number {
   return Math.max(0, Math.floor((now.getTime() - new Date(createdAt).getTime()) / 60000));
 }
@@ -105,7 +41,7 @@ export function buildHumanReviewOpsQueueItem(input: {
   currentResult: ResultPayload;
   now?: Date;
 }): HumanReviewOpsQueueItem {
-  const blockers = extractHumanReviewOpsBlockers(input.currentResult);
+  const blockers = extractHumanReviewBlockers(input.currentResult);
   return {
     itemStatus: "ready",
     requestId: input.request.id,
@@ -192,7 +128,7 @@ export function buildHumanReviewOpsDetail(input: {
       updatedAt: input.caseData.updatedAt
     },
     currentResult: input.currentResult,
-    blockingReasons: extractHumanReviewOpsBlockers(input.currentResult),
+    blockingReasons: extractHumanReviewBlockers(input.currentResult),
     auditTrail: input.request.events.map((event) => ({
       id: event.id,
       at: event.at,
@@ -210,8 +146,8 @@ export function buildHumanReviewOpsDetail(input: {
         }
       : null,
     learning: {
-      source: "unavailable",
-      summary: null
+      source: "learning_api",
+      summary: "Learning feedback is captured after terminal operator resolution."
     },
     operatorNextActions: operatorActions(input.request)
   };
