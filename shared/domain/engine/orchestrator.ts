@@ -326,22 +326,9 @@ function buildTrustEvidenceSnapshot(
   };
 }
 
-function buildEvidenceStateSnapshot(
+function buildCalibrationEvidenceState(
   decisions: RuleEvidenceDecision[]
-): Pick<
-  ResultPayload["trust"],
-  "evidenceStatus" | "freshnessStatus" | "blockingReason"
-> {
-  const blocked = decisions.filter((decision) => decision.blocksAutomation);
-  const blockingReason =
-    blocked.length === 0
-      ? null
-      : blocked
-          .map(
-            (decision) =>
-              `${decision.ruleId}: ${decision.evidenceStatus}, automation=${decision.automationClass}`
-          )
-          .join("; ");
+): Pick<ResultPayload["trust"], "evidenceStatus" | "freshnessStatus"> {
   return {
     evidenceStatus: strongestEvidenceStatus(decisions),
     freshnessStatus:
@@ -349,9 +336,21 @@ function buildEvidenceStateSnapshot(
         ? "unknown"
         : decisions.some((decision) => decision.evidenceStatus === "stale")
           ? "stale"
-          : "fresh",
-    blockingReason
+          : "fresh"
   };
+}
+
+function evidenceGateSourceRuleId(ruleId: string): string | null {
+  return ruleId.startsWith("EVIDENCE_GATE:") ? ruleId.replace("EVIDENCE_GATE:", "") : null;
+}
+
+function evidenceTargetMatchesRule(
+  target: Extract<HumanReviewTrustCalibration["target"], { type: "evidence_gap" }>,
+  result: RuleResult
+): boolean {
+  if (target.gapIds.includes(result.ruleId)) return true;
+  const sourceRuleId = evidenceGateSourceRuleId(result.ruleId);
+  return !!sourceRuleId && target.ruleIds.includes(sourceRuleId);
 }
 
 function calibrationStillApplies(input: {
@@ -365,19 +364,42 @@ function calibrationStillApplies(input: {
   if (!calibration.applyToFutureAutomation) return false;
 
   switch (calibration.action) {
-    case "fail_closed_until_evidence_refresh":
+    case "fail_closed_until_evidence_refresh": {
+      const target = calibration.target;
+      if (target.type === "evidence_gap") {
+        return input.ruleResults.some(
+          (result) => result.fired && evidenceTargetMatchesRule(target, result)
+        );
+      }
+      if (target.type === "trust_state") {
+        return (
+          input.evidenceState.evidenceStatus !== "valid" ||
+          input.evidenceState.freshnessStatus !== "fresh"
+        );
+      }
+      return false;
+    }
+    case "fail_closed_until_signal_capture": {
+      const target = calibration.target;
       return (
-        input.evidenceState.evidenceStatus !== "valid" ||
-        input.evidenceState.freshnessStatus !== "fresh"
+        target.type === "signal" &&
+        target.signalIds.some(
+          (signalId) => !input.signals.some((signal) => signal.id === signalId)
+        )
       );
-    case "fail_closed_until_signal_capture":
-      return mandatorySignalIds(input.productType).some(
-        (signalId) => !hasSignal(input.signals, signalId)
+    }
+    case "manual_policy_review_only": {
+      const target = calibration.target;
+      return (
+        target.type === "policy_rule" &&
+        input.ruleResults.some(
+          (result) =>
+            result.fired &&
+            result.output.type === "human_review_trigger" &&
+            target.ruleIds.includes(result.ruleId)
+        )
       );
-    case "manual_policy_review_only":
-      return input.ruleResults.some(
-        (result) => result.fired && result.output.type === "human_review_trigger"
-      );
+    }
     case "informational_operator_note":
       return false;
   }
@@ -651,7 +673,6 @@ export function runDecision(
     evidenceGate.blockedRuleIds
   );
 
-  const evidenceState = buildEvidenceStateSnapshot(evidenceGate.decisions);
   let calibrated: {
     ruleResults: RuleResult[];
     activeCalibrations: HumanReviewTrustCalibration[];
@@ -661,6 +682,7 @@ export function runDecision(
     activeCalibrations: [],
     observedCalibrations: []
   };
+  const calibrationEvidenceState = buildCalibrationEvidenceState(evidenceGate.decisions);
   if ((input.catalogs.humanReviewCalibrations?.length ?? 0) > 0) {
     const finishHumanReviewCalibration = audit.start(
       "evaluateHumanReviewCalibration",
@@ -671,7 +693,7 @@ export function runDecision(
       productType,
       signals: validSignals,
       ruleResults,
-      evidenceState,
+      evidenceState: calibrationEvidenceState,
       calibrations: input.catalogs.humanReviewCalibrations ?? []
     });
     ruleResults = calibrated.ruleResults;

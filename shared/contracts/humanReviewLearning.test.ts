@@ -75,7 +75,11 @@ describe("human review learning contracts", () => {
       version: "human-review-trust-calibration.v1",
       calibrationId: "hrc_hr_case_1_2026-04-30T10:00:00.000Z",
       action: "fail_closed_until_evidence_refresh",
-      applyToFutureAutomation: true,
+      status: "informational",
+      target: {
+        type: "legacy_event"
+      },
+      applyToFutureAutomation: false,
       sourceCatalogMutation: {
         allowed: false,
         applied: false
@@ -86,9 +90,21 @@ describe("human review learning contracts", () => {
       humanReviewTrustCalibrationSchema.safeParse({
         ...parsed.trustCalibration,
         applyToFutureAutomation: true,
-        status: "informational"
+        status: "active"
       }).success
     ).toBe(false);
+    expect(
+      humanReviewTrustCalibrationSchema.safeParse({
+        ...parsed.trustCalibration,
+        status: "active",
+        target: {
+          type: "evidence_gap",
+          gapIds: ["EVIDENCE_GATE:rule_1"],
+          ruleIds: ["rule_1"]
+        },
+        applyToFutureAutomation: true
+      }).success
+    ).toBe(true);
     expect(
       humanReviewTrustCalibrationSchema.safeParse({
         ...parsed.trustCalibration,

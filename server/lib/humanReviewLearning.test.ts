@@ -239,6 +239,10 @@ describe("buildHumanReviewLearningEvent", () => {
       calibrationId: "hrc_hr_case_1_2026-04-30T10:00:00.000Z",
       action: "manual_policy_review_only",
       status: "active",
+      target: {
+        type: "policy_rule",
+        ruleIds: ["manual_policy"]
+      },
       confidenceDelta: 0.35,
       applyToFutureAutomation: true,
       evidenceStatus: "valid",
@@ -248,6 +252,92 @@ describe("buildHumanReviewLearningEvent", () => {
     expect(event.sourceCatalogMutation).toEqual({
       allowed: false,
       applied: false
+    });
+  });
+
+  it("scopes trust calibration to the blocker or signal that caused review", () => {
+    const evidenceEvent = buildHumanReviewLearningEvent({
+      requestBefore,
+      requestAfter,
+      postResult: result({
+        trust: trust({
+          evidenceStatus: "conflicting",
+          freshnessStatus: "unknown"
+        })
+      }),
+      blockers: [
+        {
+          id: "EVIDENCE_GATE:visa_rule",
+          type: "evidence_gate",
+          ruleId: "visa_rule",
+          label: "Evidence gate заблокировал visa_rule.",
+          detail: "Источники конфликтуют.",
+          severity: "high",
+          triggeredBy: []
+        }
+      ],
+      postDecisionRecordId: "dec_case_1_1"
+    });
+
+    expect(evidenceEvent.trustCalibration.target).toEqual({
+      type: "evidence_gap",
+      gapIds: ["EVIDENCE_GATE:visa_rule"],
+      ruleIds: ["visa_rule"]
+    });
+
+    const signalEvent = buildHumanReviewLearningEvent({
+      requestBefore,
+      requestAfter,
+      postResult: result({
+        decisionSignals: [
+          {
+            id: "insurance_ok",
+            label: "Доход",
+            displayValue: "нет данных",
+            importance: 0.5,
+            present: false
+          }
+        ]
+      }),
+      blockers: [],
+      postDecisionRecordId: "dec_case_1_1"
+    });
+
+    expect(signalEvent.trustCalibration.target).toEqual({
+      type: "signal",
+      signalIds: ["insurance_ok"]
+    });
+
+    const trustOnlyEvent = buildHumanReviewLearningEvent({
+      requestBefore,
+      requestAfter,
+      postResult: result({
+        trust: trust({
+          evidenceStatus: "stale",
+          freshnessStatus: "stale",
+          blockingReason: "Trust state requires a human review.",
+          humanReviewReason: "Trust state requires a human review."
+        })
+      }),
+      blockers: [
+        {
+          id: "trust:case_1:stale:trust-state",
+          type: "trust",
+          ruleId: null,
+          label: "Доверие к автоматическому решению недостаточно.",
+          detail: "Trust state requires a human review.",
+          severity: "high",
+          triggeredBy: []
+        }
+      ],
+      postDecisionRecordId: "dec_case_1_1"
+    });
+
+    expect(trustOnlyEvent.trustCalibration.target).toEqual({
+      type: "trust_state",
+      blockerId: "trust:case_1:stale:trust-state",
+      evidenceStatus: "stale",
+      freshnessStatus: "stale"
     });
   });
 });

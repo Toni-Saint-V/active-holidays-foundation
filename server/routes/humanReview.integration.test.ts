@@ -729,6 +729,37 @@ describe("human review HTTP surface", () => {
         "автоматический совет остаётся закрытым"
       );
 
+      const driftAfterResolution = await requestJson(
+        "GET",
+        "/api/cases/s2-tr-spb/drift",
+        undefined,
+        isolatedApp
+      );
+      expect(driftAfterResolution.status).toBe(200);
+      expect(driftAfterResolution.json.drifted).toBe(false);
+
+      const newerRequest = await requestJson(
+        "POST",
+        "/api/cases/s2-tr-spb/human-review",
+        {
+          channel: "email",
+          contact: "second-learning@example.com",
+          message: "Новый запрос не должен ломать drift terminal snapshot."
+        },
+        isolatedApp
+      );
+      expect(newerRequest.status).toBe(200);
+      expect(newerRequest.json.request.id).not.toBe(created.json.request.id);
+
+      const driftWithNewerRequest = await requestJson(
+        "GET",
+        "/api/cases/s2-tr-spb/drift",
+        undefined,
+        isolatedApp
+      );
+      expect(driftWithNewerRequest.status).toBe(200);
+      expect(driftWithNewerRequest.json.drifted).toBe(false);
+
       const laterRecompute = await requestJson(
         "POST",
         "/api/cases/s2-tr-spb/recompute",
