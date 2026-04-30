@@ -361,6 +361,18 @@ export class CaseStore {
     return latest ? structuredClone(latest) : null;
   }
 
+  humanReviewForDecisionRecord(
+    caseId: string,
+    decisionRecordId: string
+  ): HumanReviewRequest | null {
+    const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
+    const request = bucket
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .find((entry) => entry.resolution?.postDecisionRecordId === decisionRecordId);
+    return request ? structuredClone(request) : null;
+  }
+
   activeHumanReviewFor(caseId: string): HumanReviewRequest | null {
     const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
     const active = bucket

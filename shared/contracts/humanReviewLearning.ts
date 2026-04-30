@@ -103,6 +103,50 @@ export type HumanReviewTrustCalibrationAction = z.infer<
   typeof humanReviewTrustCalibrationActionSchema
 >;
 
+export const humanReviewTrustCalibrationTargetSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("evidence_gap"),
+      gapIds: z.array(z.string().min(1)).min(1),
+      ruleIds: z.array(z.string().min(1)).default([])
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("trust_state"),
+      blockerId: z.string().min(1),
+      evidenceStatus: evidenceStatusSchema,
+      freshnessStatus: freshnessStatusSchema
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("signal"),
+      signalIds: z.array(z.string().min(1)).min(1)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("policy_rule"),
+      ruleIds: z.array(z.string().min(1)).min(1)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("legacy_event"),
+      note: z.string().min(1)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("operator_note")
+    })
+    .strict()
+]);
+export type HumanReviewTrustCalibrationTarget = z.infer<
+  typeof humanReviewTrustCalibrationTargetSchema
+>;
+
 export const humanReviewTrustCalibrationSchema = z
   .object({
     version: z.literal("human-review-trust-calibration.v1"),
@@ -115,6 +159,7 @@ export const humanReviewTrustCalibrationSchema = z
     status: z.enum(["active", "informational"]),
     evidenceStatus: evidenceStatusSchema,
     freshnessStatus: freshnessStatusSchema,
+    target: humanReviewTrustCalibrationTargetSchema,
     confidenceDelta: z.number(),
     applyToFutureAutomation: z.boolean(),
     reason: z.string().min(1).max(1000),
@@ -129,6 +174,16 @@ export const humanReviewTrustCalibrationSchema = z
         code: "custom",
         path: ["action"],
         message: "Trust calibration action must match the root cause."
+      });
+    }
+    if (
+      calibration.applyToFutureAutomation &&
+      (calibration.target.type === "legacy_event" || calibration.target.type === "operator_note")
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "Active trust calibration must target a concrete blocker or signal."
       });
     }
     if (calibration.applyToFutureAutomation && calibration.status !== "active") {
@@ -202,7 +257,6 @@ function legacyCalibration(value: Record<string, unknown>): HumanReviewTrustCali
   const resolvedAt = String(value.resolvedAt ?? value.capturedAt ?? value.ingestedAt ?? "");
   const eventId = String(value.eventId ?? `hrl_${requestId}_${resolvedAt}`);
   const action = calibrationActionForRootCause(rootCause);
-  const applyToFutureAutomation = action !== "informational_operator_note";
   return {
     version: "human-review-trust-calibration.v1",
     calibrationId: `hrc_${requestId}_${resolvedAt}`,
@@ -211,11 +265,15 @@ function legacyCalibration(value: Record<string, unknown>): HumanReviewTrustCali
     caseId,
     rootCause,
     action,
-    status: applyToFutureAutomation ? "active" : "informational",
+    status: "informational",
     evidenceStatus: defaultCalibrationEvidenceStatus(rootCause),
     freshnessStatus: defaultCalibrationFreshnessStatus(rootCause),
+    target: {
+      type: "legacy_event",
+      note: "Legacy event imported before scoped trust calibration existed."
+    },
     confidenceDelta: typeof value.confidenceDelta === "number" ? value.confidenceDelta : 0,
-    applyToFutureAutomation,
+    applyToFutureAutomation: false,
     reason:
       typeof value.resolutionSummary === "string" && value.resolutionSummary.length > 0
         ? value.resolutionSummary

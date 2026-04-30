@@ -53,6 +53,25 @@ function event(overrides: Partial<HumanReviewLearningEvent> = {}): HumanReviewLe
   });
 }
 
+function activeEvent(
+  overrides: Partial<HumanReviewLearningEvent> = {}
+): HumanReviewLearningEvent {
+  const parsed = event(overrides);
+  return humanReviewLearningEventSchema.parse({
+    ...parsed,
+    trustCalibration: {
+      ...parsed.trustCalibration,
+      status: "active",
+      target: {
+        type: "evidence_gap",
+        gapIds: ["EVIDENCE_GATE:rule_1"],
+        ruleIds: ["rule_1"]
+      },
+      applyToFutureAutomation: true
+    }
+  });
+}
+
 describe("HumanReviewLearningStore", () => {
   it("dedupes exact replay and rejects conflicting natural-key replay", () => {
     const store = new HumanReviewLearningStore();
@@ -106,5 +125,43 @@ describe("HumanReviewLearningStore", () => {
         missing_signal: 1
       }
     });
+  });
+
+  it("keeps legacy imported calibrations informational and out of automation", () => {
+    const store = new HumanReviewLearningStore();
+    const legacy = event();
+
+    store.ingest(legacy);
+
+    expect(legacy.trustCalibration).toMatchObject({
+      status: "informational",
+      target: {
+        type: "legacy_event"
+      },
+      applyToFutureAutomation: false
+    });
+    expect(store.calibrations({ caseId: "case_1" })).toEqual([]);
+  });
+
+  it("returns only active calibrations for the requested case and exclusion set", () => {
+    const store = new HumanReviewLearningStore();
+    store.ingest(activeEvent());
+    store.ingest(
+      activeEvent({
+        requestId: "hr_case_2",
+        caseId: "case_2",
+        resolvedAt: "2026-04-30T10:01:00.000Z",
+        eventId: "hrl_hr_case_2_2026-04-30T10:01:00.000Z"
+      })
+    );
+
+    expect(store.calibrations({ caseId: "case_1" })).toHaveLength(1);
+    expect(store.calibrations({ caseId: "case_2" })).toHaveLength(1);
+    expect(
+      store.calibrations({
+        caseId: "case_1",
+        excludeRequestIds: ["hr_case_1"]
+      })
+    ).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@ import type {
   HumanReviewLearningRootCause,
   HumanReviewTrustCalibration,
   HumanReviewTrustCalibrationAction,
+  HumanReviewTrustCalibrationTarget,
   HumanReviewOpsBlocker,
   HumanReviewRequest,
   ResultPayload
@@ -65,6 +66,65 @@ function evidenceGaps(blockers: HumanReviewOpsBlocker[]): HumanReviewLearningEvi
   }));
 }
 
+function missingSignalIds(result: ResultPayload): string[] {
+  return result.decisionSignals
+    .filter((signal) => !signal.present)
+    .map((signal) => signal.id)
+    .sort();
+}
+
+function calibrationTarget(input: {
+  action: HumanReviewTrustCalibrationAction;
+  blockers: HumanReviewOpsBlocker[];
+  postResult: ResultPayload;
+}): HumanReviewTrustCalibrationTarget {
+  if (input.action === "fail_closed_until_evidence_refresh") {
+    const evidenceGaps = input.blockers.filter(
+      (blocker) => blocker.type === "evidence_gate"
+    );
+    const gapIds = evidenceGaps.map((blocker) => blocker.id).filter(Boolean);
+    const ruleIds = evidenceGaps
+      .map((blocker) => blocker.ruleId)
+      .filter((ruleId): ruleId is string => !!ruleId)
+      .sort();
+    const trustBlocker = input.blockers.find((blocker) => blocker.type === "trust");
+    if (gapIds.length === 0) {
+      return {
+        type: "trust_state",
+        blockerId: trustBlocker?.id ?? `trust:${input.postResult.caseId}`,
+        evidenceStatus: input.postResult.trust.evidenceStatus,
+        freshnessStatus: input.postResult.trust.freshnessStatus
+      };
+    }
+    return {
+      type: "evidence_gap",
+      gapIds: gapIds.length > 0 ? gapIds : [`trust:${input.postResult.caseId}`],
+      ruleIds
+    };
+  }
+
+  if (input.action === "fail_closed_until_signal_capture") {
+    const signalIds = missingSignalIds(input.postResult);
+    return {
+      type: "signal",
+      signalIds: signalIds.length > 0 ? signalIds : ["unknown_missing_signal"]
+    };
+  }
+
+  if (input.action === "manual_policy_review_only") {
+    const ruleIds = input.blockers
+      .filter((blocker) => blocker.type === "human_review_trigger" && blocker.ruleId)
+      .map((blocker) => blocker.ruleId as string)
+      .sort();
+    return {
+      type: "policy_rule",
+      ruleIds: ruleIds.length > 0 ? ruleIds : ["manual_policy"]
+    };
+  }
+
+  return { type: "operator_note" };
+}
+
 function calibrationActionForRootCause(
   rootCause: HumanReviewLearningRootCause
 ): HumanReviewTrustCalibrationAction {
@@ -117,6 +177,7 @@ function buildTrustCalibration(input: {
   rootCauseLabel: string;
   resolutionSummary: string;
   postResult: ResultPayload;
+  blockers: HumanReviewOpsBlocker[];
   confidenceDelta: number;
   createdAt: string;
 }): HumanReviewTrustCalibration {
@@ -133,6 +194,11 @@ function buildTrustCalibration(input: {
     status: applyToFutureAutomation ? "active" : "informational",
     evidenceStatus: input.postResult.trust.evidenceStatus,
     freshnessStatus: input.postResult.trust.freshnessStatus,
+    target: calibrationTarget({
+      action,
+      blockers: input.blockers,
+      postResult: input.postResult
+    }),
     confidenceDelta: input.confidenceDelta,
     applyToFutureAutomation,
     reason: calibrationReason({
@@ -218,6 +284,7 @@ export function buildHumanReviewLearningEvent(input: {
       rootCauseLabel,
       resolutionSummary,
       postResult: input.postResult,
+      blockers: input.blockers,
       confidenceDelta,
       createdAt: input.now?.toISOString() ?? resolvedAt
     }),

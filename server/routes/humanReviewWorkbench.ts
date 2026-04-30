@@ -53,7 +53,7 @@ function getRequestId(req: Request): string {
   return Array.isArray(raw) ? raw[0] ?? "" : raw ?? "";
 }
 
-function orchestratorCatalogs(): OrchestratorCatalogs {
+function orchestratorCatalogs(caseId?: string): OrchestratorCatalogs {
   const catalogs = getCatalogsOrThrow();
   return {
     paths: catalogs.paths,
@@ -63,7 +63,9 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
     ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
     insuranceProducts: catalogs.insuranceProducts,
-    humanReviewCalibrations: getHumanReviewLearningStore().calibrations()
+    humanReviewCalibrations: caseId
+      ? getHumanReviewLearningStore().calibrations({ caseId })
+      : []
   };
 }
 
@@ -73,7 +75,7 @@ function computeResultForCaseId(caseId: string) {
     throw new HttpError(404, `Кейс ${caseId} не найден.`, "case_not_found");
   }
   const result = runDecision(
-    { case: caseData, catalogs: orchestratorCatalogs() },
+    { case: caseData, catalogs: orchestratorCatalogs(caseId) },
     { now: () => new Date() }
   );
   return { caseData, result };
@@ -96,11 +98,11 @@ function snapshotResolvedOpsDecision(input: {
   requestId: string;
   caseId: string;
 }) {
-  const catalogs = orchestratorCatalogs();
   const caseData = getCaseStore().get(input.caseId);
   if (!caseData) {
     throw new HttpError(404, `Кейс ${input.caseId} не найден.`, "case_not_found");
   }
+  const catalogs = orchestratorCatalogs(input.caseId);
   const result = runDecision(
     { case: caseData, catalogs },
     { now: () => new Date() }
@@ -227,7 +229,7 @@ export function humanReviewWorkbenchRouter(): Router {
         });
       }
       const result = runDecision(
-        { case: caseData, catalogs: orchestratorCatalogs() },
+        { case: caseData, catalogs: orchestratorCatalogs(request.caseId) },
         { now: () => new Date() }
       );
       return buildHumanReviewOpsQueueItem({

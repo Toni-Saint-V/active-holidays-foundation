@@ -66,7 +66,10 @@ function requireCase(id: string): Case {
   return existing;
 }
 
-function orchestratorCatalogs(): OrchestratorCatalogs {
+function orchestratorCatalogs(
+  caseId?: string,
+  options: { excludeCalibrationRequestIds?: string[] } = {}
+): OrchestratorCatalogs {
   const catalogs = getCatalogsOrThrow();
   return {
     paths: catalogs.paths,
@@ -76,11 +79,16 @@ function orchestratorCatalogs(): OrchestratorCatalogs {
     ruleEvidence: catalogs.ruleEvidence,
     residencyPrograms: catalogs.residencyPrograms,
     insuranceProducts: catalogs.insuranceProducts,
-    humanReviewCalibrations: getHumanReviewLearningStore().calibrations()
+    humanReviewCalibrations: caseId
+      ? getHumanReviewLearningStore().calibrations({
+          caseId,
+          excludeRequestIds: options.excludeCalibrationRequestIds
+        })
+      : []
   };
 }
 
-function computeResult(caseData: Case, catalogs = orchestratorCatalogs()) {
+function computeResult(caseData: Case, catalogs = orchestratorCatalogs(caseData.id)) {
   return runDecision(
     { case: caseData, catalogs },
     { now: () => new Date() }
@@ -180,7 +188,7 @@ function recordDecision(
     changedPreferenceIds?: string[];
   }
 ) {
-  const catalogs = orchestratorCatalogs();
+  const catalogs = orchestratorCatalogs(caseData.id);
   const result = runDecision(
     { case: caseData, catalogs },
     { now: () => new Date() }
@@ -403,7 +411,7 @@ export function casesRouter(): Router {
     (req, res) => {
       const caseData = requireCase(getId(req));
       const payload = humanReviewCreateRequestSchema.parse(req.body);
-      const catalogs = orchestratorCatalogs();
+      const catalogs = orchestratorCatalogs(caseData.id);
       const result = computeResult(caseData, catalogs);
       const handoff = payload.scenarioId
         ? buildScenarioHumanReviewHandoff(caseData, payload.scenarioId, catalogs, result)
@@ -579,7 +587,7 @@ export function casesRouter(): Router {
   router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     const result = computeResult(caseData);
-    res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(), result));
+    res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(caseData.id), result));
   });
 
   router.get("/:id/scenarios", validateParams(caseIdParams), (req, res) => {
@@ -685,8 +693,16 @@ export function casesRouter(): Router {
         "legacy_decision_record"
       );
     }
+    const terminalRequest = getCaseStore().humanReviewForDecisionRecord(id, latest.decisionId);
+    const excludeCalibrationRequestIds =
+      terminalRequest?.resolution?.postDecisionRecordId === latest.decisionId
+        ? [terminalRequest.id]
+        : [];
     const replayResult = runDecision(
-      { case: currentCase, catalogs: orchestratorCatalogs() },
+      {
+        case: currentCase,
+        catalogs: orchestratorCatalogs(id, { excludeCalibrationRequestIds })
+      },
       { now: () => new Date(latest.computedAt) }
     );
     const replayFingerprint = fingerprintResult(replayResult);

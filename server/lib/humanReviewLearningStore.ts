@@ -127,9 +127,13 @@ export class HumanReviewLearningStore {
       .map((event) => structuredClone(event));
   }
 
-  calibrations(): HumanReviewTrustCalibration[] {
+  calibrations(input: { caseId?: string; excludeRequestIds?: string[] } = {}): HumanReviewTrustCalibration[] {
+    const excluded = new Set(input.excludeRequestIds ?? []);
     return this.list()
       .map((event) => event.trustCalibration)
+      .filter((calibration) => calibration.applyToFutureAutomation)
+      .filter((calibration) => !input.caseId || calibration.caseId === input.caseId)
+      .filter((calibration) => !excluded.has(calibration.requestId))
       .sort(
         (a, b) =>
           b.createdAt.localeCompare(a.createdAt) ||

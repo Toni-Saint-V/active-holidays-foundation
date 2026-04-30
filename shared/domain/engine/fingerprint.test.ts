@@ -208,6 +208,11 @@ describe("fingerprintCatalogs", () => {
       status: "active",
       evidenceStatus: "stale",
       freshnessStatus: "stale",
+      target: {
+        type: "evidence_gap",
+        gapIds: ["EVIDENCE_GATE:R1"],
+        ruleIds: ["R1"]
+      },
       confidenceDelta: 0,
       applyToFutureAutomation: true,
       reason: "Оставить fail-closed до обновления источников.",
