@@ -241,6 +241,27 @@ function scenarioSafetyStatus(
   return "safe_automatic";
 }
 
+function hasPositiveScenarioDelta(before: ResultPayload, after: ResultPayload): boolean {
+  const beforeRisks = riskLabels(before);
+  const afterRisks = riskLabels(after);
+
+  return (
+    verdictRank[after.verdict] > verdictRank[before.verdict] ||
+    after.trust.confidence - before.trust.confidence >= 0.03 ||
+    after.documents.readyCount > before.documents.readyCount ||
+    after.documents.score > before.documents.score ||
+    beforeRisks.some((label) => !afterRisks.includes(label))
+  );
+}
+
+function isHelpfulPathSwitch(before: ResultPayload, after: ResultPayload): boolean {
+  return (
+    (before.primaryPath?.id ?? null) !== (after.primaryPath?.id ?? null) &&
+    scenarioSafetyStatus(before, after) === "safe_automatic" &&
+    hasPositiveScenarioDelta(before, after)
+  );
+}
+
 function buildWhyChanged(
   before: ResultPayload,
   after: ResultPayload,
@@ -350,6 +371,10 @@ function isHelpfulScenario(
   after: ResultPayload,
   draft: ScenarioDraft
 ): boolean {
+  if (draft.type === "path_switch") {
+    return isHelpfulPathSwitch(before, after);
+  }
+
   if (after.verdict !== before.verdict && verdictRank[after.verdict] >= verdictRank[before.verdict]) {
     return true;
   }
@@ -360,21 +385,6 @@ function isHelpfulScenario(
     return true;
   }
   if (draft.type === "human_review") {
-    return true;
-  }
-
-  if (
-    draft.type === "path_switch" &&
-    after.verdict !== "HUMAN_REVIEW" &&
-    (before.primaryPath?.id ?? null) !== (after.primaryPath?.id ?? null) &&
-    (
-      before.verdict !== after.verdict ||
-      Math.abs(after.trust.confidence - before.trust.confidence) >= 0.03 ||
-      before.documents.score !== after.documents.score ||
-      before.nextAction.type !== after.nextAction.type ||
-      riskLabels(before).join("|") !== riskLabels(after).join("|")
-    )
-  ) {
     return true;
   }
 
@@ -672,7 +682,6 @@ function buildHumanReviewScenario(result: ResultPayload): ScenarioCandidate {
     nextAction,
     trust: {
       ...result.trust,
-      confidence: 0,
       humanReviewReason: result.trust.humanReviewReason ?? reason
     }
   };
@@ -781,7 +790,7 @@ export function buildDecisionScenarioLab(
   const noHelpfulScenarios = trimmed.length === 0;
 
   return {
-    version: "scenario-lab.v1",
+    version: "scenario-lab.v2",
     caseId: caseData.id,
     generatedAt: stableNow.toISOString(),
     baseResult: referenceResult,

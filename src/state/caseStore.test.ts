@@ -75,7 +75,7 @@ const resultStub = {
 } as const;
 
 const scenarioLabStub = {
-  version: "scenario-lab.v1",
+  version: "scenario-lab.v2",
   caseId: CASE_ID,
   generatedAt: "2026-04-17T10:00:00.000Z",
   baseResult: resultStub,

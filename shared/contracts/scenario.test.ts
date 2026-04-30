@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { scenarioCandidateSchema } from "./scenario";
+import { scenarioCandidateSchema, scenarioLabPayloadSchema } from "./scenario";
+import { trustSchema } from "./trust";
 
 const candidate = {
   id: "documents-ready",
@@ -85,5 +86,47 @@ describe("scenarioCandidateSchema", () => {
 
     expect(scenarioCandidateSchema.safeParse(legacyCandidate).success).toBe(false);
     expect(scenarioCandidateSchema.safeParse(candidate).success).toBe(true);
+  });
+
+  it("uses scenario-lab.v2 for the breaking evidence-aware payload shape", () => {
+    expect(
+      scenarioLabPayloadSchema.safeParse({
+        version: "scenario-lab.v1",
+        caseId: "case",
+        generatedAt: "2026-04-17T10:00:00.000Z",
+        baseResult: {},
+        issues: [],
+        scenarios: [],
+        recommendedScenarioId: null,
+        noHelpfulScenarios: false,
+        humanReviewEscalation: {
+          required: false,
+          title: "Ручная проверка не нужна",
+          detail: "Есть рабочий автоматический сценарий.",
+          triggeredBy: []
+        }
+      }).success
+    ).toBe(false);
+  });
+
+  it("accepts every canonical trust freshness status in scenario candidates", () => {
+    const freshnessValues = trustSchema.shape.freshnessStatus.options;
+
+    for (const freshnessStatus of freshnessValues) {
+      expect(
+        scenarioCandidateSchema.safeParse({
+          ...candidate,
+          freshnessStatus,
+          delta: {
+            ...candidate.delta,
+            freshnessStatus: {
+              before: freshnessStatus,
+              after: freshnessStatus,
+              changed: false
+            }
+          }
+        }).success
+      ).toBe(true);
+    }
   });
 });

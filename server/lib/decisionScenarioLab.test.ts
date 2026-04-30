@@ -64,9 +64,34 @@ describe("buildDecisionScenarioLab", () => {
     expect(lab.noHelpfulScenarios).toBe(true);
     expect(lab.scenarios[0]?.type).toBe("human_review");
     expect(lab.scenarios[0]?.safetyStatus).toBe("human_review_only");
-    expect(lab.scenarios[0]?.comparison.confidenceAfter).toBe(0);
+    expect(lab.scenarios[0]?.comparison.confidenceAfter).toBe(result.trust.confidence);
     expect(lab.scenarios[0]?.delta?.verdict.after).toBe("HUMAN_REVIEW");
-    expect(lab.scenarios[0]?.delta?.confidence.after).toBe(0);
+    expect(lab.scenarios[0]?.delta?.confidence.after).toBe(result.trust.confidence);
     expect(lab.scenarios[0]?.delta?.nextAction.afterType).toBe("send_for_review");
+  });
+
+  it("does not recommend a path switch that degrades the base result", async () => {
+    const catalogs = await loadCatalogs();
+    const caseData = catalogs.cases.find((entry) => entry.id === "s5-rf-italy-insurance");
+    expect(caseData).toBeDefined();
+    if (!caseData) return;
+
+    const result = runDecision({ case: caseData, catalogs });
+    const degradedBase = {
+      ...result,
+      verdict: "GO" as const,
+      alternativePaths: result.alternativePaths.slice(0, 1),
+      trust: {
+        ...result.trust,
+        confidence: 0.9
+      }
+    };
+
+    const lab = buildDecisionScenarioLab(caseData, catalogs, degradedBase);
+
+    expect(lab.noHelpfulScenarios).toBe(true);
+    expect(lab.recommendedScenarioId).toBe("human-review");
+    expect(lab.scenarios.some((scenario) => scenario.type === "path_switch")).toBe(false);
+    expect(lab.scenarios[0]?.safetyStatus).toBe("human_review_only");
   });
 });

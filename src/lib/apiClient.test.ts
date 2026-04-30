@@ -214,7 +214,7 @@ describe("apiClient strict productType parsing", () => {
       "fetch",
       vi.fn().mockResolvedValue(
         okJson({
-          version: "scenario-lab.v1",
+          version: "scenario-lab.v2",
           caseId: caseResponse.id,
           generatedAt: "2026-04-17T10:00:00.000Z",
           baseResult: resultWithoutProductType,

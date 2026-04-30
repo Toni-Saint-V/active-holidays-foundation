@@ -35,11 +35,13 @@ const TRUST_EVIDENCE_LEGACY_DEFAULTS = {
   humanReviewReason: null
 } as const;
 
+export const freshnessStatusSchema = z.enum(["fresh", "stale", "unknown"]);
+
 const strictTrustSchema = z.object({
   confidence: z.number().min(0).max(1),
   confidenceBreakdown: confidenceBreakdownSchema,
   evidenceStatus: evidenceStatusSchema,
-  freshnessStatus: z.enum(["fresh", "stale", "unknown"]),
+  freshnessStatus: freshnessStatusSchema,
   blockingReason: z.string().min(1).nullable(),
   humanReviewReason: z.string().min(1).nullable(),
   volatilityScore: z.number().min(0).max(1),
