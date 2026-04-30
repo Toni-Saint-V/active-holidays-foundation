@@ -1,12 +1,10 @@
 name: Autonomous Product OS Checks
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+  # GitHub Actions are currently disabled as an automatic merge gate because
+  # the account is locked by billing. Keep the workflow manual so PRs do not
+  # receive false red checks before a runner can start. Until billing is
+  # restored, use `npm run verify:local` and paste the output in the PR.
   workflow_dispatch: {}
 
 permissions:
