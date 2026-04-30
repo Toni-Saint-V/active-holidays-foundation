@@ -10,6 +10,7 @@ import {
 import { createApp } from "../index";
 import { getCatalogsOrThrow } from "../lib/catalogs";
 import { resetRecommendationClientForTests } from "../lib/recommendations";
+import { installStableRouteTestClock } from "./routeTestClock";
 
 const { createResponseMock } = vi.hoisted(() => ({
   createResponseMock: vi.fn()
@@ -41,6 +42,8 @@ beforeAll(async () => {
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
+
+installStableRouteTestClock();
 
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;

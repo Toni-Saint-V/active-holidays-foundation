@@ -147,6 +147,220 @@ async function requestJson(
 }
 
 describe("human review HTTP surface", () => {
+  it("rejects operator workbench reads without the internal token", async () => {
+    const response = await requestJson("GET", "/api/human-review/ops/queue");
+
+    expect(response.status).toBe(403);
+    expect(response.json.error).toBe("internal_api_forbidden");
+  });
+
+  it("returns an empty operator queue when no active review exists", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-ops-empty-"));
+    const previous = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+
+    try {
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
+        isolatedTempDir,
+        "human-reviews.json"
+      );
+      const isolatedApp = await createApp();
+      const response = await requestJson(
+        "GET",
+        "/api/human-review/ops/queue",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.json.queue).toEqual([]);
+      expect(response.json.capabilities.learningFeedback).toBe("unavailable");
+    } finally {
+      if (previous) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previous;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns active operator queue and detail read models from existing review state", async () => {
+    const created = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
+      channel: "email",
+      contact: "ops@example.com",
+      message: "Нужна операторская проверка evidence по кейсу."
+    });
+    expect(created.status).toBe(200);
+
+    const queue = await requestJson(
+      "GET",
+      "/api/human-review/ops/queue",
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
+    expect(queue.status).toBe(200);
+    const item = queue.json.queue.find(
+      (entry: { requestId: string }) => entry.requestId === created.json.request.id
+    );
+    expect(item).toBeTruthy();
+    expect(item.currentVerdict).toBe("HUMAN_REVIEW");
+    expect(item.currentEvidenceStatus).toBe("conflicting");
+    expect(item.blockerCount).toBeGreaterThan(0);
+
+    const detail = await requestJson(
+      "GET",
+      `/api/human-review/ops/requests/${created.json.request.id}`,
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
+    expect(detail.status).toBe(200);
+    expect(detail.json.detail.request.id).toBe(created.json.request.id);
+    expect(detail.json.detail.currentResult.verdict).toBe("HUMAN_REVIEW");
+    expect(detail.json.detail.blockingReasons.length).toBeGreaterThan(0);
+    expect(detail.json.detail.learning.source).toBe("unavailable");
+    const moveInReview = detail.json.detail.operatorNextActions.find(
+      (action: { id: string }) => action.id === "move_in_review"
+    );
+    expect(moveInReview.transitionStatus).toBe("in_review");
+  });
+
+  it("keeps the operator queue available when persisted review points to a missing case", async () => {
+    const isolatedTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-ops-orphan-"));
+    const previous = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+
+    try {
+      const filePath = path.join(isolatedTempDir, "human-reviews.json");
+      process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = filePath;
+      await writeFile(
+        filePath,
+        `${JSON.stringify(
+          [
+            {
+              id: "hr_missing-case_1",
+              caseId: "missing-case",
+              status: "submitted",
+              channel: "email",
+              contact: "ops@example.com",
+              message: "Этот запрос ссылается на удалённый кейс.",
+              createdAt: "2026-04-30T09:00:00.000Z",
+              updatedAt: "2026-04-30T09:00:00.000Z",
+              closedAt: null,
+              durability: "persisted",
+              snapshot: {
+                decisionId: null,
+                verdict: "HUMAN_REVIEW",
+                confidence: 0,
+                computedAt: "2026-04-30T09:00:00.000Z",
+                lastCheckedAt: "2026-04-30T09:00:00.000Z",
+                nextActionLabel: "Передать кейс менеджеру",
+                summary: "Нужна ручная проверка."
+              },
+              events: [
+                {
+                  id: "hr_missing-case_1_submitted",
+                  at: "2026-04-30T09:00:00.000Z",
+                  type: "submitted",
+                  status: "submitted",
+                  changedBy: "traveler",
+                  note: null
+                }
+              ]
+            }
+          ],
+          null,
+          2
+        )}\n`,
+        "utf8"
+      );
+      const isolatedApp = await createApp();
+
+      const queue = await requestJson(
+        "GET",
+        "/api/human-review/ops/queue",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+
+      expect(queue.status).toBe(200);
+      expect(queue.json.queue[0].itemStatus).toBe("orphaned_case");
+      expect(queue.json.queue[0].caseId).toBe("missing-case");
+      expect(queue.json.queue[0].recoveryLabel).toContain("кейс не найден");
+
+      const detail = await requestJson(
+        "GET",
+        "/api/human-review/ops/requests/hr_missing-case_1",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+
+      expect(detail.status).toBe(404);
+      expect(detail.json.error).toBe("case_not_found");
+    } finally {
+      if (previous) {
+        process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previous;
+      } else {
+        delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+      }
+      await rm(isolatedTempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps terminal reviews out of the active queue while preserving operator detail", async () => {
+    const created = await requestJson("POST", "/api/cases/s4-rf-residency-dnv/human-review", {
+      channel: "telegram",
+      contact: "@ops",
+      message: "Закрываем ручную проверку через текущий transition-only lifecycle."
+    });
+    expect(created.status).toBe(200);
+
+    const terminal = await requestJson(
+      "POST",
+      "/api/cases/s4-rf-residency-dnv/human-review/transition",
+      {
+        requestId: created.json.request.id,
+        status: "resolved",
+        note: "Оператор закрыл проверку.",
+        resolution: {
+          summary: "Оператор завершил проверку без автоматического пересчёта."
+        }
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
+    expect(terminal.status).toBe(200);
+
+    const queue = await requestJson(
+      "GET",
+      "/api/human-review/ops/queue",
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
+    expect(queue.status).toBe(200);
+    expect(
+      queue.json.queue.some(
+        (entry: { requestId: string }) => entry.requestId === created.json.request.id
+      )
+    ).toBe(false);
+
+    const detail = await requestJson(
+      "GET",
+      `/api/human-review/ops/requests/${created.json.request.id}`,
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
+    expect(detail.status).toBe(200);
+    expect(detail.json.detail.resolution.status).toBe("resolved");
+    expect(detail.json.detail.resolution.mode).toBe("transition_only");
+    expect(detail.json.detail.resolution.recompute).toBeNull();
+  });
+
   it("creates one active request and reuses it on repeated submit", async () => {
     const first = await requestJson("POST", "/api/cases/s3-us-spb-business/human-review", {
       channel: "email",

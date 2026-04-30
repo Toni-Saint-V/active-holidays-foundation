@@ -16,6 +16,7 @@ import { pathsRouter } from "./routes/paths";
 import { intakeRouter } from "./routes/intake";
 import { decisionsRouter } from "./routes/decisions";
 import { scenariosRouter } from "./routes/scenarios";
+import { humanReviewWorkbenchRouter } from "./routes/humanReviewWorkbench";
 
 export async function createApp(): Promise<express.Express> {
   const app = express();
@@ -48,6 +49,7 @@ export async function createApp(): Promise<express.Express> {
   app.use("/api/intake", intakeRouter());
   app.use("/api/decisions", decisionsRouter());
   app.use("/api/scenarios", scenariosRouter());
+  app.use("/api/human-review", humanReviewWorkbenchRouter());
 
   app.use(notFound);
   app.use(errorHandler);

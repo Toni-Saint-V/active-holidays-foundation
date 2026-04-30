@@ -21,6 +21,18 @@ export type HumanReviewStatus = z.infer<typeof humanReviewStatusSchema>;
 export const humanReviewTerminalStatusSchema = z.enum(["resolved", "cancelled"]);
 export type HumanReviewTerminalStatus = z.infer<typeof humanReviewTerminalStatusSchema>;
 
+export const activeHumanReviewStatuses = ["submitted", "in_queue", "in_review"] as const satisfies
+  readonly HumanReviewStatus[];
+export type ActiveHumanReviewStatus = (typeof activeHumanReviewStatuses)[number];
+
+export const allowedHumanReviewTransitions = {
+  submitted: ["in_queue", "in_review", "resolved", "cancelled"],
+  in_queue: ["in_review", "resolved", "cancelled"],
+  in_review: ["resolved", "cancelled"],
+  resolved: [],
+  cancelled: []
+} as const satisfies Record<HumanReviewStatus, readonly HumanReviewStatus[]>;
+
 export const humanReviewChannelSchema = z.enum(["email", "telegram"]);
 export type HumanReviewChannel = z.infer<typeof humanReviewChannelSchema>;
 
@@ -89,22 +101,54 @@ export const humanReviewEventSchema = z.object({
 });
 export type HumanReviewEvent = z.infer<typeof humanReviewEventSchema>;
 
-export const humanReviewRequestSchema = z.object({
-  id: z.string().min(1),
-  caseId: z.string().min(1),
-  status: humanReviewStatusSchema,
-  channel: humanReviewChannelSchema,
-  contact: z.string().min(3),
-  message: z.string().min(10),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  closedAt: z.string().datetime().nullable(),
-  durability: humanReviewDurabilitySchema,
-  snapshot: humanReviewSnapshotSchema,
-  handoff: humanReviewHandoffSchema.nullable().default(null),
-  resolution: humanReviewResolutionSchema.nullable().default(null),
-  events: z.array(humanReviewEventSchema).min(1)
-});
+export const humanReviewRequestSchema = z
+  .object({
+    id: z.string().min(1),
+    caseId: z.string().min(1),
+    status: humanReviewStatusSchema,
+    channel: humanReviewChannelSchema,
+    contact: z.string().min(3),
+    message: z.string().min(10),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    closedAt: z.string().datetime().nullable(),
+    durability: humanReviewDurabilitySchema,
+    snapshot: humanReviewSnapshotSchema,
+    handoff: humanReviewHandoffSchema.nullable().default(null),
+    resolution: humanReviewResolutionSchema.nullable().default(null),
+    events: z.array(humanReviewEventSchema).min(1)
+  })
+  .superRefine((request, ctx) => {
+    const terminal = isHumanReviewTerminalStatus(request.status);
+    if (terminal && request.closedAt === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["closedAt"],
+        message: "Terminal human review requests must include closedAt."
+      });
+    }
+    if (!terminal && request.closedAt !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["closedAt"],
+        message: "Active human review requests must not include closedAt."
+      });
+    }
+    if (request.status === "resolved" && request.resolution === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "Resolved human review requests must include resolution."
+      });
+    }
+    if (request.status !== "resolved" && request.resolution !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolution"],
+        message: "Resolution is only allowed for resolved human review requests."
+      });
+    }
+  });
 export type HumanReviewRequest = z.infer<typeof humanReviewRequestSchema>;
 
 export const humanReviewRequestsSchema = z.array(humanReviewRequestSchema);

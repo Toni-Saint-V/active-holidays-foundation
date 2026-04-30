@@ -21,6 +21,8 @@ import type {
 import {
   decisionLedgerEntrySchema,
   decisionRecordToLogEntry,
+  activeHumanReviewStatuses,
+  allowedHumanReviewTransitions,
   isHumanReviewTerminalStatus,
   isDecisionRecord,
   signalIdSchema,
@@ -67,18 +69,6 @@ export type TransitionHumanReviewInput = {
 export type CaseStoreOptions = {
   humanReviews?: HumanReviewRequest[];
   persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
-};
-
-const ACTIVE_HUMAN_REVIEW_STATUSES: HumanReviewStatus[] = ["submitted", "in_queue", "in_review"];
-const ALLOWED_HUMAN_REVIEW_TRANSITIONS: Record<
-  HumanReviewStatus,
-  readonly HumanReviewStatus[]
-> = {
-  submitted: ["in_queue", "in_review", "resolved", "cancelled"],
-  in_queue: ["in_review", "resolved", "cancelled"],
-  in_review: ["resolved", "cancelled"],
-  resolved: [],
-  cancelled: []
 };
 
 export class HumanReviewHandoffConflictError extends Error {
@@ -368,8 +358,16 @@ export class CaseStore {
     const active = bucket
       .slice()
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .find((entry) => ACTIVE_HUMAN_REVIEW_STATUSES.includes(entry.status));
+      .find((entry) => activeHumanReviewStatuses.some((status) => status === entry.status));
     return active ? structuredClone(active) : null;
+  }
+
+  activeHumanReviewQueue(): HumanReviewRequest[] {
+    return this.humanReviews
+      .filter((entry) => activeHumanReviewStatuses.some((status) => status === entry.status))
+      .slice()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((request) => structuredClone(request));
   }
 
   getHumanReviewById(requestId: string): HumanReviewRequest | null {
@@ -487,7 +485,7 @@ export class CaseStore {
     if (existing.status === input.status) {
       return structuredClone(existing);
     }
-    if (!ALLOWED_HUMAN_REVIEW_TRANSITIONS[existing.status].includes(input.status)) {
+    if (!allowedHumanReviewTransitions[existing.status].some((status) => status === input.status)) {
       throw new Error(
         `Переход ${existing.status} -> ${input.status} для HumanReviewRequest ${input.requestId} запрещён.`
       );
