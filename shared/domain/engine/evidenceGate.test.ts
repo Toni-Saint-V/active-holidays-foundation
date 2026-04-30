@@ -31,6 +31,18 @@ function r17EvidenceCatalogs(
   };
 }
 
+function r12EvidenceCatalogs(
+  catalogs: OrchestratorCatalogs,
+  overrides: Partial<OrchestratorCatalogs["ruleEvidence"][number]>
+): OrchestratorCatalogs {
+  return {
+    ...catalogs,
+    ruleEvidence: catalogs.ruleEvidence.map((record) =>
+      record.ruleId === "R12" ? { ...record, ...overrides } : record
+    )
+  };
+}
+
 function withOnlyAlfaInsuranceFresh(catalogs: OrchestratorCatalogs): OrchestratorCatalogs {
   const insuranceSourceIds = new Set([
     "src_alfa_insurance",
@@ -62,6 +74,20 @@ function withAlfaFreshAtBoundary(catalogs: OrchestratorCatalogs): OrchestratorCa
     sources: next.sources.map((source) =>
       source.id === "src_alfa_insurance"
         ? { ...source, lastCheckedAt: "2026-04-24T09:00:00.000Z" }
+        : source
+    )
+  };
+}
+
+function withStaleSource(
+  catalogs: OrchestratorCatalogs,
+  sourceId: string
+): OrchestratorCatalogs {
+  return {
+    ...catalogs,
+    sources: catalogs.sources.map((source) =>
+      source.id === sourceId
+        ? { ...source, lastCheckedAt: "2026-03-01T09:00:00.000Z" }
         : source
     )
   };
@@ -118,7 +144,13 @@ describe("evidence gate in the real verdict pipeline", () => {
     const result = runDecision(
       {
         case: caseData,
-        catalogs
+        catalogs: withStaleSource(
+          r12EvidenceCatalogs(catalogs, {
+            evidenceStatus: "valid",
+            rationale: "Test fixture: valid evidence with stale source freshness."
+          }),
+          "src_russia_mfa_tr"
+        )
       },
       {
         now: () => new Date("2026-04-29T09:00:00.000Z")
@@ -188,7 +220,7 @@ describe("evidence gate in the real verdict pipeline", () => {
     const result = runDecision(
       {
         case: caseData,
-        catalogs
+        catalogs: withStaleSource(catalogs, "src_alfa_insurance")
       },
       {
         now: () => new Date("2026-04-29T09:00:00.000Z")

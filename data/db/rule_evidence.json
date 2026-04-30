@@ -114,11 +114,11 @@
     "countryOrScope": "TR->RU",
     "sourceUrlOrRef": "src_russia_mfa_tr",
     "sourceKind": "official",
-    "lastVerifiedAt": "2026-04-16T09:00:00.000Z",
+    "lastVerifiedAt": "2026-04-30T01:40:10.000Z",
     "freshnessWindowDays": 30,
     "automationClass": "safe_auto",
-    "evidenceStatus": "valid",
-    "rationale": "Existing visa rule and source catalog entry support the visa-free route used for cost prioritization."
+    "evidenceStatus": "conflicting",
+    "rationale": "Manual live review found that the official KDMID inbound page does not support a general TR->RU visa-free 60-day route for ordinary passports; it lists electronic visa entry up to 30 days and visa-free only for special categories."
   },
   {
     "ruleId": "R14",

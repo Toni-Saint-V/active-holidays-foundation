@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
-import { getCatalogsOrThrow } from "../lib/catalogs";
+import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
 
@@ -163,6 +163,22 @@ describe("decision integrity HTTP surface", () => {
   it("POST /api/cases/:id/recompute fails closed when referenced evidence source is stale", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-29T09:00:00.000Z"));
+    const staleCatalogs = structuredClone(getCatalogsOrThrow());
+    staleCatalogs.sources = staleCatalogs.sources.map((source) =>
+      source.id === "src_russia_mfa_tr"
+        ? { ...source, lastCheckedAt: "2026-03-01T09:00:00.000Z" }
+        : source
+    );
+    staleCatalogs.ruleEvidence = staleCatalogs.ruleEvidence.map((record) =>
+      record.ruleId === "R12"
+        ? {
+            ...record,
+            evidenceStatus: "valid",
+            rationale: "Test fixture: valid evidence with stale source freshness."
+          }
+        : record
+    );
+    const restoreCatalogs = replaceCatalogsForTest(staleCatalogs);
     try {
       const recompute = await postJson("/api/cases/s2-tr-spb/recompute");
 
@@ -176,6 +192,7 @@ describe("decision integrity HTTP surface", () => {
         )?.explanation
       ).toContain("stale");
     } finally {
+      restoreCatalogs();
       vi.useRealTimers();
     }
   });

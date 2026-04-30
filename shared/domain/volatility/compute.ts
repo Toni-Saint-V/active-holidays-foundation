@@ -7,13 +7,13 @@ const tierBaseline: Record<SourceTier, number> = {
   crowdsourced: 0.5
 };
 
-function daysBetween(a: Date, b: Date): number {
-  return Math.abs((a.getTime() - b.getTime()) / DAY_MS);
+function ageDaysAt(now: Date, checkedAt: Date): number {
+  return Math.max(0, (now.getTime() - checkedAt.getTime()) / DAY_MS);
 }
 
 export function computeSourceVolatility(source: Source, now: Date): number {
   const baseline = tierBaseline[source.tier];
-  const ageDays = daysBetween(now, new Date(source.lastCheckedAt));
+  const ageDays = ageDaysAt(now, new Date(source.lastCheckedAt));
   const staleness = Math.min(1, ageDays / 45);
   const combined = baseline + staleness * 0.5;
   return Math.min(1, Math.max(0, Math.round(combined * 100) / 100));

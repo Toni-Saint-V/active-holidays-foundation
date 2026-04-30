@@ -3,7 +3,7 @@
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
   "resultFingerprint": "b6fe6df7bc23931741fe31bc37b7af6d83e6d80c662f06fdcfbb5eb8cc8288ef",
-  "catalogFingerprint": "07cae2d18e4a9091922cd161bf0a47f2686d457fd62e991bb781f9868b30caee",
+  "catalogFingerprint": "76ca3cf436c5269aac3783341cf76f316bb089022b1e92056aa957f076a5221f",
   "verdict": "HUMAN_REVIEW",
   "nextActionType": "send_for_review",
   "primaryPathId": null,

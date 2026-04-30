@@ -13,11 +13,11 @@
     "caseId": "s2-tr-spb",
     "productType": "travel",
     "title": "S2 · Анкара → Санкт-Петербург",
-    "subtitle": "Туризм, безвиз, регистрация за 7 дней",
-    "expectedVerdict": "GO_WITH_CONDITIONS",
-    "expectedActionType": "start_application",
-    "expectedPrimaryPath": "turkey_visa_free_spb",
-    "note": "Турция → РФ: безвизовый режим, регистрация по прибытии."
+    "subtitle": "Туризм, визовый режим требует ручной проверки",
+    "expectedVerdict": "HUMAN_REVIEW",
+    "expectedActionType": "send_for_review",
+    "expectedPrimaryPath": null,
+    "note": "Турция → РФ: официальный источник не подтверждает общий безвиз 60 дней, автомат передаёт кейс менеджеру."
   },
   {
     "caseId": "s3-us-spb-business",

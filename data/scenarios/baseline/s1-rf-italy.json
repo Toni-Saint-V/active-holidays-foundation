@@ -2,10 +2,10 @@
   "caseId": "s1-rf-italy",
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
-  "resultFingerprint": "8d6c163e094ee13047829c859974b6e2d1b5f7fe62ba805edf5fcd2446af14e8",
-  "catalogFingerprint": "07cae2d18e4a9091922cd161bf0a47f2686d457fd62e991bb781f9868b30caee",
+  "resultFingerprint": "4d0ecc42f43c5b7d825cb7d4a4de433a68baa7d135a57627d0e730c6f6e2f00b",
+  "catalogFingerprint": "76ca3cf436c5269aac3783341cf76f316bb089022b1e92056aa957f076a5221f",
   "verdict": "GO_WITH_CONDITIONS",
   "nextActionType": "book_appointment",
   "primaryPathId": "italy_c_tourism",
-  "confidence": 0.78
+  "confidence": 0.79
 }

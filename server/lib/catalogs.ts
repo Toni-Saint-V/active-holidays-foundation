@@ -79,3 +79,11 @@ export function getCatalogsOrThrow(): Catalogs {
 export function resetCatalogsCache(): void {
   cached = null;
 }
+
+export function replaceCatalogsForTest(next: Catalogs): () => void {
+  const previous = cached;
+  cached = structuredClone(next);
+  return () => {
+    cached = previous;
+  };
+}

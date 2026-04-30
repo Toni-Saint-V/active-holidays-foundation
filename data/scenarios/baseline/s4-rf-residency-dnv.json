@@ -2,10 +2,10 @@
   "caseId": "s4-rf-residency-dnv",
   "engineVersion": "rdc.v1",
   "engineRevision": "2026.04.18",
-  "resultFingerprint": "9bf0f215ca8bd4e50ffa6e9c3f49064b59a6e47c0a6db4f5335103124b65bc28",
-  "catalogFingerprint": "07cae2d18e4a9091922cd161bf0a47f2686d457fd62e991bb781f9868b30caee",
+  "resultFingerprint": "a0115b7e8cec133c625accbe3adc2fd8e1fba631983e3c327a309e62060b2dcd",
+  "catalogFingerprint": "76ca3cf436c5269aac3783341cf76f316bb089022b1e92056aa957f076a5221f",
   "verdict": "GO",
   "nextActionType": "collect_financial_docs",
   "primaryPathId": "dnv_espana",
-  "confidence": 0.83
+  "confidence": 0.84
 }
