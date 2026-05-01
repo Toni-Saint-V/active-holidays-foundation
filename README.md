@@ -54,6 +54,10 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 
 ## Current Scope
 
+Product source of truth:
+
+- `docs/product-canon-v1.md` — active M1 canon: AI-first visa travel readiness for Russian citizens in Moscow and Saint Petersburg. Outdoor marketplace, activity booking, supplier tools, loyalty, and broad travel companion scope are not M1.
+
 This repository currently contains:
 
 - bootable client shell
