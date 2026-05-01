@@ -30,7 +30,7 @@ const rootCauseLabels: Record<HumanReviewLearningRootCause, string> = {
   conflicting_evidence: "источники конфликтуют",
   missing_signal: "не хватает входного сигнала",
   policy_ambiguity: "правило требует ручной интерпретации",
-  operator_override_only: "решение держится только на операторском override"
+  operator_override_only: "решение держится только на операторском переопределении"
 };
 
 const actionByRootCause: Record<HumanReviewLearningRootCause, {
@@ -39,19 +39,19 @@ const actionByRootCause: Record<HumanReviewLearningRootCause, {
 }> = {
   missing_evidence: {
     action: "fail_closed_until_evidence_refresh",
-    label: "Оставить fail-closed до пополнения evidence"
+    label: "Оставить закрытым до пополнения доказательной базы"
   },
   stale_evidence: {
     action: "fail_closed_until_evidence_refresh",
-    label: "Оставить fail-closed до обновления источников"
+    label: "Оставить закрытым до обновления источников"
   },
   conflicting_evidence: {
     action: "fail_closed_until_evidence_refresh",
-    label: "Оставить fail-closed до разбора конфликта источников"
+    label: "Оставить закрытым до разбора конфликта источников"
   },
   missing_signal: {
     action: "fail_closed_until_signal_capture",
-    label: "Оставить fail-closed до сбора недостающего сигнала"
+    label: "Оставить закрытым до сбора недостающего сигнала"
   },
   policy_ambiguity: {
     action: "manual_policy_review_only",
@@ -75,6 +75,16 @@ function dominantRootCause(
   return humanReviewLearningRootCauseSchema.options
     .slice()
     .sort((a, b) => counts[b] - counts[a] || a.localeCompare(b))[0] ?? "missing_evidence";
+}
+
+function closureLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} повторное закрытие`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} повторных закрытия`;
+  }
+  return `${count} повторных закрытий`;
 }
 
 function upsertGroup(
@@ -178,7 +188,7 @@ function toRecommendation(group: CalibrationGroup): HumanReviewTrustCalibrationR
     },
     action: action.action,
     actionLabel: action.label,
-    rationale: `${events.length} повторяющихся закрытия HUMAN_REVIEW: ${rootCauseLabels[rootCause]}. Рекомендация только для операционного разбора, без автоматической правки каталогов.`,
+    rationale: `${closureLabel(events.length)} ручной проверки: ${rootCauseLabels[rootCause]}. Рекомендация только для операционного разбора, без автоматической правки каталогов.`,
     sourceEventIds: events.map((event) => event.eventId),
     safety: {
       mode: "proposal_only",
@@ -218,9 +228,9 @@ export function buildHumanReviewTrustCalibration(input: {
     emptyState:
       recommendations.length === 0
         ? {
-            title: "Недостаточно повторов для calibration",
+            title: "Недостаточно повторов для калибровки",
             detail:
-              "Learning события сохранены, но пока нет повторяющихся blockers выше выбранного порога."
+              "События обучения сохранены, но пока нет повторяющихся блокеров выше выбранного порога."
           }
         : null
   };

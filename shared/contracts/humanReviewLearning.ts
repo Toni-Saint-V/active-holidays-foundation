@@ -550,3 +550,171 @@ export const humanReviewTrustCalibrationResponseSchema = z
 export type HumanReviewTrustCalibrationResponse = z.infer<
   typeof humanReviewTrustCalibrationResponseSchema
 >;
+
+const severityCountsShape = {
+  critical: z.number().int().min(0),
+  high: z.number().int().min(0),
+  medium: z.number().int().min(0),
+  low: z.number().int().min(0)
+} satisfies Record<HumanReviewLearningBlockerSeverity, z.ZodNumber>;
+
+export const humanReviewTrustCalibrationCockpitItemSchema = z
+  .object({
+    priorityRank: z.number().int().min(1),
+    recommendation: humanReviewTrustCalibrationRecommendationSchema,
+    actionPlan: z
+      .object({
+        title: z.string().min(1),
+        steps: z.array(z.string().min(1)).min(1),
+        terminalFallback: z
+          .object({
+            label: z.string().min(1),
+            detail: z.string().min(1)
+          })
+          .strict()
+      })
+      .strict(),
+    operatorDecision: z
+      .object({
+        mode: z.literal("proposal_only"),
+        primaryLabel: z.string().min(1),
+        disabledReason: z.string().min(1)
+      })
+      .strict()
+  })
+  .strict();
+export type HumanReviewTrustCalibrationCockpitItem = z.infer<
+  typeof humanReviewTrustCalibrationCockpitItemSchema
+>;
+
+export const humanReviewTrustCalibrationCockpitLaneSchema = z
+  .object({
+    id: z.enum(["urgent", "watchlist", "informational"]),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    count: z.number().int().min(0),
+    items: z.array(humanReviewTrustCalibrationCockpitItemSchema)
+  })
+  .strict()
+  .superRefine((lane, ctx) => {
+    if (lane.count !== lane.items.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["count"],
+        message: "Lane count must match items length."
+      });
+    }
+  });
+export type HumanReviewTrustCalibrationCockpitLane = z.infer<
+  typeof humanReviewTrustCalibrationCockpitLaneSchema
+>;
+
+export const humanReviewTrustCalibrationCockpitResponseSchema = z
+  .object({
+    generatedAt: z.string().datetime(),
+    totalEvents: z.number().int().min(0),
+    thresholds: z
+      .object({
+        minOccurrences: z.number().int().min(1),
+        limit: z.number().int().min(1)
+      })
+      .strict(),
+    summary: z
+      .object({
+        recommendationCount: z.number().int().min(0),
+        sourceCatalogMutationsApplied: z.literal(0),
+        proposalOnlyCount: z.number().int().min(0),
+        severityCounts: z.object(severityCountsShape),
+        actionCounts: z.object(calibrationActionCountsShape)
+      })
+      .strict(),
+    lanes: z.array(humanReviewTrustCalibrationCockpitLaneSchema),
+    emptyState: z
+      .object({
+        title: z.string().min(1),
+        detail: z.string().min(1),
+        nextCheckLabel: z.string().min(1)
+      })
+      .strict()
+      .nullable(),
+    safety: z
+      .object({
+        title: z.string().min(1),
+        detail: z.string().min(1),
+        sourceCatalogMutation: humanReviewLearningSourceCatalogMutationSchema
+      })
+      .strict()
+  })
+  .strict()
+  .superRefine((response, ctx) => {
+    const itemCount = response.lanes.reduce((sum, lane) => sum + lane.items.length, 0);
+    const severityCounts = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    } satisfies Record<HumanReviewLearningBlockerSeverity, number>;
+    const actionCounts = {
+      fail_closed_until_evidence_refresh: 0,
+      fail_closed_until_signal_capture: 0,
+      manual_policy_review_only: 0,
+      informational_operator_note: 0
+    } satisfies Record<HumanReviewTrustCalibrationAction, number>;
+
+    for (const lane of response.lanes) {
+      for (const item of lane.items) {
+        severityCounts[item.recommendation.severity] += 1;
+        actionCounts[item.recommendation.action] += 1;
+      }
+    }
+
+    if (response.summary.recommendationCount !== itemCount) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["summary", "recommendationCount"],
+        message: "Cockpit summary recommendationCount must match lane items."
+      });
+    }
+    if (response.summary.proposalOnlyCount !== itemCount) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["summary", "proposalOnlyCount"],
+        message: "All cockpit recommendations must remain proposal-only."
+      });
+    }
+    for (const severity of humanReviewLearningBlockerSeveritySchema.options) {
+      if (response.summary.severityCounts[severity] !== severityCounts[severity]) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["summary", "severityCounts", severity],
+          message: "Cockpit severityCounts must match lane items."
+        });
+      }
+    }
+    for (const action of humanReviewTrustCalibrationActionSchema.options) {
+      if (response.summary.actionCounts[action] !== actionCounts[action]) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["summary", "actionCounts", action],
+          message: "Cockpit actionCounts must match lane items."
+        });
+      }
+    }
+    if (itemCount === 0 && response.emptyState === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emptyState"],
+        message: "Empty cockpit responses must explain why no action is available."
+      });
+    }
+    if (itemCount > 0 && response.emptyState !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emptyState"],
+        message: "Non-empty cockpit responses must not include an empty state."
+      });
+    }
+  });
+export type HumanReviewTrustCalibrationCockpitResponse = z.infer<
+  typeof humanReviewTrustCalibrationCockpitResponseSchema
+>;

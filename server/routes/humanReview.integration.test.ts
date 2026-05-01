@@ -152,6 +152,13 @@ describe("human review HTTP surface", () => {
 
     expect(response.status).toBe(403);
     expect(response.json.error).toBe("internal_api_forbidden");
+
+    const cockpit = await requestJson(
+      "GET",
+      "/api/human-review/learning/trust-calibration/cockpit"
+    );
+    expect(cockpit.status).toBe(403);
+    expect(cockpit.json.error).toBe("internal_api_forbidden");
   });
 
   it("returns an empty operator queue when no active review exists", async () => {
@@ -1071,6 +1078,46 @@ describe("human review HTTP surface", () => {
         }
       });
 
+      const cockpit = await requestJson(
+        "GET",
+        "/api/human-review/learning/trust-calibration/cockpit?minOccurrences=2",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(cockpit.status).toBe(200);
+      expect(cockpit.json.summary).toMatchObject({
+        recommendationCount: 1,
+        sourceCatalogMutationsApplied: 0,
+        proposalOnlyCount: 1,
+        severityCounts: {
+          high: 1
+        },
+        actionCounts: {
+          fail_closed_until_evidence_refresh: 1
+        }
+      });
+      expect(cockpit.json.lanes[0]).toMatchObject({
+        id: "urgent",
+        count: 1
+      });
+      expect(cockpit.json.lanes[0].items[0]).toMatchObject({
+        recommendation: {
+          blockerId: "EVIDENCE_GATE:visa_rule",
+          occurrences: 3,
+          safety: {
+            mode: "proposal_only",
+            sourceCatalogMutation: {
+              allowed: false,
+              applied: false
+            }
+          }
+        },
+        operatorDecision: {
+          mode: "proposal_only"
+        }
+      });
+
       const emptyCalibration = await requestJson(
         "GET",
         "/api/human-review/learning/trust-calibration?minOccurrences=4",
@@ -1081,6 +1128,17 @@ describe("human review HTTP surface", () => {
       expect(emptyCalibration.status).toBe(200);
       expect(emptyCalibration.json.recommendations).toEqual([]);
       expect(emptyCalibration.json.emptyState.title).toContain("Недостаточно");
+
+      const emptyCockpit = await requestJson(
+        "GET",
+        "/api/human-review/learning/trust-calibration/cockpit?minOccurrences=4",
+        undefined,
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      );
+      expect(emptyCockpit.status).toBe(200);
+      expect(emptyCockpit.json.lanes).toEqual([]);
+      expect(emptyCockpit.json.emptyState.title).toContain("Нет безопасных");
     } finally {
       if (previousReviewFile) {
         process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousReviewFile;

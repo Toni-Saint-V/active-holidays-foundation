@@ -6,6 +6,7 @@ import {
   humanReviewLearningIngestResponseSchema,
   humanReviewLearningSummaryResponseSchema,
   humanReviewLearningTopBlockersResponseSchema,
+  humanReviewTrustCalibrationCockpitResponseSchema,
   humanReviewTrustCalibrationResponseSchema,
   humanReviewOpsActionRequestSchema,
   humanReviewOpsActionResponseSchema,
@@ -33,6 +34,7 @@ import {
   getHumanReviewLearningStore,
   HumanReviewLearningConflictError
 } from "../lib/humanReviewLearningStore";
+import { buildHumanReviewTrustCalibrationCockpit } from "../lib/humanReviewTrustCalibrationCockpit";
 import { buildHumanReviewTrustCalibration } from "../lib/humanReviewTrustCalibration";
 import { HttpError } from "../middleware/errorHandler";
 import { requireInternalApiToken } from "../middleware/internalApi";
@@ -284,6 +286,19 @@ export function humanReviewWorkbenchRouter(): Router {
     res.json(
       humanReviewTrustCalibrationResponseSchema.parse(
         buildHumanReviewTrustCalibration({
+          events: getHumanReviewLearningStore().list(),
+          minOccurrences: query.minOccurrences,
+          limit: query.limit
+        })
+      )
+    );
+  });
+
+  router.get("/learning/trust-calibration/cockpit", requireInternalApiToken, (req, res) => {
+    const query = learningCalibrationQuerySchema.parse(req.query);
+    res.json(
+      humanReviewTrustCalibrationCockpitResponseSchema.parse(
+        buildHumanReviewTrustCalibrationCockpit({
           events: getHumanReviewLearningStore().list(),
           minOccurrences: query.minOccurrences,
           limit: query.limit
