@@ -98,10 +98,32 @@ describe("buildDocumentsScreenModel", () => {
 
   it("switches to a review gate for human-review verdicts", () => {
     const model = buildDocumentsScreenModel({
-      result: createResult({ verdict: "HUMAN_REVIEW" })
+      result: createResult({
+        verdict: "HUMAN_REVIEW",
+        documents: {
+          score: 1,
+          readyCount: 5,
+          requiredCount: 5,
+          items: [
+            {
+              id: "passport",
+              label: "Паспорт",
+              status: "ready",
+              detail: "Документ готов.",
+              pathId: "italy_c_tourism"
+            }
+          ]
+        }
+      })
     });
 
     expect(model.gate?.title).toBe("Документный трек откроет оператор");
     expect(model.gate?.actionLabel).toBe("Вернуться к ручной проверке");
+    expect(model.readiness.heading).toBe("Пакет на ручной проверке");
+    expect(model.readiness.summary).toContain("нельзя показывать как готовый к подаче");
+    expect(model.readiness.badgeLabel).toBe("проверка");
+    expect(model.readiness.badgeTone).toBe("review");
+    expect(model.requirements.items).toEqual([]);
+    expect(JSON.stringify(model)).not.toContain("можно подавать");
   });
 });

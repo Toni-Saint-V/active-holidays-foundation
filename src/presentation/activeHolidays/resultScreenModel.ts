@@ -228,6 +228,29 @@ function evidenceSignals(
   recommendedScenario: ScenarioLabPayload["scenarios"][number] | null,
   missingDocs: DocumentsReadinessItem[]
 ): ResultScreenModel["evidence"] {
+  if (result.verdict === "HUMAN_REVIEW") {
+    return [
+      {
+        id: "manual-review",
+        label: "Автомат остановлен",
+        tone: "manual"
+      },
+      {
+        id: "evidence",
+        label:
+          result.trust.blockingReason ??
+          result.trust.humanReviewReason ??
+          "Нужна ручная проверка",
+        tone: "manual"
+      },
+      {
+        id: "next-step",
+        label: result.nextAction.label,
+        tone: "manual"
+      }
+    ];
+  }
+
   return [
     {
       id: "docs",
@@ -425,7 +448,7 @@ export function buildResultScreenModel({
     evidence: evidenceSignals(result, recommendedScenario, missingDocs),
     workSection: {
       eyebrow: "нужно сейчас",
-      heading: "Собрать пакет",
+      heading: isHumanReview ? "Передать кейс человеку" : "Собрать пакет",
       rows: documentRows(result, missingDocs, recommendedScenario)
     },
     ai: aiInsight(result, recommendedScenario, missingDocs),
@@ -443,11 +466,17 @@ export function buildResultScreenModel({
         result.whyBullets.length > 0
           ? result.whyBullets.slice(0, 4).map((bullet) => bullet.text)
           : [result.nextAction.detail],
-      trustSummary: `Уверенность движка: ${Math.round(result.trust.confidence * 100)}%. Пределы: ${
-        result.trust.confidenceBreakdown.capsApplied.length > 0
-          ? result.trust.confidenceBreakdown.capsApplied.join(", ")
-          : "нет активных ограничителей"
-      }.`,
+      trustSummary: isHumanReview
+        ? `Автоматический вывод остановлен безопасно: ${
+            result.trust.blockingReason ??
+            result.trust.humanReviewReason ??
+            "кейс должен посмотреть человек"
+          }.`
+        : `Уверенность движка: ${Math.round(result.trust.confidence * 100)}%. Пределы: ${
+            result.trust.confidenceBreakdown.capsApplied.length > 0
+              ? result.trust.confidenceBreakdown.capsApplied.join(", ")
+              : "нет активных ограничителей"
+          }.`,
       topRiskLabels: result.risks.slice(0, 3).map((risk) => risk.label)
     }
   };

@@ -333,6 +333,93 @@ describe("buildVisaReadinessPassScreenModel", () => {
     expect(model.aiBoundary.summary).toContain("не предлагает продолжать автоматически");
   });
 
+  it("does not mask stale or conflicting evidence behind generic human review state", () => {
+    const stale = buildVisaReadinessPassScreenModel({
+      result: createBaseResult({
+        verdict: "HUMAN_REVIEW",
+        nextAction: {
+          type: "send_for_review",
+          priority: "human_review",
+          label: "Передать кейс менеджеру",
+          detail: "Источник устарел, поэтому автоматический вывод остановлен.",
+          targetScreen: "human-review",
+          triggeredBy: ["evidence"]
+        },
+        trust: {
+          ...createBaseResult().trust,
+          evidenceStatus: "stale",
+          freshnessStatus: "stale",
+          blockingReason: "Источник устарел."
+        }
+      }),
+      scenarioLab: null
+    });
+    const conflicting = buildVisaReadinessPassScreenModel({
+      result: createBaseResult({
+        verdict: "HUMAN_REVIEW",
+        nextAction: {
+          type: "send_for_review",
+          priority: "human_review",
+          label: "Передать кейс менеджеру",
+          detail: "Источники конфликтуют, поэтому автоматический вывод остановлен.",
+          targetScreen: "human-review",
+          triggeredBy: ["evidence"]
+        },
+        trust: {
+          ...createBaseResult().trust,
+          evidenceStatus: "conflicting",
+          blockingReason: "Источники конфликтуют."
+        }
+      }),
+      scenarioLab: null
+    });
+
+    expect(stale.state).toBe("stale_evidence");
+    expect(stale.readinessStatus.evidenceLabel).toBe("Есть устаревшие источники");
+    expect(stale.alternativesCta.primaryCta.targetScreen).toBe("human-review");
+    expect(conflicting.state).toBe("conflicting_evidence");
+    expect(conflicting.readinessStatus.evidenceLabel).toBe("Есть конфликт источников");
+    expect(conflicting.alternativesCta.primaryCta.targetScreen).toBe("human-review");
+  });
+
+  it.each([
+    ["missing", "Не хватает источников", "Не хватает источника для правила R17."],
+    ["manual_only", "Только ручная проверка", "Кейс требует ручной проверки оператора."]
+  ] as const)("keeps %s evidence reason visible in human review state", (
+    evidenceStatus,
+    evidenceLabel,
+    blockingReason
+  ) => {
+    const model = buildVisaReadinessPassScreenModel({
+      result: createBaseResult({
+        verdict: "HUMAN_REVIEW",
+        primaryPath: null,
+        nextAction: {
+          type: "send_for_review",
+          priority: "human_review",
+          label: "Передать кейс менеджеру",
+          detail: blockingReason,
+          targetScreen: "human-review",
+          triggeredBy: ["evidence"]
+        },
+        trust: {
+          ...createBaseResult().trust,
+          evidenceStatus,
+          freshnessStatus: evidenceStatus === "missing" ? "unknown" : "fresh",
+          blockingReason
+        }
+      }),
+      scenarioLab: null
+    });
+
+    expect(model.state).toBe("human_review_required");
+    expect(model.readinessStatus.evidenceLabel).toBe(evidenceLabel);
+    expect(model.readinessStatus.why).toBe(blockingReason);
+    expect(model.routeRiskMap.selectedPointId).toBe("evidence");
+    expect(model.routeRiskMap.selectedPoint.requirements).toContain(blockingReason);
+    expect(model.alternativesCta.primaryCta.targetScreen).toBe("human-review");
+  });
+
   it("models resolved-after-review and long-text states without changing verdicts", () => {
     const resolved = buildVisaReadinessPassScreenModel({
       result: createBaseResult({ verdict: "GO" }),
