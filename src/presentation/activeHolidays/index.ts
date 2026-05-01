@@ -15,3 +15,7 @@ export {
   buildTrustCalibrationCockpitScreenModel,
   type TrustCalibrationCockpitScreenModel
 } from "./trustCalibrationCockpitScreenModel";
+export {
+  buildVisaReadinessPassScreenModel,
+  type VisaReadinessPassScreenModel
+} from "./visaReadinessPassScreenModel";
