@@ -11,3 +11,7 @@ export {
 } from "./humanReviewOpsWorkbenchScreenModel";
 export { buildResultScreenModel, type ResultScreenModel } from "./resultScreenModel";
 export { buildTrustScreenModel, type TrustScreenModel } from "./trustScreenModel";
+export {
+  buildTrustCalibrationCockpitScreenModel,
+  type TrustCalibrationCockpitScreenModel
+} from "./trustCalibrationCockpitScreenModel";

@@ -7,6 +7,7 @@ import {
   humanReviewLearningRootCauseSchema,
   humanReviewLearningSummaryResponseSchema,
   humanReviewTrustCalibrationSchema,
+  humanReviewTrustCalibrationCockpitResponseSchema,
   humanReviewTrustCalibrationResponseSchema,
   humanReviewLearningTopBlockersResponseSchema
 } from "./humanReviewLearning";
@@ -237,9 +238,9 @@ describe("human review learning contracts", () => {
               negativeEvents: 2
             },
             action: "fail_closed_until_evidence_refresh",
-            actionLabel: "Оставить fail-closed до обновления источников",
+            actionLabel: "Оставить закрытым до обновления источников",
             rationale:
-              "2 повторяющихся закрытия HUMAN_REVIEW: источники устарели. Рекомендация только для операционного разбора, без автоматической правки каталогов.",
+              "2 повторных закрытия ручной проверки: источники устарели. Рекомендация только для операционного разбора, без автоматической правки каталогов.",
             sourceEventIds: [
               "hrl_hr_1_2026-05-01T08:00:00.000Z",
               "hrl_hr_2_2026-05-01T08:30:00.000Z"
@@ -255,6 +256,147 @@ describe("human review learning contracts", () => {
         ],
         emptyState: null
       }).recommendations[0].safety.sourceCatalogMutation.applied
+    ).toBe(false);
+
+    expect(
+      humanReviewTrustCalibrationCockpitResponseSchema.parse({
+        generatedAt: "2026-05-01T09:00:00.000Z",
+        totalEvents: 2,
+        thresholds: {
+          minOccurrences: 2,
+          limit: 10
+        },
+        summary: {
+          recommendationCount: 1,
+          sourceCatalogMutationsApplied: 0,
+          proposalOnlyCount: 1,
+          severityCounts: {
+            critical: 0,
+            high: 1,
+            medium: 0,
+            low: 0
+          },
+          actionCounts: {
+            fail_closed_until_evidence_refresh: 1,
+            fail_closed_until_signal_capture: 0,
+            manual_policy_review_only: 0,
+            informational_operator_note: 0
+          }
+        },
+        lanes: [
+          {
+            id: "urgent",
+            title: "Срочные блокеры",
+            description: "Высокий риск.",
+            count: 1,
+            items: [
+              {
+                priorityRank: 1,
+                recommendation: {
+                  id: "cal_EVIDENCE_GATE:rule_1",
+                  blockerId: "EVIDENCE_GATE:rule_1",
+                  label: "Evidence gate заблокировал rule_1.",
+                  rootCause: "stale_evidence",
+                  rootCauseCounts: {
+                    missing_evidence: 0,
+                    stale_evidence: 2,
+                    conflicting_evidence: 0,
+                    missing_signal: 0,
+                    policy_ambiguity: 0,
+                    operator_override_only: 0
+                  },
+                  occurrences: 2,
+                  severity: "high",
+                  lastSeenAt: "2026-05-01T08:30:00.000Z",
+                  confidenceImpact: {
+                    averageDelta: -0.1,
+                    negativeEvents: 2
+                  },
+                  action: "fail_closed_until_evidence_refresh",
+                  actionLabel: "Оставить закрытым до обновления источников",
+                  rationale:
+                    "2 повторных закрытия ручной проверки: источники устарели. Рекомендация только для операционного разбора, без автоматической правки каталогов.",
+                  sourceEventIds: [
+                    "hrl_hr_1_2026-05-01T08:00:00.000Z",
+                    "hrl_hr_2_2026-05-01T08:30:00.000Z"
+                  ],
+                  safety: {
+                    mode: "proposal_only",
+                    sourceCatalogMutation: {
+                      allowed: false,
+                      applied: false
+                    }
+                  }
+                },
+                actionPlan: {
+                  title: "Разобрать доказательную базу",
+                  steps: ["Проверить источники."],
+                  terminalFallback: {
+                    label: "Оставить ручную проверку",
+                    detail: "Без свежего источника автоматический совет не выдаётся."
+                  }
+                },
+                operatorDecision: {
+                  mode: "proposal_only",
+                  primaryLabel: "Подготовить разбор",
+                  disabledReason: "Автоматическое применение отключено."
+                }
+              }
+            ]
+          }
+        ],
+        emptyState: null,
+        safety: {
+          title: "Только предложение",
+          detail: "Каталоги источников не меняются.",
+          sourceCatalogMutation: {
+            allowed: false,
+            applied: false
+          }
+        }
+      }).summary.sourceCatalogMutationsApplied
+    ).toBe(0);
+
+    expect(
+      humanReviewTrustCalibrationCockpitResponseSchema.safeParse({
+        generatedAt: "2026-05-01T09:00:00.000Z",
+        totalEvents: 0,
+        thresholds: {
+          minOccurrences: 2,
+          limit: 10
+        },
+        summary: {
+          recommendationCount: 0,
+          sourceCatalogMutationsApplied: 0,
+          proposalOnlyCount: 0,
+          severityCounts: {
+            critical: 0,
+            high: 1,
+            medium: 0,
+            low: 0
+          },
+          actionCounts: {
+            fail_closed_until_evidence_refresh: 0,
+            fail_closed_until_signal_capture: 0,
+            manual_policy_review_only: 0,
+            informational_operator_note: 0
+          }
+        },
+        lanes: [],
+        emptyState: {
+          title: "Нет безопасных действий",
+          detail: "Повторов пока недостаточно.",
+          nextCheckLabel: "Продолжать сбор решений"
+        },
+        safety: {
+          title: "Только предложение",
+          detail: "Каталоги источников не меняются.",
+          sourceCatalogMutation: {
+            allowed: false,
+            applied: false
+          }
+        }
+      }).success
     ).toBe(false);
   });
 });
