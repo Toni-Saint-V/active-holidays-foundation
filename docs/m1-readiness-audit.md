@@ -356,3 +356,12 @@ Rules:
 Verify:
 npm run verify
 ```
+
+## PR1-safe Non-Visual Scope Contract
+
+Follow-up status:
+
+- Added a repo-local M1 scope contract for allowed public routes, known non-M1 routes, and required M1 capabilities.
+- Added `npm run audit:m1-scope` as a non-blocking static audit of registered routes and visible nav exposure.
+- This does not change visible UI, copy, layout, navigation, or route behavior.
+- Visible route/nav gating still requires PNG/Figma approval before implementation.

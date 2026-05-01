@@ -25,3 +25,4 @@ export * from "./decisions";
 export * from "./health";
 export * from "./scenarioLab";
 export * from "./recommendations";
+export * from "./m1Scope";
