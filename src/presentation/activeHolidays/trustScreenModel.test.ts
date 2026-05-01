@@ -100,9 +100,51 @@ describe("buildTrustScreenModel", () => {
 
   it("blocks trust details for human-review verdicts", () => {
     const model = buildTrustScreenModel({
-      result: createResult({ verdict: "HUMAN_REVIEW" })
+      result: createResult({
+        verdict: "HUMAN_REVIEW",
+        trust: {
+          ...createResult().trust,
+          evidenceStatus: "missing",
+          freshnessStatus: "unknown",
+          blockingReason: "EVIDENCE_GATE:R17 missing"
+        }
+      })
     });
 
     expect(model.gate?.title).toBe("Доверие уточнит оператор");
+    expect(model.hero.heading).toBe("Автоматический вывод остановлен");
+    expect(model.hero.badgeLabel).toBe("проверка");
+    expect(model.hero.badgeTone).toBe("review");
+    expect(model.explanation.heading).toBe("Сигналы → правила → ручная проверка");
+    expect(model.sourcesSection.volatilityLabel).toContain("EVIDENCE_GATE:R17 missing");
+    expect(model.sourcesSection.items).toEqual([]);
+    expect(JSON.stringify(model)).not.toContain("83%");
+  });
+
+  it.each([
+    ["stale", "fresh", "источники устарели"],
+    ["conflicting", "fresh", "источники конфликтуют"],
+    ["manual_only", "fresh", "кейс доступен только для ручной проверки"]
+  ] as const)("keeps %s evidence reason visible without confidence details", (
+    evidenceStatus,
+    freshnessStatus,
+    expected
+  ) => {
+    const model = buildTrustScreenModel({
+      result: createResult({
+        verdict: "HUMAN_REVIEW",
+        trust: {
+          ...createResult().trust,
+          evidenceStatus,
+          freshnessStatus,
+          blockingReason: null,
+          humanReviewReason: null
+        }
+      })
+    });
+
+    expect(model.sourcesSection.volatilityLabel).toContain(expected);
+    expect(model.sourcesSection.items).toEqual([]);
+    expect(JSON.stringify(model)).not.toContain("83%");
   });
 });

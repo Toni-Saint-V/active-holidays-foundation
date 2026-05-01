@@ -35,7 +35,7 @@ export type DocumentsScreenModel = {
 };
 
 function readinessSummary(score: number): string {
-  if (score >= 0.99) return "Пакет собран — можно подавать.";
+  if (score >= 0.99) return "Пакет собран — можно перейти к следующему шагу.";
   if (score >= 0.5) return "Базовая часть готова, осталось добрать несколько документов.";
   return "Рано подавать: нужно готовить ключевые документы.";
 }
@@ -45,9 +45,11 @@ export function buildDocumentsScreenModel({
 }: {
   result: ResultPayload;
 }): DocumentsScreenModel {
+  const isHumanReview = result.verdict === "HUMAN_REVIEW";
+
   return {
     gate:
-      result.verdict === "HUMAN_REVIEW"
+      isHumanReview
         ? {
             title: "Документный трек откроет оператор",
             description:
@@ -57,22 +59,30 @@ export function buildDocumentsScreenModel({
         : null,
     readiness: {
       eyebrow: "Документы",
-      heading: "Индекс готовности",
-      summary: readinessSummary(result.documents.score),
-      badgeLabel: `${Math.round(result.documents.score * 100)}%`,
-      badgeTone: scoreBadgeTone(result.documents.score),
-      primaryActionLabel: "Отметить документ как готовый",
+      heading: isHumanReview ? "Пакет на ручной проверке" : "Индекс готовности",
+      summary: isHumanReview
+        ? "Пока кейс на ручной проверке, документный пакет нельзя показывать как готовый к подаче."
+        : readinessSummary(result.documents.score),
+      badgeLabel: isHumanReview ? "проверка" : `${Math.round(result.documents.score * 100)}%`,
+      badgeTone: isHumanReview ? "review" : scoreBadgeTone(result.documents.score),
+      primaryActionLabel: isHumanReview
+        ? "Вернуться к ручной проверке"
+        : "Отметить документ как готовый",
       secondaryActionLabel: "Вернуться к вердикту"
     },
     requirements: {
       heading: "Требования основного маршрута",
-      emptyMessage: "Список появится, когда движок найдёт основной маршрут.",
-      items: result.documents.items.map(({ id, label, status, detail }) => ({
-        id,
-        label,
-        status,
-        detail
-      }))
+      emptyMessage: isHumanReview
+        ? "Список документов откроется после ручной проверки."
+        : "Список появится, когда движок найдёт основной маршрут.",
+      items: isHumanReview
+        ? []
+        : result.documents.items.map(({ id, label, status, detail }) => ({
+            id,
+            label,
+            status,
+            detail
+          }))
     },
     nextStep: {
       heading: "Следующий шаг от движка",

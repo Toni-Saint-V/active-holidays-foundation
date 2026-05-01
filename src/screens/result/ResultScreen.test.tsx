@@ -361,9 +361,9 @@ describe("ResultScreen", () => {
 
     renderScreen(<ResultScreen />);
 
-    expect(screen.getByText("Нужна ручная проверка")).toBeInTheDocument();
+    expect(screen.getAllByText("Нужна ручная проверка").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Передать менеджеру").length).toBeGreaterThan(0);
-    expect(screen.getByText("Нужен оператор")).toBeInTheDocument();
+    expect(screen.getByText("Автомат остановлен")).toBeInTheDocument();
     expect(screen.queryByText("Маршрут подтверждён")).not.toBeInTheDocument();
   });
 

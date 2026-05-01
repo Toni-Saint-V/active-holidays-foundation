@@ -214,6 +214,59 @@ describe("decision integrity HTTP surface", () => {
     }
   });
 
+  it("POST /api/cases/:id/recompute fails closed when required evidence is missing", async () => {
+    const missingCatalogs = structuredClone(getCatalogsOrThrow());
+    missingCatalogs.ruleEvidence = missingCatalogs.ruleEvidence.filter(
+      (record) => record.ruleId !== "R17"
+    );
+    const restoreCatalogs = replaceCatalogsForTest(missingCatalogs);
+    try {
+      const recompute = await postJson("/api/cases/s4-rf-residency-dnv/recompute");
+
+      expect(recompute.status).toBe(200);
+      expect(recompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(recompute.json.result.nextAction.type).toBe("send_for_review");
+      expect(recompute.json.result.nextAction.priority).toBe("human_review");
+      expect(recompute.json.result.trust.confidence).toBe(0);
+      expect(recompute.json.result.trust.evidenceStatus).toBe("missing");
+      expect(recompute.json.result.trust.freshnessStatus).toBe("unknown");
+      expect(recompute.json.result.trust.blockingReason).toContain("missing");
+      expect(recompute.json.result.trust.humanReviewReason).toContain("EVIDENCE_GATE:R17");
+      expect(getCatalogsOrThrow()).toEqual(missingCatalogs);
+    } finally {
+      restoreCatalogs();
+    }
+  });
+
+  it("POST /api/cases/:id/recompute fails closed when evidence conflicts", async () => {
+    const conflictingCatalogs = structuredClone(getCatalogsOrThrow());
+    conflictingCatalogs.ruleEvidence = conflictingCatalogs.ruleEvidence.map((record) =>
+      record.ruleId === "R17"
+        ? {
+            ...record,
+            evidenceStatus: "conflicting" as const,
+            rationale: "Test fixture: external sources conflict with current automation."
+          }
+        : record
+    );
+    const restoreCatalogs = replaceCatalogsForTest(conflictingCatalogs);
+    try {
+      const recompute = await postJson("/api/cases/s4-rf-residency-dnv/recompute");
+
+      expect(recompute.status).toBe(200);
+      expect(recompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(recompute.json.result.nextAction.type).toBe("send_for_review");
+      expect(recompute.json.result.nextAction.priority).toBe("human_review");
+      expect(recompute.json.result.trust.confidence).toBe(0);
+      expect(recompute.json.result.trust.evidenceStatus).toBe("conflicting");
+      expect(recompute.json.result.trust.freshnessStatus).toBe("fresh");
+      expect(recompute.json.result.trust.blockingReason).toContain("conflicting");
+      expect(recompute.json.result.trust.humanReviewReason).toContain("EVIDENCE_GATE:R17");
+    } finally {
+      restoreCatalogs();
+    }
+  });
+
   it("POST /api/decisions/:id/replay returns diff:null on a fresh record", async () => {
     const recompute = await postJson("/api/cases/s2-tr-spb/recompute");
     const recordId = recompute.json.decisionRecordId as string;

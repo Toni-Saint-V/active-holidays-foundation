@@ -236,6 +236,7 @@ describe("buildResultScreenModel", () => {
     expect(model.bridge.activeNodeId).toBe("review");
     expect(model.ai.summary).toContain("менеджера");
     expect(model.cta.targetScreen).toBe("human-review");
+    expect(model.workSection.heading).toBe("Передать кейс человеку");
     expect(model.workSection.rows).toEqual([
       {
         id: "manual-review",
@@ -245,6 +246,25 @@ describe("buildResultScreenModel", () => {
         tone: "manual"
       }
     ]);
+    expect(model.evidence).toEqual([
+      {
+        id: "manual-review",
+        label: "Автомат остановлен",
+        tone: "manual"
+      },
+      {
+        id: "evidence",
+        label: "Нужна ручная проверка",
+        tone: "manual"
+      },
+      {
+        id: "next-step",
+        label: "Передать кейс менеджеру",
+        tone: "manual"
+      }
+    ]);
+    expect(model.basisSheet.trustSummary).toContain("Автоматический вывод остановлен безопасно");
+    expect(model.basisSheet.trustSummary).not.toContain("Уверенность движка");
     expect(model.compareCard).toBeNull();
   });
 

@@ -254,7 +254,6 @@ function titleLabel(result: ResultPayload): string {
 }
 
 function evidenceState(result: ResultPayload, humanReviewResolved: boolean): VisaReadinessPassState {
-  if (result.verdict === "HUMAN_REVIEW") return "human_review_required";
   if (result.trust.evidenceStatus === "conflicting") return "conflicting_evidence";
   if (
     result.trust.evidenceStatus === "stale" ||
@@ -262,6 +261,7 @@ function evidenceState(result: ResultPayload, humanReviewResolved: boolean): Vis
   ) {
     return "stale_evidence";
   }
+  if (result.verdict === "HUMAN_REVIEW") return "human_review_required";
   if (humanReviewResolved) return "resolved_after_review";
 
   const longText =
@@ -275,7 +275,7 @@ function evidenceLabel(result: ResultPayload): string {
   if (result.trust.evidenceStatus === "stale" || result.trust.freshnessStatus === "stale") {
     return "Есть устаревшие источники";
   }
-  if (result.trust.evidenceStatus === "missing") return "Не хватает evidence";
+  if (result.trust.evidenceStatus === "missing") return "Не хватает источников";
   if (result.trust.evidenceStatus === "manual_only") return "Только ручная проверка";
   return "Источники актуальны";
 }
