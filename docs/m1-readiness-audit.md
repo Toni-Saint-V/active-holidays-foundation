@@ -365,3 +365,12 @@ Follow-up status:
 - Added `npm run audit:m1-scope` as a non-blocking static audit of registered routes and visible nav exposure.
 - This does not change visible UI, copy, layout, navigation, or route behavior.
 - Visible route/nav gating still requires PNG/Figma approval before implementation.
+
+## PR2-safe Public Readiness Contract
+
+Follow-up status:
+
+- Added a contract-only public readiness adapter for the six Product Canon public states.
+- Preserved `ResultPayload.verdict` and the four canonical engine verdicts: `GO`, `GO_WITH_CONDITIONS`, `NOT_NOW`, `HUMAN_REVIEW`.
+- Did not add `DecisionResult`, did not replace the engine enum, and did not change visible UI behavior.
+- The adapter precedence is explicit: `insufficient_data` → `not_ready_blocked` → `needs_human_review` → `not_ready_fixable` → `ready` / `almost_ready`.
