@@ -1,11 +1,13 @@
 import type { Express } from "express";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
-import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { getCatalogsOrThrow, loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 
 let app: Express;
+let restoreFreshCatalogs: (() => void) | null = null;
 
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
@@ -61,6 +63,17 @@ class MockSocket extends Duplex {
 
 beforeAll(async () => {
   app = await createApp();
+});
+
+beforeEach(() => {
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
+  );
+});
+
+afterEach(() => {
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
 });
 
 async function requestJson(

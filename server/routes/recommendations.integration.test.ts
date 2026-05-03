@@ -8,8 +8,9 @@ import {
   recommendationShortlistSchema
 } from "@shared/contracts";
 import { createApp } from "../index";
-import { getCatalogsOrThrow } from "../lib/catalogs";
+import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { resetRecommendationClientForTests } from "../lib/recommendations";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 
 const { createResponseMock } = vi.hoisted(() => ({
   createResponseMock: vi.fn()
@@ -29,14 +30,7 @@ let app: Express;
 let server: Server;
 let baseUrl = "";
 const previousApiKey = process.env.OPENAI_API_KEY;
-const insuranceSourceIds = [
-  "src_alfa_insurance",
-  "src_ingos",
-  "src_sogaz",
-  "src_tinkoff",
-  "src_rosgosstrakh"
-];
-let originalInsuranceSourceChecks: Map<string, string> | null = null;
+let restoreFreshCatalogs: (() => void) | null = null;
 
 beforeAll(async () => {
   delete process.env.OPENAI_API_KEY;
@@ -50,30 +44,16 @@ beforeAll(async () => {
 
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
-  const catalogs = getCatalogsOrThrow();
-  originalInsuranceSourceChecks = new Map(
-    catalogs.sources
-      .filter((source) => insuranceSourceIds.includes(source.id))
-      .map((source) => [source.id, source.lastCheckedAt])
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
   );
-  const refreshedAt = new Date().toISOString();
-  for (const source of catalogs.sources) {
-    if (insuranceSourceIds.includes(source.id)) {
-      source.lastCheckedAt = refreshedAt;
-    }
-  }
   createResponseMock.mockReset();
   resetRecommendationClientForTests();
 });
 
 afterEach(() => {
-  if (!originalInsuranceSourceChecks) return;
-  const catalogs = getCatalogsOrThrow();
-  for (const source of catalogs.sources) {
-    const original = originalInsuranceSourceChecks.get(source.id);
-    if (original) source.lastCheckedAt = original;
-  }
-  originalInsuranceSourceChecks = null;
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
 });
 
 afterAll(async () => {
