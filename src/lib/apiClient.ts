@@ -16,6 +16,7 @@ import {
   caseSignalsSchema,
   humanReviewCreateRequestSchema,
   humanReviewCreateResponseSchema,
+  humanReviewCasePacketResponseSchema,
   humanReviewResponseSchema,
   pathPreferencesSchema,
   recommendationDetailRequestSchema,
@@ -35,6 +36,7 @@ import {
   type CaseSummary,
   type DecisionLogEntry,
   type HumanReviewCreateRequest,
+  type HumanReviewCasePacket,
   type HumanReviewRequest,
   type IntakePreview,
   type IntakeQueue,
@@ -241,6 +243,13 @@ export const apiClient = {
       humanReviewResponseSchema
     );
     return response.request;
+  },
+  async humanReviewCasePacket(id: string): Promise<HumanReviewCasePacket> {
+    const response = await request(
+      `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
+      humanReviewCasePacketResponseSchema
+    );
+    return response.packet;
   },
   async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
     const body = humanReviewCreateRequestSchema.parse(payload);

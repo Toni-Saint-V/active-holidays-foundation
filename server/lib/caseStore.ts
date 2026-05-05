@@ -12,6 +12,8 @@ import type {
   Verdict,
   HumanReviewActor,
   HumanReviewCreateRequest,
+  HumanReviewHandoff,
+  HumanReviewResolution,
   HumanReviewRequest,
   HumanReviewSnapshot,
   HumanReviewStatus
@@ -19,6 +21,8 @@ import type {
 import {
   decisionLedgerEntrySchema,
   decisionRecordToLogEntry,
+  activeHumanReviewStatuses,
+  allowedHumanReviewTransitions,
   isHumanReviewTerminalStatus,
   isDecisionRecord,
   signalIdSchema,
@@ -49,6 +53,7 @@ export type CreateOrReuseHumanReviewInput = {
   caseId: string;
   request: HumanReviewCreateRequest;
   snapshot: HumanReviewSnapshot;
+  handoff?: HumanReviewHandoff | null;
   now?: Date;
 };
 
@@ -57,7 +62,16 @@ export type TransitionHumanReviewInput = {
   status: HumanReviewStatus;
   changedBy: HumanReviewActor;
   note?: string | null;
+  resolution?: {
+    summary: HumanReviewResolution["summary"];
+    postDecisionRecordId?: HumanReviewResolution["postDecisionRecordId"];
+  } | null;
   now?: Date;
+};
+
+export type AttachHumanReviewDecisionRecordInput = {
+  requestId: string;
+  postDecisionRecordId: string;
 };
 
 export type CaseStoreOptions = {
@@ -65,17 +79,12 @@ export type CaseStoreOptions = {
   persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
 };
 
-const ACTIVE_HUMAN_REVIEW_STATUSES: HumanReviewStatus[] = ["submitted", "in_queue", "in_review"];
-const ALLOWED_HUMAN_REVIEW_TRANSITIONS: Record<
-  HumanReviewStatus,
-  readonly HumanReviewStatus[]
-> = {
-  submitted: ["in_queue", "in_review", "resolved", "cancelled"],
-  in_queue: ["in_review", "resolved", "cancelled"],
-  in_review: ["resolved", "cancelled"],
-  resolved: [],
-  cancelled: []
-};
+export class HumanReviewHandoffConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HumanReviewHandoffConflictError";
+  }
+}
 
 function migrateLegacyEntry(entry: DecisionLogEntry): DecisionRecord {
   const placeholder = `legacy:${entry.id}`;
@@ -352,13 +361,33 @@ export class CaseStore {
     return latest ? structuredClone(latest) : null;
   }
 
+  humanReviewForDecisionRecord(
+    caseId: string,
+    decisionRecordId: string
+  ): HumanReviewRequest | null {
+    const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
+    const request = bucket
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .find((entry) => entry.resolution?.postDecisionRecordId === decisionRecordId);
+    return request ? structuredClone(request) : null;
+  }
+
   activeHumanReviewFor(caseId: string): HumanReviewRequest | null {
     const bucket = this.humanReviewByCaseId.get(caseId) ?? [];
     const active = bucket
       .slice()
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .find((entry) => ACTIVE_HUMAN_REVIEW_STATUSES.includes(entry.status));
+      .find((entry) => activeHumanReviewStatuses.some((status) => status === entry.status));
     return active ? structuredClone(active) : null;
+  }
+
+  activeHumanReviewQueue(): HumanReviewRequest[] {
+    return this.humanReviews
+      .filter((entry) => activeHumanReviewStatuses.some((status) => status === entry.status))
+      .slice()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((request) => structuredClone(request));
   }
 
   getHumanReviewById(requestId: string): HumanReviewRequest | null {
@@ -371,6 +400,43 @@ export class CaseStore {
   ): { request: HumanReviewRequest; reused: boolean } {
     const existing = this.activeHumanReviewFor(input.caseId);
     if (existing) {
+      if (
+        existing.handoff &&
+        input.handoff &&
+        existing.handoff.scenarioId !== input.handoff.scenarioId
+      ) {
+        throw new HumanReviewHandoffConflictError(
+          `Active HumanReviewRequest ${existing.id} already tracks scenario ${existing.handoff.scenarioId}.`
+        );
+      }
+      if (!existing.handoff && input.handoff) {
+        const now = (input.now ?? new Date()).toISOString();
+        const enriched: HumanReviewRequest = {
+          ...existing,
+          handoff: structuredClone(input.handoff),
+          updatedAt: now,
+          events: [
+            ...existing.events,
+            {
+              id: `${existing.id}_handoff`,
+              at: now,
+              type: "handoff_created",
+              status: existing.status,
+              changedBy: "system",
+              note: input.handoff.humanReviewReason
+            }
+          ]
+        };
+        this.persistHumanReviewSnapshot(
+          this.humanReviews.map((request) =>
+            request.id === enriched.id
+              ? structuredClone(enriched)
+              : structuredClone(request)
+          )
+        );
+        this.replaceHumanReview(enriched);
+        return { request: structuredClone(enriched), reused: true };
+      }
       return { request: existing, reused: true };
     }
 
@@ -397,7 +463,21 @@ export class CaseStore {
       closedAt: null,
       durability: "persisted",
       snapshot: structuredClone(input.snapshot),
-      events: [event]
+      handoff: input.handoff ? structuredClone(input.handoff) : null,
+      resolution: null,
+      events: input.handoff
+        ? [
+            event,
+            {
+              id: `${requestId}_handoff`,
+              at: now,
+              type: "handoff_created" as const,
+              status: "submitted" as const,
+              changedBy: "system" as const,
+              note: input.handoff.humanReviewReason
+            }
+          ]
+        : [event]
     };
     this.persistHumanReviewSnapshot([...this.humanReviews, structuredClone(request)]);
     this.appendHumanReview(request);
@@ -412,21 +492,41 @@ export class CaseStore {
     if (isHumanReviewTerminalStatus(existing.status)) {
       throw new Error(`HumanReviewRequest ${input.requestId} уже закрыт и не может меняться.`);
     }
+    if (input.status === "resolved" && !input.resolution && !existing.resolution) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} требует resolution payload перед закрытием.`
+      );
+    }
+    if (input.status !== "resolved" && input.resolution) {
+      throw new Error(
+        `Resolution payload допустим только для resolved HumanReviewRequest ${input.requestId}.`
+      );
+    }
     if (existing.status === input.status) {
       return structuredClone(existing);
     }
-    if (!ALLOWED_HUMAN_REVIEW_TRANSITIONS[existing.status].includes(input.status)) {
+    if (!allowedHumanReviewTransitions[existing.status].some((status) => status === input.status)) {
       throw new Error(
         `Переход ${existing.status} -> ${input.status} для HumanReviewRequest ${input.requestId} запрещён.`
       );
     }
 
     const now = (input.now ?? new Date()).toISOString();
+    const resolution =
+      input.status === "resolved" && input.resolution
+        ? {
+            summary: input.resolution.summary,
+            resolvedAt: now,
+            changedBy: input.changedBy,
+            postDecisionRecordId: input.resolution.postDecisionRecordId ?? null
+          }
+        : existing.resolution;
     const next: HumanReviewRequest = {
       ...existing,
       status: input.status,
       updatedAt: now,
       closedAt: isHumanReviewTerminalStatus(input.status) ? now : null,
+      resolution,
       events: [
         ...existing.events,
         {
@@ -438,6 +538,42 @@ export class CaseStore {
           note: input.note ?? null
         }
       ]
+    };
+    this.persistHumanReviewSnapshot(
+      this.humanReviews.map((request) =>
+        request.id === next.id ? structuredClone(next) : structuredClone(request)
+      )
+    );
+    this.replaceHumanReview(next);
+    return structuredClone(next);
+  }
+
+  attachHumanReviewDecisionRecord(
+    input: AttachHumanReviewDecisionRecordInput
+  ): HumanReviewRequest {
+    const existing = this.humanReviewById.get(input.requestId);
+    if (!existing) {
+      throw new Error(`HumanReviewRequest ${input.requestId} не найден.`);
+    }
+    if (existing.status !== "resolved" || !existing.resolution) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} не закрыт и не может получить decision record.`
+      );
+    }
+    if (existing.resolution.postDecisionRecordId === input.postDecisionRecordId) {
+      return structuredClone(existing);
+    }
+    if (existing.resolution.postDecisionRecordId) {
+      throw new Error(
+        `HumanReviewRequest ${input.requestId} уже связан с decision record ${existing.resolution.postDecisionRecordId}.`
+      );
+    }
+    const next: HumanReviewRequest = {
+      ...existing,
+      resolution: {
+        ...existing.resolution,
+        postDecisionRecordId: input.postDecisionRecordId
+      }
     };
     this.persistHumanReviewSnapshot(
       this.humanReviews.map((request) =>

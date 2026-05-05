@@ -7,7 +7,7 @@ import {
   type KitViolation
 } from "./verify-kit-utils";
 
-const FORBIDDEN_MODEL_RE = /\b(?:type|interface|class|const)?\s*DecisionResult\b/;
+const FORBIDDEN_MODEL_RE = /\b(?:type|interface|class|const)\s+DecisionResult\b/;
 const VERDICT_LITERAL_RE = /["']([A-Z][A-Z_]+)["']/g;
 const CONTRACT_SCAN_DIRS = ["src", "server", "shared", "packages"] as const;
 const ALLOWED_VERDICTS = new Set<string>(verdictSchema.options);

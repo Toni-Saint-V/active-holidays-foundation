@@ -87,6 +87,18 @@ describe("verifyImportBoundaries", () => {
     );
   });
 
+  it("ignores test files under src because they are not browser runtime code", async () => {
+    await withFixture(
+      {
+        "src/component.tsx": "export const ok = true;",
+        "src/component.test.ts": 'import path from "node:path";\nexport const ok = path.sep;'
+      },
+      async (root) => {
+        expect(verifyImportBoundaries(root)).toEqual([]);
+      }
+    );
+  });
+
   it("flags server and shared imports from browser src", async () => {
     await withFixture(
       {

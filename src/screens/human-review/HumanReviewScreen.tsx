@@ -29,12 +29,14 @@ export function HumanReviewScreen() {
     activeCaseId,
     activeResult,
     activeHumanReview,
+    activeHumanReviewPacket,
     scenarios,
     audit,
     bootstrap,
     loadCase,
     loadAudit,
     loadHumanReview,
+    loadHumanReviewPacket,
     submitHumanReview,
     status,
     errorMessage,
@@ -77,6 +79,17 @@ export function HumanReviewScreen() {
   }, [activeCase?.id, loadHumanReview]);
 
   useEffect(() => {
+    if (
+      activeCase?.id &&
+      currentReview &&
+      currentReview.status !== "resolved" &&
+      currentReview.status !== "cancelled"
+    ) {
+      void loadHumanReviewPacket(activeCase.id);
+    }
+  }, [activeCase?.id, currentReview, loadHumanReviewPacket]);
+
+  useEffect(() => {
     setChannel("email");
     setContact("");
     setMessage("");
@@ -103,6 +116,7 @@ export function HumanReviewScreen() {
     result: activeResult,
     caseUpdatedAt: activeCase.updatedAt,
     request: currentReview,
+    packet: activeHumanReviewPacket?.case.id === activeCase.id ? activeHumanReviewPacket : null,
     audit,
     humanReviewStatus
   });

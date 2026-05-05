@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Case, RuleEvidenceRecord, Source } from "@shared/contracts";
+import type {
+  Case,
+  HumanReviewTrustCalibration,
+  RuleEvidenceRecord,
+  Source
+} from "@shared/contracts";
 import type { OrchestratorCatalogs } from "./orchestrator";
 import {
   fingerprintCase,
@@ -181,6 +186,46 @@ describe("fingerprintCatalogs", () => {
     };
 
     expect(fingerprintCatalogs(left)).toBe(fingerprintCatalogs(right));
+  });
+
+  it("keeps empty human-review calibrations compatible with historical catalog fingerprints", async () => {
+    const base = toOrchestrator(await loadCatalogs());
+    expect(fingerprintCatalogs(base)).toBe(
+      fingerprintCatalogs({ ...base, humanReviewCalibrations: [] })
+    );
+  });
+
+  it("flips when a real human-review calibration is present", async () => {
+    const base = toOrchestrator(await loadCatalogs());
+    const calibration: HumanReviewTrustCalibration = {
+      version: "human-review-trust-calibration.v1",
+      calibrationId: "hrc_case_1",
+      eventId: "hrl_case_1_2026-05-01T08:00:00.000Z",
+      requestId: "hr_case_1",
+      caseId: "case_1",
+      rootCause: "stale_evidence",
+      action: "fail_closed_until_evidence_refresh",
+      status: "active",
+      evidenceStatus: "stale",
+      freshnessStatus: "stale",
+      target: {
+        type: "evidence_gap",
+        gapIds: ["EVIDENCE_GATE:R1"],
+        ruleIds: ["R1"]
+      },
+      confidenceDelta: 0,
+      applyToFutureAutomation: true,
+      reason: "Оставить fail-closed до обновления источников.",
+      createdAt: "2026-05-01T08:00:00.000Z",
+      sourceCatalogMutation: {
+        allowed: false,
+        applied: false
+      }
+    };
+
+    expect(fingerprintCatalogs(base)).not.toBe(
+      fingerprintCatalogs({ ...base, humanReviewCalibrations: [calibration] })
+    );
   });
 });
 

@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useCaseStore } from "./caseStore";
-import { apiClient } from "@/lib/apiClient";
-import type { HumanReviewRequest } from "@shared/contracts";
+	import { useCaseStore } from "./caseStore";
+	import { apiClient } from "@/lib/apiClient";
+	import type { HumanReviewCasePacket, HumanReviewRequest } from "@shared/contracts";
 
 vi.mock("@/lib/apiClient", () => ({
   apiClient: {
     recompute: vi.fn(),
     paths: vi.fn(),
-    decisionScenarioLab: vi.fn(),
-    humanReview: vi.fn(),
-    submitHumanReview: vi.fn()
-  }
+	    decisionScenarioLab: vi.fn(),
+	    humanReview: vi.fn(),
+	    humanReviewCasePacket: vi.fn(),
+	    submitHumanReview: vi.fn()
+	  }
 }));
 
 const apiClientMock = vi.mocked(apiClient);
@@ -102,7 +103,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createHumanReviewRequest(
+	function createHumanReviewRequest(
   overrides: Partial<HumanReviewRequest> = {}
 ): HumanReviewRequest {
   return {
@@ -125,6 +126,8 @@ function createHumanReviewRequest(
       nextActionLabel: "Передать кейс менеджеру",
       summary: "Автомат не может честно закрыть неоднозначность."
     },
+    handoff: null,
+    resolution: null,
     events: [
       {
         id: "event-1",
@@ -136,8 +139,64 @@ function createHumanReviewRequest(
       }
     ],
     ...overrides
-  };
-}
+	  };
+	}
+
+	function createHumanReviewPacket(
+	  overrides: Partial<HumanReviewCasePacket> = {}
+	): HumanReviewCasePacket {
+	  const request = createHumanReviewRequest();
+	  return {
+	    version: "human-review-packet.v1",
+	    generatedAt: "2026-04-17T10:05:00.000Z",
+	    case: {
+	      id: CASE_ID,
+	      title: "Тестовый кейс",
+	      productType: "travel",
+	      updatedAt: "2026-04-17T10:00:00.000Z"
+	    },
+	    request,
+	    submittedSnapshot: request.snapshot,
+	    currentResult: {
+	      verdict: "HUMAN_REVIEW",
+	      confidence: 0.42,
+	      computedAt: "2026-04-17T10:05:00.000Z",
+	      nextAction: {
+	        type: "send_for_review",
+	        priority: "human_review",
+	        label: "Передать кейс менеджеру",
+	        detail: "Кейс требует ручной проверки.",
+	        targetScreen: "human-review",
+	        triggeredBy: ["ambiguity"]
+	      }
+	    },
+	    resultDrift: {
+	      changed: false,
+	      verdictChanged: false,
+	      confidenceDelta: 0,
+	      computedAtChanged: false,
+	      lastCheckedAtChanged: false,
+	      nextActionChanged: false
+	    },
+	    reviewReason: "Автомат не может честно закрыть неоднозначность.",
+	    evidence: {
+	      evidenceStatus: "valid",
+	      freshnessStatus: "fresh",
+	      blockingReason: null,
+	      humanReviewReason: null,
+	      lastCheckedAt: "2026-04-17T10:00:00.000Z"
+	    },
+	    scenario: null,
+	    operatorChecklist: [],
+	    documentsToInspect: [],
+	    riskSummary: {
+	      criticalRisk: null,
+	      risks: []
+	    },
+	    doNotAutoDecideNotes: ["Не обещать пользователю результат до решения оператора."],
+	    ...overrides
+	  };
+	}
 
 describe("useCaseStore scenario lab refresh", () => {
   beforeEach(() => {
@@ -196,7 +255,7 @@ describe("useCaseStore scenario lab refresh", () => {
     expect(state.humanReviewStatus).toBe("loading");
   });
 
-  it("keeps the newer submit result when an older human review load resolves later", async () => {
+	  it("keeps the newer submit result when an older human review load resolves later", async () => {
     const pendingLoad = deferred<HumanReviewRequest | null>();
     const pendingSubmit = deferred<{ reused: boolean; request: HumanReviewRequest }>();
     const olderRequest = createHumanReviewRequest({
@@ -231,6 +290,28 @@ describe("useCaseStore scenario lab refresh", () => {
     expect(state.activeHumanReview?.id).toBe("hr-submit");
     expect(state.activeHumanReview?.message).toBe("Новый запрос");
     expect(state.humanReviewStatus).toBe("ready");
-    await expect(submitPromise).resolves.toEqual({ reused: false });
-  });
-});
+	    await expect(submitPromise).resolves.toEqual({ reused: false });
+	  });
+
+	  it("ignores stale human review packet responses after the active case token changes", async () => {
+	    const pendingPacket = deferred<HumanReviewCasePacket>();
+	    apiClientMock.humanReviewCasePacket.mockReturnValueOnce(pendingPacket.promise as Promise<any>);
+
+	    const loadPromise = useCaseStore.getState().loadHumanReviewPacket(CASE_ID);
+
+	    useCaseStore.setState({
+	      humanReviewCaseId: "case-b",
+	      humanReviewRequestToken: useCaseStore.getState().humanReviewRequestToken + 1,
+	      humanReviewStatus: "loading",
+	      activeHumanReviewPacket: null
+	    });
+
+	    pendingPacket.resolve(createHumanReviewPacket());
+	    await loadPromise;
+
+	    const state = useCaseStore.getState();
+	    expect(state.humanReviewCaseId).toBe("case-b");
+	    expect(state.activeHumanReviewPacket).toBeNull();
+	    expect(state.humanReviewStatus).toBe("loading");
+	  });
+	});

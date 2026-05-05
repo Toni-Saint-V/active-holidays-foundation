@@ -7,9 +7,23 @@ import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
 import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
+import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 let restoreFreshCatalogs: (() => void) | null = null;
+
+function markValidEvidenceFresh(): void {
+  const catalogs = getCatalogsOrThrow();
+  const refreshedAt = "2026-04-30T00:00:00.000Z";
+  for (const source of catalogs.sources) {
+    source.lastCheckedAt = refreshedAt;
+  }
+  for (const record of catalogs.ruleEvidence) {
+    if (record.evidenceStatus === "valid") {
+      record.lastVerifiedAt = refreshedAt;
+    }
+  }
+}
 
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
@@ -65,7 +79,10 @@ class MockSocket extends Duplex {
 
 beforeAll(async () => {
   app = await createApp();
+  markValidEvidenceFresh();
 });
+
+installStableRouteTestClock();
 
 beforeEach(() => {
   restoreFreshCatalogs = replaceCatalogsForTest(
@@ -207,6 +224,59 @@ describe("decision integrity HTTP surface", () => {
     } finally {
       restoreCatalogs();
       vi.useRealTimers();
+    }
+  });
+
+  it("POST /api/cases/:id/recompute fails closed when required evidence is missing", async () => {
+    const missingCatalogs = structuredClone(getCatalogsOrThrow());
+    missingCatalogs.ruleEvidence = missingCatalogs.ruleEvidence.filter(
+      (record) => record.ruleId !== "R17"
+    );
+    const restoreCatalogs = replaceCatalogsForTest(missingCatalogs);
+    try {
+      const recompute = await postJson("/api/cases/s4-rf-residency-dnv/recompute");
+
+      expect(recompute.status).toBe(200);
+      expect(recompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(recompute.json.result.nextAction.type).toBe("send_for_review");
+      expect(recompute.json.result.nextAction.priority).toBe("human_review");
+      expect(recompute.json.result.trust.confidence).toBe(0);
+      expect(recompute.json.result.trust.evidenceStatus).toBe("missing");
+      expect(recompute.json.result.trust.freshnessStatus).toBe("unknown");
+      expect(recompute.json.result.trust.blockingReason).toContain("missing");
+      expect(recompute.json.result.trust.humanReviewReason).toContain("EVIDENCE_GATE:R17");
+      expect(getCatalogsOrThrow()).toEqual(missingCatalogs);
+    } finally {
+      restoreCatalogs();
+    }
+  });
+
+  it("POST /api/cases/:id/recompute fails closed when evidence conflicts", async () => {
+    const conflictingCatalogs = structuredClone(getCatalogsOrThrow());
+    conflictingCatalogs.ruleEvidence = conflictingCatalogs.ruleEvidence.map((record) =>
+      record.ruleId === "R17"
+        ? {
+            ...record,
+            evidenceStatus: "conflicting" as const,
+            rationale: "Test fixture: external sources conflict with current automation."
+          }
+        : record
+    );
+    const restoreCatalogs = replaceCatalogsForTest(conflictingCatalogs);
+    try {
+      const recompute = await postJson("/api/cases/s4-rf-residency-dnv/recompute");
+
+      expect(recompute.status).toBe(200);
+      expect(recompute.json.result.verdict).toBe("HUMAN_REVIEW");
+      expect(recompute.json.result.nextAction.type).toBe("send_for_review");
+      expect(recompute.json.result.nextAction.priority).toBe("human_review");
+      expect(recompute.json.result.trust.confidence).toBe(0);
+      expect(recompute.json.result.trust.evidenceStatus).toBe("conflicting");
+      expect(recompute.json.result.trust.freshnessStatus).toBe("fresh");
+      expect(recompute.json.result.trust.blockingReason).toContain("conflicting");
+      expect(recompute.json.result.trust.humanReviewReason).toContain("EVIDENCE_GATE:R17");
+    } finally {
+      restoreCatalogs();
     }
   });
 

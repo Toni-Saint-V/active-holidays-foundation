@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:agent-stack": "tsx scripts/verify-agent-stack.ts",
+    "audit:m1-scope": "tsx scripts/audit-m1-scope.ts",
     "test:watch": "vitest",
     "ah": "tsx scripts/codex/ah-command.ts",
     "ah:route": "tsx scripts/codex/ah-command.ts auto",

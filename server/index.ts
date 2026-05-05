@@ -7,6 +7,11 @@ import {
   loadPersistedHumanReviews,
   savePersistedHumanReviews
 } from "./lib/humanReviewPersistence";
+import {
+  loadPersistedHumanReviewLearningEvents,
+  savePersistedHumanReviewLearningEvents
+} from "./lib/humanReviewLearningPersistence";
+import { initializeHumanReviewLearningStore } from "./lib/humanReviewLearningStore";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 import { casesRouter } from "./routes/cases";
@@ -16,14 +21,20 @@ import { pathsRouter } from "./routes/paths";
 import { intakeRouter } from "./routes/intake";
 import { decisionsRouter } from "./routes/decisions";
 import { scenariosRouter } from "./routes/scenarios";
+import { humanReviewWorkbenchRouter } from "./routes/humanReviewWorkbench";
 
 export async function createApp(): Promise<express.Express> {
   const app = express();
   const catalogs = await loadCatalogs();
   const humanReviews = await loadPersistedHumanReviews();
+  const humanReviewLearningEvents = await loadPersistedHumanReviewLearningEvents();
   initializeCaseStore(catalogs, {
     humanReviews,
     persistHumanReviews: savePersistedHumanReviews
+  });
+  initializeHumanReviewLearningStore({
+    events: humanReviewLearningEvents,
+    persistEvents: savePersistedHumanReviewLearningEvents
   });
 
   app.use(cors());
@@ -48,6 +59,7 @@ export async function createApp(): Promise<express.Express> {
   app.use("/api/intake", intakeRouter());
   app.use("/api/decisions", decisionsRouter());
   app.use("/api/scenarios", scenariosRouter());
+  app.use("/api/human-review", humanReviewWorkbenchRouter());
 
   app.use(notFound);
   app.use(errorHandler);

@@ -10,6 +10,7 @@ export type BoundaryViolation = {
 
 const SOURCE_DIRS = ["src", "server", "shared"] as const;
 const TS_FILE_RE = /\.(ts|tsx)$/;
+const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx)$/;
 
 function isInside(candidate: string, parent: string): boolean {
   const relative = path.relative(parent, candidate);
@@ -31,7 +32,7 @@ function collectFiles(root: string, dir: string): string[] {
       files.push(...collectFiles(root, path.relative(root, absolutePath)));
       continue;
     }
-    if (entry.isFile() && TS_FILE_RE.test(entry.name)) {
+    if (entry.isFile() && TS_FILE_RE.test(entry.name) && !TEST_FILE_RE.test(entry.name)) {
       files.push(absolutePath);
     }
   }
