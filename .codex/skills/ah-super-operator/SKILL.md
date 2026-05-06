@@ -21,7 +21,7 @@ Do not use for narrow one-file fixes, simple terminal commands, or pure status r
 ## Workflow
 
 1. Start with `ah-control-protocol` and resolve the primary mode.
-2. For broad work, run or mirror `npm run skills:orchestrate -- --prompt "<request>"`.
+2. For broad work, run or mirror `npm run super -- "<request>"`.
 3. Pick one power mix below. Do not load every skill blindly.
 4. Define:
    - user goal

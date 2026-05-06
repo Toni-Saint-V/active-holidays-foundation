@@ -616,6 +616,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
       "ah-review-release"
     ],
     promptKeywords: [
+      "backend",
+      "server",
+      "api",
+      "route",
       "contract",
       "schema",
       "payload",
@@ -1029,6 +1033,19 @@ export function countKeywordHits(text: string, keywords: string[]): string[] {
   });
 }
 
+function hasNegatedUiIntent(text: string): boolean {
+  const lowerText = normalizePrompt(text).toLowerCase();
+  return /(^|[^\p{L}\p{N}])(?:non[-\s]?ui|no[-\s]?ui|not\s+ui|without\s+ui|без\s+ui|не\s+ui|без\s+интерфейса|не\s+интерфейс)([^\p{L}\p{N}]|$)/u.test(
+    lowerText
+  );
+}
+
+function countModeKeywordHits(text: string, mode: CompiledModeDefinition): string[] {
+  const hits = countKeywordHits(text, mode.promptKeywords);
+  if (mode.id !== "premium-ui" || !hasNegatedUiIntent(text)) return hits;
+  return hits.filter((hit) => hit.toLowerCase() !== "ui");
+}
+
 export function countFileHits(files: string[], patterns: RegExp[]): string[] {
   const hits: string[] = [];
   for (const file of files.map(normalizeFilePath).filter(Boolean)) {
@@ -1074,7 +1091,7 @@ export function collectModeMatches(
   const matches: ModeMatch[] = [];
 
   for (const mode of MODE_DEFINITIONS) {
-    const keywordHits = countKeywordHits(normalizedPrompt, mode.promptKeywords);
+    const keywordHits = countModeKeywordHits(normalizedPrompt, mode);
     const fileHits = countFileHits(normalizedFiles, mode.filePatterns);
     const reviewHit = Boolean(reviewOnly && mode.reviewOnly);
     const score = keywordHits.length + fileHits.length + (reviewHit ? 3 : 0);

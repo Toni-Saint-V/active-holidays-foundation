@@ -34,17 +34,17 @@ This repo exposes a compact action catalog. Do not route work through dozens of 
 
 Use these instead of remembering internal skill stacks:
 
+- `npm run super -- "задача"` — simplest maximum mode; deep skill mix, agent plan, proof gates.
 - `npm run ah` — show the command menu.
-- `PROMPT="..." npm run ah:auto` — auto-route a task into mode/lane/verify plan.
-- `PROMPT="..." npm run ah:orchestrate` — deep planning packet: skill scan, agent roles, prompt hardening, proof gates.
+- `npm run ah:auto -- "задача"` — auto-route a task into mode/lane/verify plan.
+- `npm run ah:orchestrate -- "задача"` — deep planning packet: skill scan, agent roles, prompt hardening, proof gates.
 - `npm run ah:verify` — full local gate: agent stack, typecheck, tests, build, audit.
 - `npm run ah:review` — review/merge gate flow.
 - `npm run ah:ui` — UI flow with PNG gate before implementation.
 - `npm run ah:ship` — final ship gate plus git status.
 - `npm run ah:skills` — compact skill catalog and context checks.
-- `npm run ah:auto` — automatic routing packet by PROMPT.
 - `npm run ah:manual` — manual routing packet without execution.
-- `PROMPT="..." FILES="src/file.ts" npm run ah:custom` — custom routing packet by prompt and files.
+- `FILES="src/file.ts" npm run ah:custom -- "задача"` — custom routing packet by prompt and files.
 - `npm run skills:orchestrate -- --prompt "..."` — explicit deep orchestration without remembering the env flag.
 - `npm run ah:next` — autonomous next-task readiness.
 - `npm run ah:audit` — dependency audit and LangGraph/uuid chain check.

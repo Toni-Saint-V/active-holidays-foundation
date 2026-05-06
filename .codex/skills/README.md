@@ -32,15 +32,15 @@ Review:
 
 ## Hotkey Commands
 
+- `npm run super -- "задача"`
 - `npm run ah`
-- `PROMPT="..." npm run ah:auto`
-- `PROMPT="..." npm run ah:orchestrate`
+- `npm run ah:auto -- "задача"`
+- `npm run ah:orchestrate -- "задача"`
 - `npm run ah:verify`
 - `npm run ah:review`
 - `npm run ah:ui`
 - `npm run ah:ship`
 - `npm run ah:skills`
-- `npm run ah:auto`
 - `npm run skills:orchestrate -- --prompt "..."`
 - `npm run ah:audit`
 

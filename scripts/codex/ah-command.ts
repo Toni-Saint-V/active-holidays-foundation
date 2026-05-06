@@ -5,31 +5,43 @@ type AhCommand = {
   title: string;
   description: string;
   commands: string[];
+  promptRequired?: boolean;
 };
 
 const commands: AhCommand[] = [
   {
+    id: "super",
+    title: "Super operator",
+    description: "Самый простой максимальный режим: skill mix, agent plan, proof gates.",
+    promptRequired: true,
+    commands: ["npm run skills:orchestrate -- --prompt \"super skill mix: $PROMPT\" --files \"$FILES\""]
+  },
+  {
     id: "auto",
     title: "Auto mode",
-    description: "Автоматически определить режим, lane, agent pack и проверки по PROMPT.",
+    description: "Автоматически определить режим, lane, agent pack и проверки по задаче.",
+    promptRequired: true,
     commands: ["npm run skills:autopilot -- --prompt \"$PROMPT\""]
   },
   {
     id: "orchestrate",
     title: "Deep orchestration",
     description: "Включить глубокий план: полный skill scan, agent roles, prompt hardening и proof gates.",
+    promptRequired: true,
     commands: ["npm run skills:orchestrate -- --prompt \"$PROMPT\" --files \"$FILES\""]
   },
   {
     id: "manual",
     title: "Manual mode",
     description: "Показать режим и шаги без исполнения flow.",
+    promptRequired: true,
     commands: ["npm run skills:start -- --prompt \"$PROMPT\""]
   },
   {
     id: "custom",
     title: "Custom mode",
     description: "Кастомный routing packet по PROMPT и FILES.",
+    promptRequired: true,
     commands: ["npm run skills:autopilot -- --prompt \"$PROMPT\" --files \"$FILES\""]
   },
   {
@@ -108,17 +120,18 @@ function printMenu() {
   }
   console.log("");
   console.log("Usage:");
+  console.log("  npm run super -- \"найди самый сильный следующий шаг\"");
+  console.log("  npm run ah:auto -- \"коротко опиши задачу\"");
+  console.log("  npm run ah:orchestrate -- \"сложная задача\"");
   console.log("  npm run ah -- <command>");
-  console.log("  PROMPT=\"...\" npm run ah:auto");
-  console.log("  PROMPT=\"...\" npm run ah:orchestrate");
-  console.log("  PROMPT=\"...\" FILES=\"src/file.ts\" npm run ah:custom");
+  console.log("  FILES=\"src/file.ts\" npm run super -- \"задача с файлом\"");
 }
 
-function runShell(command: string) {
+function runShell(command: string, env: NodeJS.ProcessEnv) {
   const result = spawnSync(command, {
     shell: true,
     stdio: "inherit",
-    env: process.env
+    env
   });
 
   if (result.status !== 0) {
@@ -127,6 +140,9 @@ function runShell(command: string) {
 }
 
 const requested = process.argv[2];
+const inlinePrompt = process.argv.slice(3).join(" ").trim();
+const prompt = (process.env.PROMPT?.trim() || inlinePrompt).trim();
+const files = (process.env.FILES ?? "").trim();
 
 if (!requested || requested === "help" || requested === "menu") {
   printMenu();
@@ -141,7 +157,19 @@ if (!selected) {
   process.exit(1);
 }
 
+if (selected.promptRequired && !prompt) {
+  console.error("Нужна задача обычным текстом после --");
+  console.error("Пример: npm run super -- \"найди самый сильный следующий шаг\"");
+  process.exit(1);
+}
+
+const childEnv = {
+  ...process.env,
+  PROMPT: prompt,
+  FILES: files
+};
+
 console.log(`AH command: ${selected.title}`);
 for (const command of selected.commands) {
-  runShell(command);
+  runShell(command, childEnv);
 }

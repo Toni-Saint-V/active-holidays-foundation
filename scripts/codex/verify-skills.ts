@@ -290,7 +290,8 @@ async function main() {
       "skills:orchestrate",
       "skills:evaluate-agents",
       "skills:telemetry:report",
-      "ah:orchestrate"
+      "ah:orchestrate",
+      "super"
     ]) {
       if (!scripts[scriptName]) {
         failures.push(`package.json: missing script ${scriptName}`);

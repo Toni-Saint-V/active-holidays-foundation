@@ -23,6 +23,7 @@
     "verify:agent-stack": "tsx scripts/verify-agent-stack.ts",
     "audit:m1-scope": "tsx scripts/audit-m1-scope.ts",
     "test:watch": "vitest",
+    "super": "tsx scripts/codex/ah-command.ts super",
     "ah": "tsx scripts/codex/ah-command.ts",
     "ah:route": "tsx scripts/codex/ah-command.ts auto",
     "ah:auto": "tsx scripts/codex/ah-command.ts auto",

@@ -41,6 +41,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
 - `npm run skills:orchestrate` — opt-in deep planning packet with skill scan, agent roles, prompt hardening, and proof gates
+- `npm run super -- "<request>"` — simplest maximum-mode wrapper around deep orchestration
 - `npm run skills:telemetry:report` — summarize recorded skill-mode telemetry
 
 ## Environment
@@ -102,7 +103,7 @@ Key repo-local bundles:
 Routing model:
 
 - auto-detect with `npm run skills:detect-mode`, `npm run skills:start`, or `npm run skills:autopilot`
-- use `npm run skills:orchestrate -- --prompt "<request>"` or `PROMPT="..." npm run ah:orchestrate` for broad skill/subagent orchestration
+- use `npm run super -- "<request>"` for broad skill/subagent orchestration
 - accept exactly one primary mode per task
 - use that mode to choose one bundle and one template
 - add secondary skills only inside that chosen mode
@@ -150,6 +151,7 @@ Autopilot runner:
 - `npm run skills:autopilot -- --prompt "<request>"`
 - `npm run skills:autopilot -- --files "<csv paths>"`
 - `npm run skills:orchestrate -- --prompt "<request>"` for the deep planning packet
+- `npm run super -- "<request>"` for the same deep packet with less syntax
 - turn the deep mode off with `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`
 - add `--telemetry` or `--telemetry-file reports/automations/state/runtime-observed/custom-skill-telemetry.jsonl` when you want runtime telemetry written to disk
 
