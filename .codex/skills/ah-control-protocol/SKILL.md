@@ -16,6 +16,7 @@ Keep Active Holidays execution disciplined without exposing dozens of atomic ski
 - UI-задачи, где нужен PNG approval перед кодом
 - handoff / prompt / checklist / risk output
 - ситуация, где нужно остановить scope creep
+- включаемый deep-orchestration режим для broad / high-risk / multi-surface задач
 
 ## Workflow
 
@@ -23,14 +24,27 @@ Keep Active Holidays execution disciplined without exposing dozens of atomic ski
 2. For UI work, block code changes until a PNG preview is explicitly approved.
 3. Use structured JSON only for execution-critical artifacts.
 4. Keep ordinary discussion human-readable and short.
-5. Use internal references only when needed:
+5. If `orchestrationMode.status` is `enabled`, scan the full router/catalog and build a task-specific skill + agent plan before implementation.
+6. Use internal references only when needed:
    - `_internal/protocol-structured-json-and-png-gate.md`
+   - `_internal/deep-orchestration-mode.md`
    - `_internal/repo-hygiene-and-structure.md`
    - `_internal/docs-and-handoff.md`
+
+## Deep Orchestration Switch
+
+Use for broad, ambiguous, high-risk, or multi-surface work where a shallow two-skill loadout would miss product, architecture, UI, AI, QA, release, or handoff risk.
+
+Turn on with:
+
+- `npm run skills:orchestrate -- --prompt "..."`
+- `PROMPT="..." npm run ah:orchestrate`
+- `AH_DEEP_ORCHESTRATION=1 npm run skills:autopilot -- --prompt "..."`
+
+Turn off with `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`.
 
 ## Hard Rules
 
 - No UI code before PNG approval.
-- No broad skill loading when one action skill is enough.
+- No broad skill loading when one action skill is enough; when deep orchestration is enabled, load all relevant skills, not all skills blindly.
 - No fake completeness without verification.
-

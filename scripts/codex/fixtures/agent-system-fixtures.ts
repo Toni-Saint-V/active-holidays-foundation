@@ -189,6 +189,26 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     ]
   },
   {
+    id: "skill-system-governance-deep-orchestration-switch",
+    title: "Deep orchestration switch for skills and subagents",
+    prompt:
+      "Нужно прописать вкл/выкл режим, чтобы skill router сам анализировал нужные скиллы, сабагентов, роли агентов и best practices для промптов.",
+    files: [],
+    expectedPrimaryMode: "skill-system-governance",
+    expectedBlockedState: "unblocked",
+    expectedRoutingConfidence: "high",
+    expectedExecutionLane: "standard-lane",
+    requiredAxes: ["governance", "verification", "review"],
+    preferredEntrySkills: ["ah-control-protocol", "ah-repo-automation"],
+    requiredAgentRoles: ["lead", "verifier", "reviewer"],
+    expectedAgentPackSkills: [
+      "ah-control-protocol",
+      "ah-backend-contracts",
+      "ah-repo-automation",
+      "ah-review-release"
+    ]
+  },
+  {
     id: "ah-repo-automation",
     title: "Plugin and MCP surface governance",
     prompt:

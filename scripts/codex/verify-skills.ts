@@ -287,8 +287,10 @@ async function main() {
       "skills:detect-mode",
       "skills:start",
       "skills:autopilot",
+      "skills:orchestrate",
       "skills:evaluate-agents",
-      "skills:telemetry:report"
+      "skills:telemetry:report",
+      "ah:orchestrate"
     ]) {
       if (!scripts[scriptName]) {
         failures.push(`package.json: missing script ${scriptName}`);

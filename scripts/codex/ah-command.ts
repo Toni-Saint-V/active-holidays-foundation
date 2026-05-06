@@ -15,6 +15,12 @@ const commands: AhCommand[] = [
     commands: ["npm run skills:autopilot -- --prompt \"$PROMPT\""]
   },
   {
+    id: "orchestrate",
+    title: "Deep orchestration",
+    description: "Включить глубокий план: полный skill scan, agent roles, prompt hardening и proof gates.",
+    commands: ["npm run skills:orchestrate -- --prompt \"$PROMPT\" --files \"$FILES\""]
+  },
+  {
     id: "manual",
     title: "Manual mode",
     description: "Показать режим и шаги без исполнения flow.",
@@ -98,12 +104,13 @@ const commands: AhCommand[] = [
 function printMenu() {
   console.log("Active Holidays commands:");
   for (const command of commands) {
-    console.log(`- ${command.id.padEnd(8)} ${command.title} — ${command.description}`);
+    console.log(`- ${command.id.padEnd(12)} ${command.title} — ${command.description}`);
   }
   console.log("");
   console.log("Usage:");
   console.log("  npm run ah -- <command>");
   console.log("  PROMPT=\"...\" npm run ah:auto");
+  console.log("  PROMPT=\"...\" npm run ah:orchestrate");
   console.log("  PROMPT=\"...\" FILES=\"src/file.ts\" npm run ah:custom");
 }
 

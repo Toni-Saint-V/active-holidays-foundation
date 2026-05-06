@@ -32,6 +32,7 @@ Use these instead of remembering internal skill stacks:
 
 - `npm run ah` — show the command menu.
 - `PROMPT="..." npm run ah:auto` — auto-route a task into mode/lane/verify plan.
+- `PROMPT="..." npm run ah:orchestrate` — deep planning packet: skill scan, agent roles, prompt hardening, proof gates.
 - `npm run ah:verify` — full local gate: agent stack, typecheck, tests, build, audit.
 - `npm run ah:review` — review/merge gate flow.
 - `npm run ah:ui` — UI flow with PNG gate before implementation.
@@ -40,6 +41,7 @@ Use these instead of remembering internal skill stacks:
 - `npm run ah:auto` — automatic routing packet by PROMPT.
 - `npm run ah:manual` — manual routing packet without execution.
 - `PROMPT="..." FILES="src/file.ts" npm run ah:custom` — custom routing packet by prompt and files.
+- `npm run skills:orchestrate -- --prompt "..."` — explicit deep orchestration without remembering the env flag.
 - `npm run ah:next` — autonomous next-task readiness.
 - `npm run ah:audit` — dependency audit and LangGraph/uuid chain check.
 
@@ -48,6 +50,7 @@ Use these instead of remembering internal skill stacks:
 - Pick exactly one visible action first.
 - Use `modes.md` only for automatic classification.
 - Use `bundles.md` and `task-templates.md` as internal execution references.
+- Use `orchestrationMode` as the on/off depth switch for broad skill/subagent planning.
 - Atomic legacy rules live in `_internal/*.md`; they are reference material, not visible actions.
 - Shared product context lives in `_shared/active-holidays/`.
 

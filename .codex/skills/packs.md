@@ -239,6 +239,7 @@ Output:
 Use for `.codex/skills`, automations, router docs, AGENTS, README, validator behavior, skill cleanup, semantic grouping, and workflow friction.
 
 - primary mode: `skill-system-governance`
+- deep orchestration: use `npm run skills:orchestrate -- --prompt "<request>"` when the task asks for skill/subagent/prompt-quality control
 
 Medium packs:
 
@@ -247,6 +248,7 @@ Medium packs:
 - operator docs: `ah-product-strategy`
 - validation: `ah-review-release`, `ah-review-release`
 - final review: `ah-review-release`
+- orchestration switch: `ah-control-protocol`, `_internal/deep-orchestration-mode.md`
 
 Output:
 

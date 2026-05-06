@@ -40,6 +40,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run skills:verify` — repo-local Codex skill system check
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
+- `npm run skills:orchestrate` — opt-in deep planning packet with skill scan, agent roles, prompt hardening, and proof gates
 - `npm run skills:telemetry:report` — summarize recorded skill-mode telemetry
 
 ## Environment
@@ -100,6 +101,7 @@ Key repo-local bundles:
 Routing model:
 
 - auto-detect with `npm run skills:detect-mode`, `npm run skills:start`, or `npm run skills:autopilot`
+- use `npm run skills:orchestrate -- --prompt "<request>"` or `PROMPT="..." npm run ah:orchestrate` for broad skill/subagent orchestration
 - accept exactly one primary mode per task
 - use that mode to choose one bundle and one template
 - add secondary skills only inside that chosen mode
@@ -146,6 +148,8 @@ Autopilot runner:
 
 - `npm run skills:autopilot -- --prompt "<request>"`
 - `npm run skills:autopilot -- --files "<csv paths>"`
+- `npm run skills:orchestrate -- --prompt "<request>"` for the deep planning packet
+- turn the deep mode off with `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`
 - add `--telemetry` or `--telemetry-file reports/automations/state/runtime-observed/custom-skill-telemetry.jsonl` when you want runtime telemetry written to disk
 
 ## Skill Autopilot
@@ -159,6 +163,7 @@ It returns:
 - execution lane such as `manual-routing`, `blocked-png`, `review-lane`, `fast-lane`, or `standard-lane`
 - adaptive `recommendedAgentPack` for the current task surface
 - canonical `multiAgentPack` for the selected mode
+- `orchestrationMode` when deep planning is enabled
 - `executionPlan`, verify commands, and first steps
 - optional telemetry summary plus a richer `telemetryReport`
 

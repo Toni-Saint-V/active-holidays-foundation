@@ -23,6 +23,7 @@ For every non-trivial task:
 - start with `ah-control-protocol`
 - keep ordinary discussion natural, but structure specs, handoffs, risks and acceptance criteria
 - if UI code is involved, stop for PNG approval before implementation
+- use deep orchestration only when the task is broad, ambiguous, high-risk, or explicitly asks for skill/subagent planning
 - finish non-trivial work with `ah-review-release`, `ah-review-release`, and `ah-review-release`
 
 ## Situation Map
@@ -125,6 +126,12 @@ Use when improving the work system itself.
 - add: `ah-product-strategy` for operator docs, `ah-review-release` for validator changes
 - rule: strengthen the existing router; do not add a parallel abstraction
 - verify: `npm run skills:verify`, `npm run automations:check:skills`, `npm run automations:check:context`
+
+Deep orchestration hotkeys:
+
+- on: `npm run skills:orchestrate -- --prompt "<request>"`
+- on: `PROMPT="..." npm run ah:orchestrate`
+- off: `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`
 
 ### 11. Plugin, MCP, connector, marketplace surface
 

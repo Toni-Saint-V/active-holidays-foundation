@@ -411,6 +411,8 @@ function resolveStartPacket(
     prompt: fixture.prompt,
     files: fixture.files,
     reviewOnly: Boolean(fixture.reviewOnly),
+    deepOrchestration: false,
+    deepOrchestrationSource: "default",
     telemetryEnabled: false,
     telemetryFile: null
   });

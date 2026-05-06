@@ -22,6 +22,7 @@ Turn routing into a repeatable runtime:
 - `executionLane`: the current execution path such as `manual-routing`, `blocked-png`, `review-lane`, `fast-lane`, or `standard-lane`
 - `recommendedAgentPack`: adaptive multi-agent pack built from the current surface, confidence, and lane
 - `multiAgentPack`: canonical mode-level ownership map from the registry
+- `orchestrationMode`: opt-in deep planning switch that expands skill scanning, agent planning, prompt hardening, and hard-stop checks before execution
 - `telemetryReport`: compact runtime summary for evaluator and efficiency tracking
 
 Mode chooses direction. Bundle chooses loadout. Template chooses execution shape.
@@ -80,6 +81,32 @@ The runtime exposes two complementary packs:
   canonical mode pack from the registry. It is the durable ownership map for that mode family.
 
 Use `recommendedAgentPack` to start execution now. Use `multiAgentPack` to keep the repo-wide operating model stable.
+
+## Deep Orchestration Switch
+
+Use deep orchestration when the user wants the model to plan like an owner across skills, agent roles, prompt quality, verification, and handoff instead of using a shallow default stack.
+
+Turn on:
+
+- `npm run skills:orchestrate -- --prompt "<request>"`
+- `PROMPT="..." npm run ah:orchestrate`
+- `AH_DEEP_ORCHESTRATION=1 npm run skills:autopilot -- --prompt "<request>"`
+- `npm run skills:autopilot -- --deep-orchestration --prompt "<request>"`
+
+Turn off:
+
+- `AH_DEEP_ORCHESTRATION=0`
+- `--no-deep-orchestration`
+
+When enabled, read `orchestrationMode` before `executionPlan`:
+
+1. scan all relevant skill maps: `modes.md`, `bundles.md`, `packs.md`, `situations.md`
+2. load every skill that owns a real risk surface, not a fixed "top two"
+3. create subagents only for independent ownership slices
+4. harden the downstream prompt/task packet with goal, constraints, source of truth, acceptance criteria, proof commands and stop conditions
+5. preserve all gates, especially PNG approval before UI code
+
+This is not a second router. It is an opt-in depth setting on top of the same `mode -> bundle -> template -> optional skills -> verification` flow.
 
 ## Single Primary Mode Rule
 
@@ -232,6 +259,7 @@ Examples:
 - `npm run skills:autopilot -- --prompt "<user request>"`
 - `npm run skills:autopilot -- --files "src/screens/result/ResultScreen.tsx,src/state/caseStore.ts"`
 - `npm run skills:autopilot -- --prompt "<user request>" --files "README.md,scripts/codex/skill-mode-registry.ts"`
+- `npm run skills:orchestrate -- --prompt "<user request>"` for the deep planning packet
 - add `--telemetry` to write JSONL telemetry for detect/start/autopilot runs
 - add `--telemetry-file reports/skills/custom-skill-mode.jsonl` to override the default telemetry path
 
@@ -271,6 +299,7 @@ The current report summarizes:
 ## Hard Rules
 
 - Pick one primary mode first; add secondary skills later only if the surface truly needs them.
+- Deep orchestration can widen skill and agent planning, but it never creates a second primary mode.
 - Review-only work should prefer `review-gate` over an implementation mode.
 - UI wording alone does not authorize `premium-ui`; the PNG gate still applies.
 - If the work is on `.codex` surface itself, prefer `skill-system-governance` even when the content mentions UI or plugins.
