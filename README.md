@@ -88,6 +88,7 @@ Entry points:
 
 Key repo-local bundles:
 
+- `ah-super-operator` for broad/high-stakes work that needs the strongest skill mix, verification, review, and handoff without turning into a mega-prompt
 - domain AI/trust/result-flow skills
 - engineering guardrails and hygiene skills
 - `ah-repo-automation` for plugin and MCP boundary work

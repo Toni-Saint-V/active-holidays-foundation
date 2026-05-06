@@ -119,11 +119,11 @@ Use when the user asks "can this merge?", "review", "findings", or final ship/bl
 
 ### 10. Repo-local skills, automations, router, AGENTS, README
 
-Use when improving the work system itself.
+Use when improving the work system itself, including maximum skill-mix or super-operator requests.
 
 - `primary_mode`: `skill-system-governance`
 - core skills: `ah-repo-automation`, `ah-backend-contracts`, `ah-review-release`
-- add: `ah-product-strategy` for operator docs, `ah-review-release` for validator changes
+- add: `ah-super-operator` for broad/high-stakes skill orchestration, `ah-product-strategy` for operator docs, `ah-review-release` for validator changes
 - rule: strengthen the existing router; do not add a parallel abstraction
 - verify: `npm run skills:verify`, `npm run automations:check:skills`, `npm run automations:check:context`
 

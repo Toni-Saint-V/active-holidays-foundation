@@ -131,6 +131,7 @@ This is not a second router. It is an opt-in depth setting on top of the same `m
 ### `skill-system-governance`
 
 - Use for `.codex/skills/*`, `.codex/automations/*`, `scripts/codex/*`, repo routing docs, and repo-local agent surface maintenance.
+- Also use for explicit skill-mix / super-operator requests before handing back to the normal primary-mode flow.
 - This is the router-maintenance mode for the existing `.codex` surface.
 - Bundle: `Skill-system governance`
 - Template: `Skill-system governance`

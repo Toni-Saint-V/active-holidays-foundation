@@ -53,6 +53,7 @@ Load:
 - `ah-repo-automation`
 - `ah-backend-contracts`
 - `ah-review-release`
+- `ah-super-operator` only when the user asks for maximum skill mix, agent planning, or high-stakes orchestration
 - `_internal/deep-orchestration-mode.md` only when `orchestrationMode.status` is `enabled`
 
 Inspect:

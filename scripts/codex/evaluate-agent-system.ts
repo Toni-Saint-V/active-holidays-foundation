@@ -86,6 +86,7 @@ const SKILL_QUALITY_AXES: Record<string, QualityAxis[]> = {
   "ah-control-protocol": ["governance", "png-gate", "manual-routing"],
   "ah-product-strategy": ["governance", "result-flow"],
   "ah-repo-automation": ["governance", "plugin-governance", "verification"],
+  "ah-super-operator": ["governance", "verification", "review"],
   "ah-result-flow": ["result-flow", "trust-boundary", "russian-copy"],
   "ah-ai-trust-layer": ["trust-boundary", "fallback", "verification"],
   "ah-backend-contracts": ["architecture", "fallback", "verification"],

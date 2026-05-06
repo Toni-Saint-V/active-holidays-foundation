@@ -39,6 +39,7 @@ Optional:
 
 - `ah-repo-automation` when the `.codex` task includes plugin or MCP boundary work
 - `ah-product-strategy` when the output is mainly routing guidance or operator docs
+- `ah-super-operator` when the user explicitly asks for a maximum skill/agent mix or "super" execution mode
 - `ah-review-release` when validator or repo checks changed
 - `_internal/deep-orchestration-mode.md` when the user wants on/off skill + subagent orchestration
 

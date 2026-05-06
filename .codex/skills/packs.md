@@ -28,6 +28,7 @@ Common aliases:
 | `review`, `merge`, `pr`, `release` | ship gate |
 | `notion`, `docs`, `status` | handoff/source-of-truth docs |
 | `plugin`, `mcp`, `connector` | plugin/MCP surface |
+| `super`, `10/10`, `12/10`, `skill mix`, `микс скиллов` | high-stakes super-operator mode |
 
 ## Pack Levels
 
@@ -48,6 +49,7 @@ Use for next task, project control, Notion/repo drift, skills, automations, owne
 
 Medium packs:
 
+- super-operator: `ah-super-operator`, `ah-control-protocol`, `ah-review-release`
 - routing hygiene: `ah-repo-automation`, `ah-backend-contracts`
 - task shaping: `ah-product-strategy`, `ah-review-release`
 - owner relief: `ah-review-release`, `ah-review-release`

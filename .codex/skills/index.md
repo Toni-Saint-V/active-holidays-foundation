@@ -4,6 +4,10 @@ This repo exposes a compact action catalog. Do not route work through dozens of 
 
 ## Visible Actions
 
+### Super Mode
+
+- `ah-super-operator`: максимальный execution режим для broad/high-stakes задач; собирает точный skill mix, verification, review и handoff без mega-prompt шума.
+
 ### Process
 
 - `ah-control-protocol`: старт задачи, mode choice, PNG gate, structured handoff rules.
@@ -56,6 +60,7 @@ Use these instead of remembering internal skill stacks:
 
 ## Mode Mapping
 
+- Super-mode request -> `ah-super-operator`, then normal primary-mode routing
 - `skill-system-governance` -> `ah-repo-automation`
 - `plugin-surface` -> `ah-repo-automation`
 - `review-gate` -> `ah-review-release`

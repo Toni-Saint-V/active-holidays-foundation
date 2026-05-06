@@ -1,8 +1,12 @@
 # Active Holidays Compact Skill Catalog
 
-The visible repo-local catalog is intentionally small: 10 action skills, grouped by work type.
+The visible repo-local catalog is intentionally small: 11 action skills, grouped by work type.
 
 ## Visible Actions
+
+Super mode:
+
+- `ah-super-operator`
 
 Process:
 
