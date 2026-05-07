@@ -88,9 +88,10 @@ Use deep orchestration when the user wants the model to plan like an owner acros
 
 Turn on:
 
+- `npm run do -- "<request>"`
+- `npm run super -- "<request>"`
 - `npm run skills:orchestrate -- --prompt "<request>"`
-- `PROMPT="..." npm run ah:orchestrate`
-- `AH_DEEP_ORCHESTRATION=1 npm run skills:autopilot -- --prompt "<request>"`
+- `npm run ah:orchestrate -- "<request>"`
 - `npm run skills:autopilot -- --deep-orchestration --prompt "<request>"`
 
 Turn off:
@@ -257,6 +258,7 @@ Use `npm run skills:autopilot` when you want the full runtime packet in one comm
 
 Examples:
 
+- `npm run do -- "<user request>"`
 - `npm run skills:autopilot -- --prompt "<user request>"`
 - `npm run skills:autopilot -- --files "src/screens/result/ResultScreen.tsx,src/state/caseStore.ts"`
 - `npm run skills:autopilot -- --prompt "<user request>" --files "README.md,scripts/codex/skill-mode-registry.ts"`

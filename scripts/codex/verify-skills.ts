@@ -291,6 +291,9 @@ async function main() {
       "skills:evaluate-agents",
       "skills:telemetry:report",
       "ah:orchestrate",
+      "do",
+      "check",
+      "help",
       "super"
     ]) {
       if (!scripts[scriptName]) {

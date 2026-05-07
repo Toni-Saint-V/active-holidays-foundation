@@ -129,8 +129,8 @@ Use when improving the work system itself, including maximum skill-mix or super-
 
 Deep orchestration hotkeys:
 
-- on: `npm run skills:orchestrate -- --prompt "<request>"`
-- on: `PROMPT="..." npm run ah:orchestrate`
+- simple: `npm run do -- "<request>"`
+- advanced: `npm run skills:orchestrate -- --prompt "<request>"`
 - off: `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`
 
 ### 11. Plugin, MCP, connector, marketplace surface

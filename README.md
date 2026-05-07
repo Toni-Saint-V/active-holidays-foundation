@@ -20,6 +20,14 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 
 ## Scripts
 
+Simple operator entrypoints:
+
+- `npm run do -- "<request>"` — one task entrypoint; picks mode, first steps, and checks
+- `npm run check` — full local branch verification
+- `npm run help` — short command help
+
+Project scripts:
+
 - `npm run dev` — client
 - `npm run server` — API
 - `npm run dev:all` — client + API
@@ -41,7 +49,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - `npm run skills:evaluate-agents` — fixture-based agent and mode coverage evaluation
 - `npm run skills:autopilot` — full execution packet with confidence, lanes, and agent packs
 - `npm run skills:orchestrate` — opt-in deep planning packet with skill scan, agent roles, prompt hardening, and proof gates
-- `npm run super -- "<request>"` — simplest maximum-mode wrapper around deep orchestration
+- `npm run super -- "<request>"` — advanced maximum-mode wrapper around deep orchestration
 - `npm run skills:telemetry:report` — summarize recorded skill-mode telemetry
 
 ## Environment
@@ -103,7 +111,7 @@ Key repo-local bundles:
 Routing model:
 
 - auto-detect with `npm run skills:detect-mode`, `npm run skills:start`, or `npm run skills:autopilot`
-- use `npm run super -- "<request>"` for broad skill/subagent orchestration
+- use `npm run do -- "<request>"` for broad skill/subagent orchestration
 - accept exactly one primary mode per task
 - use that mode to choose one bundle and one template
 - add secondary skills only inside that chosen mode
@@ -151,7 +159,7 @@ Autopilot runner:
 - `npm run skills:autopilot -- --prompt "<request>"`
 - `npm run skills:autopilot -- --files "<csv paths>"`
 - `npm run skills:orchestrate -- --prompt "<request>"` for the deep planning packet
-- `npm run super -- "<request>"` for the same deep packet with less syntax
+- `npm run do -- "<request>"` for the same routing with a short human-readable output
 - turn the deep mode off with `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`
 - add `--telemetry` or `--telemetry-file reports/automations/state/runtime-observed/custom-skill-telemetry.jsonl` when you want runtime telemetry written to disk
 

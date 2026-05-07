@@ -37,9 +37,10 @@ Use for broad, ambiguous, high-risk, or multi-surface work where a shallow two-s
 
 Turn on with:
 
+- `npm run do -- "..."`
+- `npm run super -- "..."`
 - `npm run skills:orchestrate -- --prompt "..."`
-- `PROMPT="..." npm run ah:orchestrate`
-- `AH_DEEP_ORCHESTRATION=1 npm run skills:autopilot -- --prompt "..."`
+- `npm run ah:orchestrate -- "..."`
 
 Turn off with `--no-deep-orchestration` or `AH_DEEP_ORCHESTRATION=0`.
 

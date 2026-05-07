@@ -4,9 +4,10 @@ Use this reference only when `orchestrationMode.status` is `enabled` in `skills:
 
 ## Activation
 
+- `npm run do -- "..."`
+- `npm run super -- "..."`
 - `npm run skills:orchestrate -- --prompt "..."`
-- `PROMPT="..." npm run ah:orchestrate`
-- `AH_DEEP_ORCHESTRATION=1 npm run skills:autopilot -- --prompt "..."`
+- `npm run ah:orchestrate -- "..."`
 - `npm run skills:autopilot -- --deep-orchestration --prompt "..."`
 
 Turn it off explicitly with:

@@ -241,7 +241,7 @@ Output:
 Use for `.codex/skills`, automations, router docs, AGENTS, README, validator behavior, skill cleanup, semantic grouping, and workflow friction.
 
 - primary mode: `skill-system-governance`
-- deep orchestration: use `npm run skills:orchestrate -- --prompt "<request>"` when the task asks for skill/subagent/prompt-quality control
+- deep orchestration: use `npm run do -- "<request>"` when the task asks for skill/subagent/prompt-quality control
 
 Medium packs:
 
