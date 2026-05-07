@@ -28,6 +28,7 @@ automation/yepcode/**/.env
 automation/yepcode/**/.env.*
 .superpowers/
 reports/autonomous/
+reports/design.zip
 reports/design/
 reports/presentations/
 reports.zip

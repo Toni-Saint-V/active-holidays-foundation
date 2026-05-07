@@ -40,17 +40,21 @@ Constraints:
 - strengthen the existing router and docs instead of creating a parallel abstraction
 - keep `skill-system-governance` as the primary mode for repo-local Codex surface maintenance
 - move to plugin governance only when plugin or MCP files are the dominant changed surface
+- use `orchestrationMode` as a depth switch, not as a new mode
 
 Protocol:
 
 - resolve one primary mode first, then keep bundle and template aligned to it
 - treat `skills:detect-mode` candidates as context, not as permission to mix templates
+- when deep orchestration is enabled, scan skill maps, candidate skills, agent ownership, prompt hardening and hard stops before editing
 
 Load:
 
 - `ah-repo-automation`
 - `ah-backend-contracts`
 - `ah-review-release`
+- `ah-super-operator` only when the user asks for maximum skill mix, agent planning, or high-stakes orchestration
+- `_internal/deep-orchestration-mode.md` only when `orchestrationMode.status` is `enabled`
 
 Inspect:
 
@@ -68,6 +72,7 @@ Implement:
 - make the mode -> bundle -> template flow explicit when docs are ambiguous
 - keep mode selection, bundle selection, and verification aligned
 - do not add a new skill or doc when a tighter existing surface would solve the problem
+- expose on/off commands for deep orchestration instead of making the user paste long meta-instructions
 - if plugin or MCP surface is involved, hand off to `ah-repo-automation`
 
 Verify:

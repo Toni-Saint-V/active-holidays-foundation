@@ -4,6 +4,10 @@ This repo exposes a compact action catalog. Do not route work through dozens of 
 
 ## Visible Actions
 
+### Super Mode
+
+- `ah-super-operator`: максимальный execution режим для broad/high-stakes задач; собирает точный skill mix, verification, review и handoff без mega-prompt шума.
+
 ### Process
 
 - `ah-control-protocol`: старт задачи, mode choice, PNG gate, structured handoff rules.
@@ -28,31 +32,26 @@ This repo exposes a compact action catalog. Do not route work through dozens of 
 
 ## Command Hotkeys
 
-Use these instead of remembering internal skill stacks:
+Use only these for normal work:
 
-- `npm run ah` — show the command menu.
-- `PROMPT="..." npm run ah:auto` — auto-route a task into mode/lane/verify plan.
-- `npm run ah:verify` — full local gate: agent stack, typecheck, tests, build, audit.
-- `npm run ah:review` — review/merge gate flow.
-- `npm run ah:ui` — UI flow with PNG gate before implementation.
-- `npm run ah:ship` — final ship gate plus git status.
-- `npm run ah:skills` — compact skill catalog and context checks.
-- `npm run ah:auto` — automatic routing packet by PROMPT.
-- `npm run ah:manual` — manual routing packet without execution.
-- `PROMPT="..." FILES="src/file.ts" npm run ah:custom` — custom routing packet by prompt and files.
-- `npm run ah:next` — autonomous next-task readiness.
-- `npm run ah:audit` — dependency audit and LangGraph/uuid chain check.
+- `npm run do -- "задача"` — one task entrypoint; the repo chooses mode, first steps, and checks.
+- `npm run check` — full branch verification.
+- `npm run help` — short help.
+
+Advanced commands stay available behind `npm run ah -- advanced`.
 
 ## Router Contract
 
 - Pick exactly one visible action first.
 - Use `modes.md` only for automatic classification.
 - Use `bundles.md` and `task-templates.md` as internal execution references.
+- Use `orchestrationMode` as the on/off depth switch for broad skill/subagent planning.
 - Atomic legacy rules live in `_internal/*.md`; they are reference material, not visible actions.
 - Shared product context lives in `_shared/active-holidays/`.
 
 ## Mode Mapping
 
+- `npm run do -- "задача"` -> `ah-super-operator`, then normal primary-mode routing
 - `skill-system-governance` -> `ah-repo-automation`
 - `plugin-surface` -> `ah-repo-automation`
 - `review-gate` -> `ah-review-release`

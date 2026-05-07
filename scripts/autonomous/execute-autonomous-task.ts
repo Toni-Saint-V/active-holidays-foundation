@@ -1,9 +1,10 @@
-import { execFileSync } from "node:child_process";
 import {
   addExecutionBlocker,
   buildExecutionBrief,
+  commandErrorFromResult,
   prepareExecutionPacket,
   repoRoot,
+  runCommandSoft,
   runVerificationStack,
   writeExecutionArtifacts
 } from "./runtime";
@@ -36,14 +37,19 @@ function main() {
   }
 
   if (shouldWrite && packet.branchName) {
-    execFileSync("git", ["switch", "-c", packet.branchName], {
-      cwd: repoRoot,
-      encoding: "utf8"
+    const branchSwitch = runCommandSoft("git", ["switch", "-c", packet.branchName], {
+      cwd: repoRoot
     });
-    packet.verificationResults = runVerificationStack(packet.verificationCommands, repoRoot);
-    const failedCheck = packet.verificationResults.find((result) => !result.ok);
-    if (failedCheck) {
-      addExecutionBlocker(packet, `Baseline verification failed: ${failedCheck.command}`);
+    const branchSwitchError = commandErrorFromResult(branchSwitch);
+    if (branchSwitchError) {
+      packet.runtimeErrors.push(branchSwitchError);
+      addExecutionBlocker(packet, `Branch creation failed: ${packet.branchName}`);
+    } else {
+      packet.verificationResults = runVerificationStack(packet.verificationCommands, repoRoot);
+      const failedCheck = packet.verificationResults.find((result) => !result.ok);
+      if (failedCheck) {
+        addExecutionBlocker(packet, `Baseline verification failed: ${failedCheck.command}`);
+      }
     }
   }
 

@@ -80,6 +80,8 @@ export type ModeCliArgs = {
   prompt: string;
   files: string[];
   reviewOnly: boolean;
+  deepOrchestration: boolean;
+  deepOrchestrationSource: "default" | "env" | "flag";
   telemetryEnabled: boolean;
   telemetryFile: string | null;
 };
@@ -126,7 +128,23 @@ export type DetectModeResult = {
   executionLane: ExecutionLaneSummary | null;
   fileSurface: FileSurface;
   recommendedAgentPack: RecommendedAgentPack;
+  orchestrationMode: DeepOrchestrationSummary;
   telemetry: TelemetrySummary;
+};
+
+export type DeepOrchestrationSummary = {
+  status: "enabled" | "disabled";
+  source: ModeCliArgs["deepOrchestrationSource"];
+  activation: string[];
+  selectedSkills: string[];
+  candidateSkillSources: Array<{
+    mode: ModeId;
+    skills: string[];
+  }>;
+  skillPolicy: string[];
+  agentPolicy: string[];
+  promptPolicy: string[];
+  hardStops: string[];
 };
 
 export type ExecutionPlan = {
@@ -213,16 +231,45 @@ export const MODE_REGISTRY: ModeDefinition[] = [
       "ah-backend-contracts",
       "ah-repo-automation",
       "ah-product-strategy",
+      "ah-super-operator",
       "ah-review-release"
     ],
     promptKeywords: [
       "skill",
       "skills",
+      "skill mix",
+      "super skill",
+      "super skills",
+      "скилл",
+      "скиллы",
+      "скиллов",
+      "микс скиллов",
+      "супер скилл",
+      "супер скиллы",
+      "навык",
+      "навыки",
       "router",
+      "роутинг",
+      "роутер",
+      "роутера",
+      "команды",
+      "упрости",
+      "упростить",
       "bundle",
       "template",
       "mode",
       "modes",
+      "subagent",
+      "subagents",
+      "сабагент",
+      "сабагенты",
+      "сабагентов",
+      "agent pack",
+      "agent role",
+      "deep orchestration",
+      "orchestration",
+      "orchestrate",
+      "best practices",
       "metadata",
       "openai.yaml",
       "automation",
@@ -576,6 +623,10 @@ export const MODE_REGISTRY: ModeDefinition[] = [
       "ah-review-release"
     ],
     promptKeywords: [
+      "backend",
+      "server",
+      "api",
+      "route",
       "contract",
       "schema",
       "payload",
@@ -849,11 +900,26 @@ function addCsvFiles(target: string[], value: string) {
   }
 }
 
+function parseBooleanSwitch(value: string | undefined): boolean | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on", "deep", "enabled"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
+    return false;
+  }
+  return null;
+}
+
 export function parseModeArgs(argv: string[]): ModeCliArgs {
+  const envDeepOrchestration = parseBooleanSwitch(process.env.AH_DEEP_ORCHESTRATION);
   const result: ModeCliArgs = {
     prompt: "",
     files: [],
     reviewOnly: false,
+    deepOrchestration: envDeepOrchestration ?? false,
+    deepOrchestrationSource: envDeepOrchestration === null ? "default" : "env",
     telemetryEnabled: false,
     telemetryFile: null
   };
@@ -864,6 +930,36 @@ export function parseModeArgs(argv: string[]): ModeCliArgs {
 
     if (token === "--review-only") {
       result.reviewOnly = true;
+      continue;
+    }
+
+    if (token === "--deep-orchestration" || token === "--orchestrate") {
+      result.deepOrchestration = true;
+      result.deepOrchestrationSource = "flag";
+      continue;
+    }
+
+    if (token === "--no-deep-orchestration" || token === "--no-orchestrate") {
+      result.deepOrchestration = false;
+      result.deepOrchestrationSource = "flag";
+      continue;
+    }
+
+    if (token.startsWith("--deep-orchestration=")) {
+      const parsed = parseBooleanSwitch(token.slice("--deep-orchestration=".length));
+      if (parsed !== null) {
+        result.deepOrchestration = parsed;
+        result.deepOrchestrationSource = "flag";
+      }
+      continue;
+    }
+
+    if (token.startsWith("--orchestration=")) {
+      const parsed = parseBooleanSwitch(token.slice("--orchestration=".length));
+      if (parsed !== null) {
+        result.deepOrchestration = parsed;
+        result.deepOrchestrationSource = "flag";
+      }
       continue;
     }
 
@@ -922,6 +1018,8 @@ export function parseModeArgs(argv: string[]): ModeCliArgs {
     prompt: normalizePrompt(result.prompt),
     files: result.files,
     reviewOnly: result.reviewOnly,
+    deepOrchestration: result.deepOrchestration,
+    deepOrchestrationSource: result.deepOrchestrationSource,
     telemetryEnabled: result.telemetryEnabled,
     telemetryFile: result.telemetryFile
   };
@@ -940,6 +1038,19 @@ export function countKeywordHits(text: string, keywords: string[]): string[] {
     );
     return pattern.test(lowerText);
   });
+}
+
+function hasNegatedUiIntent(text: string): boolean {
+  const lowerText = normalizePrompt(text).toLowerCase();
+  return /(^|[^\p{L}\p{N}])(?:non[-\s]?ui|no[-\s]?ui|not\s+ui|without\s+ui|без\s+ui|не\s+ui|без\s+интерфейса|не\s+интерфейс)([^\p{L}\p{N}]|$)/u.test(
+    lowerText
+  );
+}
+
+function countModeKeywordHits(text: string, mode: CompiledModeDefinition): string[] {
+  const hits = countKeywordHits(text, mode.promptKeywords);
+  if (mode.id !== "premium-ui" || !hasNegatedUiIntent(text)) return hits;
+  return hits.filter((hit) => hit.toLowerCase() !== "ui");
 }
 
 export function countFileHits(files: string[], patterns: RegExp[]): string[] {
@@ -987,7 +1098,7 @@ export function collectModeMatches(
   const matches: ModeMatch[] = [];
 
   for (const mode of MODE_DEFINITIONS) {
-    const keywordHits = countKeywordHits(normalizedPrompt, mode.promptKeywords);
+    const keywordHits = countModeKeywordHits(normalizedPrompt, mode);
     const fileHits = countFileHits(normalizedFiles, mode.filePatterns);
     const reviewHit = Boolean(reviewOnly && mode.reviewOnly);
     const score = keywordHits.length + fileHits.length + (reviewHit ? 3 : 0);
@@ -1127,6 +1238,66 @@ function createFileSurface(files: string[]): FileSurface {
   return analyzeFileSurface(files.map(normalizeFilePath).filter(Boolean));
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function createDeepOrchestrationSummary(
+  input: ModeCliArgs,
+  matches: ModeMatch[]
+): DeepOrchestrationSummary {
+  const candidateSkillSources = matches.slice(0, 4).map((match) => ({
+    mode: match.mode.id,
+    skills: match.mode.defaultSkills
+  }));
+  const selectedSkills = input.deepOrchestration
+    ? uniqueStrings(candidateSkillSources.flatMap((entry) => entry.skills))
+    : [];
+
+  return {
+    status: input.deepOrchestration ? "enabled" : "disabled",
+    source: input.deepOrchestrationSource,
+    activation: [
+      "npm run do -- \"...\"",
+      "npm run super -- \"...\"",
+      "npm run skills:orchestrate -- --prompt \"...\"",
+      "npm run ah:orchestrate -- \"...\"",
+      "npm run skills:autopilot -- --deep-orchestration --prompt \"...\""
+    ],
+    selectedSkills,
+    candidateSkillSources,
+    skillPolicy: input.deepOrchestration
+      ? [
+          "scan modes.md, bundles.md, packs.md and situations.md before planning",
+          "load every skill and internal reference that owns a real risk surface",
+          "do not stop at two skills when the task spans product, contracts, UI, AI, QA or release",
+          "do not load irrelevant skills just to increase count"
+        ]
+      : [
+          "use the primary mode default skills and add secondary skills only when the surface requires them",
+          "turn on deep orchestration for broad, ambiguous, high-risk or multi-surface work"
+        ],
+    agentPolicy: [
+      "create agents only for independent ownership slices that can run in parallel",
+      "keep the main agent on the immediate critical path",
+      "assign disjoint file or responsibility ownership to each worker",
+      "use reviewer/verifier roles for risk discovery and proof, not duplicate implementation"
+    ],
+    promptPolicy: [
+      "state user goal, business goal, primary flow, constraints and forbidden scope",
+      "include source-of-truth artifacts, acceptance criteria, edge cases and proof commands",
+      "separate implementation tasks, review gates and paste-ready handoff blocks",
+      "ask for exactly one missing artifact when safe execution is blocked"
+    ],
+    hardStops: [
+      "no UI implementation before PNG approval",
+      "no invented APIs, metrics, endpoints or user behavior",
+      "no completeness claim without verification",
+      "no subagent use when runtime policy or task coupling makes it unsafe"
+    ]
+  };
+}
+
 function createRecommendedAgentPackForMode(
   primary: ModeMatch | undefined,
   input: ModeCliArgs,
@@ -1174,17 +1345,25 @@ function createRecommendedAgentPackForMode(
 }
 
 function createExecutionPlan(
+  input: ModeCliArgs,
   primary: ModeMatch | undefined,
   blockedState: StartModeResult["blockedState"],
   executionLane: ExecutionLaneSummary | null
 ): ExecutionPlan {
   const verifyCommands = primary?.mode.verifyCommands ?? [];
   const firstSteps = primary?.mode.firstSteps ?? [];
+  const deepSteps = input.deepOrchestration
+    ? [
+        "Run deep orchestration first: scan all relevant skill maps, candidate modes, agent ownership, prompt hardening, and verification gates.",
+        "Create a task-specific agent plan only where work can be split by independent ownership."
+      ]
+    : [];
 
   if (!primary) {
     return {
       lane: "manual",
       immediateSteps: [
+        ...deepSteps,
         "Choose the primary mode manually before editing code.",
         "Then rerun skills:start with the clarified prompt or files."
       ],
@@ -1196,7 +1375,10 @@ function createExecutionPlan(
   if (blockedState.status === "blocked") {
     return {
       lane: "blocked",
-      immediateSteps: ["Get PNG approval before any UI code changes."],
+      immediateSteps: [
+        ...deepSteps,
+        "Get PNG approval before any UI code changes."
+      ],
       immediateVerifyCommands: [],
       deferredVerifyCommands: verifyCommands
     };
@@ -1214,7 +1396,7 @@ function createExecutionPlan(
 
     return {
       lane: executionLane.lane,
-      immediateSteps: firstSteps.slice(0, 2),
+      immediateSteps: [...deepSteps, ...firstSteps.slice(0, 2)],
       immediateVerifyCommands,
       deferredVerifyCommands: verifyCommands.filter(
         (command) => !immediateVerifyCommands.includes(command)
@@ -1224,7 +1406,7 @@ function createExecutionPlan(
 
   return {
     lane: executionLane?.lane ?? "standard-lane",
-    immediateSteps: firstSteps,
+    immediateSteps: [...deepSteps, ...firstSteps],
     immediateVerifyCommands: verifyCommands,
     deferredVerifyCommands: []
   };
@@ -1267,6 +1449,7 @@ function createDetectFallbackResult(input: ModeCliArgs): DetectModeResult {
       reviewOnly: input.reviewOnly,
       blockedByPngApproval: false
     }),
+    orchestrationMode: createDeepOrchestrationSummary(input, []),
     telemetry: createTelemetrySummary(input)
   };
 }
@@ -1295,6 +1478,7 @@ function createDetectResult(input: ModeCliArgs, matches: ModeMatch[]): DetectMod
       routingConfidence,
       executionLane
     ),
+    orchestrationMode: createDeepOrchestrationSummary(input, matches),
     telemetry: createTelemetrySummary(input)
   };
 }
@@ -1422,7 +1606,7 @@ function buildStartModeResult(
       blockedState,
       verifyCommands: [],
       firstSteps: [],
-      executionPlan: createExecutionPlan(primary, blockedState, detectResult.executionLane)
+      executionPlan: createExecutionPlan(input, primary, blockedState, detectResult.executionLane)
     };
   }
 
@@ -1431,7 +1615,7 @@ function buildStartModeResult(
     blockedState,
     verifyCommands: primary.mode.verifyCommands,
     firstSteps: primary.mode.firstSteps,
-    executionPlan: createExecutionPlan(primary, blockedState, detectResult.executionLane)
+    executionPlan: createExecutionPlan(input, primary, blockedState, detectResult.executionLane)
   };
 }
 

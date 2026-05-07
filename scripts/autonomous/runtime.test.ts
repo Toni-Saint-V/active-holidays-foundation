@@ -11,6 +11,7 @@ import {
   prepareExecutionPacket,
   readGateProjection,
   runAutonomousCycle,
+  runVerificationStack,
   selectNextTask
 } from "./runtime";
 
@@ -862,6 +863,7 @@ describe("autonomous runtime", () => {
         command: "npm run build",
         ok: false,
         exitCode: 1,
+        errorClass: "non_zero_exit",
         stdoutTail: "",
         stderrTail: "build failed"
       }
@@ -979,6 +981,94 @@ describe("autonomous runtime", () => {
     expect(packet.blocked).toBe(false);
     expect(packet.blockedReasons).not.toContain("Tracked working tree не чистый; local executor fail-closed.");
     expect(packet.gitStatus).toContain("?? src/new-test.ts");
+  });
+
+  it("blocks executor packets when git status cannot be read", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const packet = prepareExecutionPacket({
+      currentRepoRoot: tempDir,
+      write: true,
+      currentBranch: "main"
+    });
+
+    expect(packet.blocked).toBe(true);
+    expect(packet.runtimeErrors.some((error) => error.command === "git")).toBe(true);
+    expect(packet.blockedReasons).toContain(
+      "Autonomous runtime command failure: git status --short, git status --short --untracked-files=no."
+    );
+  });
+
+  it("does not select executor tasks when git status is unavailable", async () => {
+    await writeRepoFile("evidence/backend.md", "# backend");
+    await writeRepoFile(
+      ".autonomous/task-candidates.json",
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          candidates: [
+            {
+              id: "backend-hardening",
+              title: "Backend hardening",
+              productReason: "Safe backend task",
+              evidence: ["evidence/backend.md"],
+              category: "engineering_health",
+              scores: {
+                trust: 7,
+                conversion: 5,
+                polish: 4,
+                engineeringHealth: 9,
+                strategicFit: 8,
+                risk: 2,
+                effort: 2
+              },
+              requiresApproval: []
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const nextTask = selectNextTask({
+      currentRepoRoot: tempDir,
+      mode: "executor"
+    });
+
+    expect(nextTask.selected).toBeNull();
+    expect(nextTask.eligibleCandidates).toEqual([]);
+    expect(nextTask.runtimeErrors.some((error) => error.command === "git")).toBe(true);
+    expect(nextTask.founderReport).toContain("Executor command failures: git status --short");
   });
 
   it("blocks untracked entries that collide with selected task evidence", async () => {
@@ -1368,6 +1458,15 @@ describe("autonomous runtime", () => {
     expect(metrics.status).toBe("degraded");
     expect(metrics.network.status).toBe("unknown");
     expect(metrics.network.error).toBeTruthy();
+    expect(metrics.network.commandError?.errorClass).toBe("not_found");
+  });
+
+  it("returns structured failure data for verification commands", () => {
+    const [result] = runVerificationStack(["__missing_autonomous_verify_command__"], tempDir);
+
+    expect(result.ok).toBe(false);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.errorClass).toBe("non_zero_exit");
   });
 
   it("builds a stable codex branch name", () => {

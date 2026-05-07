@@ -15,6 +15,7 @@ Use this file after [index.md](/Users/user/Projects/active-holidays-foundation/.
 
 - Load `ah-control-protocol` before every non-trivial task.
 - Start with the `Core` bundle only. Add `Optional` skills only when the touched surface truly needs them.
+- If `orchestrationMode.status` is `enabled`, scan all matching packs/candidates and load every relevant skill for the real risk surface instead of stopping at the first two.
 - If visible Russian copy changes, add `ah-ui-direction`.
 - If the task is non-trivial, finish with `ah-review-release`, `ah-review-release`, and `ah-review-release`.
 - If the task is a review, PR gate, or merge-readiness check, add `ah-review-release`.
@@ -38,7 +39,9 @@ Optional:
 
 - `ah-repo-automation` when the `.codex` task includes plugin or MCP boundary work
 - `ah-product-strategy` when the output is mainly routing guidance or operator docs
+- `ah-super-operator` when the user explicitly asks for a maximum skill/agent mix or "super" execution mode
 - `ah-review-release` when validator or repo checks changed
+- `_internal/deep-orchestration-mode.md` when the user wants on/off skill + subagent orchestration
 
 Finish:
 

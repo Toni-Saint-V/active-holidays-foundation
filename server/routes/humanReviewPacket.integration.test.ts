@@ -6,10 +6,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
-import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { getCatalogsOrThrow, loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
+import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 let humanReviewTempDir: string;
+let restoreFreshCatalogs: (() => void) | null = null;
 const previousHumanReviewsFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
 
 class MockSocket extends Duplex {
@@ -64,6 +67,8 @@ class MockSocket extends Duplex {
   }
 }
 
+installStableRouteTestClock();
+
 beforeEach(async () => {
   humanReviewTempDir = await mkdtemp(path.join(tmpdir(), "ah-human-review-packet-"));
   process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = path.join(
@@ -71,9 +76,14 @@ beforeEach(async () => {
     "human-reviews.json"
   );
   app = await createApp();
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
+  );
 });
 
 afterEach(async () => {
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
   if (previousHumanReviewsFile) {
     process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousHumanReviewsFile;
   } else {
@@ -174,32 +184,32 @@ describe("human review case packet HTTP surface", () => {
     );
 
     expect(packet.status).toBe(200);
-	    expect(packet.json.packet).toMatchObject({
-	      version: "human-review-packet.v1",
-	      case: { id: "s5-rf-italy-insurance", productType: "insurance_adult" },
-	      request: { id: created.json.request.id },
-	      submittedSnapshot: created.json.request.snapshot,
-	      scenario: null,
-	      evidence: {
-	        evidenceStatus: "valid",
+    expect(packet.json.packet).toMatchObject({
+      version: "human-review-packet.v1",
+      case: { id: "s5-rf-italy-insurance", productType: "insurance_adult" },
+      request: { id: created.json.request.id },
+      submittedSnapshot: created.json.request.snapshot,
+      scenario: null,
+      evidence: {
+        evidenceStatus: "valid",
         freshnessStatus: "fresh"
       }
     });
-	    expect(packet.json.packet.reviewReason).toEqual(expect.any(String));
-	    expect(packet.json.packet.currentResult).toMatchObject({
-	      verdict: expect.any(String),
-	      confidence: expect.any(Number)
-	    });
-	    expect(packet.json.packet.resultDrift).toEqual({
-	      changed: expect.any(Boolean),
-	      verdictChanged: expect.any(Boolean),
-	      confidenceDelta: expect.any(Number),
-	      computedAtChanged: expect.any(Boolean),
-	      lastCheckedAtChanged: expect.any(Boolean),
-	      nextActionChanged: expect.any(Boolean)
-	    });
-	    expect(packet.json.packet.operatorChecklist[0]).toMatchObject({
-	      id: "review-reason",
+    expect(packet.json.packet.reviewReason).toEqual(expect.any(String));
+    expect(packet.json.packet.currentResult).toMatchObject({
+      verdict: expect.any(String),
+      confidence: expect.any(Number)
+    });
+    expect(packet.json.packet.resultDrift).toEqual({
+      changed: expect.any(Boolean),
+      verdictChanged: expect.any(Boolean),
+      confidenceDelta: expect.any(Number),
+      computedAtChanged: expect.any(Boolean),
+      lastCheckedAtChanged: expect.any(Boolean),
+      nextActionChanged: expect.any(Boolean)
+    });
+    expect(packet.json.packet.operatorChecklist[0]).toMatchObject({
+      id: "review-reason",
       priority: "critical"
     });
     expect(packet.json.packet.doNotAutoDecideNotes.at(-1)).toContain("Не обещать");
@@ -216,46 +226,46 @@ describe("human review case packet HTTP surface", () => {
     );
 
     expect(packet.status).toBe(200);
-	    expect(packet.json.packet.scenario).toMatchObject({
-	      id: scenarioId,
-	      safetyStatus: "human_review_only",
-	      operatorNextAction: expect.stringContaining("Оператор должен")
-	    });
+    expect(packet.json.packet.scenario).toMatchObject({
+      id: scenarioId,
+      safetyStatus: "human_review_only",
+      operatorNextAction: expect.stringContaining("Оператор должен")
+    });
     expect(
       packet.json.packet.operatorChecklist.some(
         (item: { id: string }) => item.id === `scenario:${scenarioId}`
       )
     ).toBe(true);
-	    expect(packet.json.packet.doNotAutoDecideNotes.join(" ")).toContain("ручной проверки");
-	  });
+    expect(packet.json.packet.doNotAutoDecideNotes.join(" ")).toContain("ручной проверки");
+  });
 
-	  it("separates submitted snapshot from current recompute when the case changes after submission", async () => {
-	    const created = await createReview("s5-rf-italy-insurance");
-	    expect(created.status).toBe(200);
+  it("separates submitted snapshot from current recompute when the case changes after submission", async () => {
+    const created = await createReview("s5-rf-italy-insurance");
+    expect(created.status).toBe(200);
 
-	    const patched = await requestJson("POST", "/api/cases/s5-rf-italy-insurance/signals", {
-	      signals: [
-	        {
-	          id: "has_chronic_conditions",
-	          value: false,
-	          source: "user",
-	          capturedAt: "2026-04-30T12:00:00.000Z"
-	        }
-	      ]
-	    });
-	    expect(patched.status).toBe(200);
+    const patched = await requestJson("POST", "/api/cases/s5-rf-italy-insurance/signals", {
+      signals: [
+        {
+          id: "has_chronic_conditions",
+          value: false,
+          source: "user",
+          capturedAt: "2026-04-30T12:00:00.000Z"
+        }
+      ]
+    });
+    expect(patched.status).toBe(200);
 
-	    const packet = await requestJson(
-	      "GET",
-	      "/api/cases/s5-rf-italy-insurance/human-review/packet"
-	    );
+    const packet = await requestJson(
+      "GET",
+      "/api/cases/s5-rf-italy-insurance/human-review/packet"
+    );
 
-	    expect(packet.status).toBe(200);
-	    expect(packet.json.packet.submittedSnapshot).toMatchObject(created.json.request.snapshot);
-	    expect(packet.json.packet.currentResult.confidence).toBe(patched.json.result.trust.confidence);
-	    expect(packet.json.packet.resultDrift.changed).toBe(true);
-	    expect(packet.json.packet.resultDrift.nextActionChanged).toBe(true);
-	  });
+    expect(packet.status).toBe(200);
+    expect(packet.json.packet.submittedSnapshot).toMatchObject(created.json.request.snapshot);
+    expect(packet.json.packet.currentResult.confidence).toBe(patched.json.result.trust.confidence);
+    expect(packet.json.packet.resultDrift.changed).toBe(true);
+    expect(packet.json.packet.resultDrift.nextActionChanged).toBe(true);
+  });
 
   it("preserves stale evidence in the operator packet", async () => {
     const catalogs = structuredClone(await loadCatalogs());

@@ -8,8 +8,9 @@ import {
   recommendationShortlistSchema
 } from "@shared/contracts";
 import { createApp } from "../index";
-import { getCatalogsOrThrow } from "../lib/catalogs";
+import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { resetRecommendationClientForTests } from "../lib/recommendations";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 import { installStableRouteTestClock } from "./routeTestClock";
 
 const { createResponseMock } = vi.hoisted(() => ({
@@ -30,8 +31,7 @@ let app: Express;
 let server: Server;
 let baseUrl = "";
 const previousApiKey = process.env.OPENAI_API_KEY;
-let originalSourceChecks: Map<string, string> | null = null;
-let originalRuleEvidenceChecks: Map<number, string | null> | null = null;
+let restoreFreshCatalogs: (() => void) | null = null;
 
 beforeAll(async () => {
   delete process.env.OPENAI_API_KEY;
@@ -47,42 +47,16 @@ installStableRouteTestClock();
 
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
-  const catalogs = getCatalogsOrThrow();
-  originalSourceChecks = new Map(
-    catalogs.sources.map((source) => [source.id, source.lastCheckedAt])
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
   );
-  originalRuleEvidenceChecks = new Map(
-    catalogs.ruleEvidence.map((record, index) => [index, record.lastVerifiedAt])
-  );
-  const refreshedAt = new Date().toISOString();
-  for (const source of catalogs.sources) {
-    source.lastCheckedAt = refreshedAt;
-  }
-  for (const record of catalogs.ruleEvidence) {
-    if (record.evidenceStatus === "valid") {
-      record.lastVerifiedAt = refreshedAt;
-    }
-  }
   createResponseMock.mockReset();
   resetRecommendationClientForTests();
 });
 
 afterEach(() => {
-  const catalogs = getCatalogsOrThrow();
-  if (originalSourceChecks) {
-    for (const source of catalogs.sources) {
-      const original = originalSourceChecks.get(source.id);
-      if (original) source.lastCheckedAt = original;
-    }
-  }
-  if (originalRuleEvidenceChecks) {
-    for (const [index, original] of originalRuleEvidenceChecks) {
-      const record = catalogs.ruleEvidence[index];
-      if (record) record.lastVerifiedAt = original;
-    }
-  }
-  originalSourceChecks = null;
-  originalRuleEvidenceChecks = null;
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
 });
 
 afterAll(async () => {

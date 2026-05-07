@@ -1,16 +1,18 @@
 import type { Express } from "express";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
-import { loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { getCatalogsOrThrow, loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 let humanReviewTempDir: string;
+let restoreFreshCatalogs: (() => void) | null = null;
 const previousHumanReviewsFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
 
 class MockSocket extends Duplex {
@@ -75,6 +77,17 @@ beforeAll(async () => {
 });
 
 installStableRouteTestClock();
+
+beforeEach(() => {
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
+  );
+});
+
+afterEach(() => {
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
+});
 
 afterAll(async () => {
   if (previousHumanReviewsFile) {

@@ -1,8 +1,48 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { cpus, freemem, loadavg, totalmem, uptime } from "node:os";
 import path from "node:path";
 import { MODE_DEFINITIONS, type ModeId, type MultiAgentRole } from "../codex/skill-mode-registry.ts";
+
+export type RuntimeCommandErrorClass =
+  | "not_found"
+  | "timeout"
+  | "non_zero_exit"
+  | "spawn_error";
+
+export type RuntimeCommandResult = {
+  command: string;
+  args: string[];
+  cwd: string | null;
+  ok: boolean;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  stdoutTail: string;
+  stderrTail: string;
+  errorClass: RuntimeCommandErrorClass | null;
+  errorMessage: string | null;
+};
+
+export type RuntimeCommandError = {
+  command: string;
+  args: string[];
+  cwd: string | null;
+  exitCode: number;
+  stderrTail: string;
+  errorClass: RuntimeCommandErrorClass;
+  message: string;
+};
+
+class RuntimeCommandFailure extends Error {
+  readonly result: RuntimeCommandResult;
+
+  constructor(result: RuntimeCommandResult) {
+    super(formatCommandFailure(result));
+    this.name = "RuntimeCommandFailure";
+    this.result = result;
+  }
+}
 
 export type ApprovalGate =
   | "merge_main"
@@ -122,6 +162,7 @@ export type NextTaskResult = {
   trackedGitStatus: string[];
   scoringModel: ScoringModelSummary;
   externalGateProjection: GateProjection;
+  runtimeErrors: RuntimeCommandError[];
   founderReport: string;
 };
 
@@ -129,6 +170,7 @@ export type VerificationCommandResult = {
   command: string;
   ok: boolean;
   exitCode: number;
+  errorClass: RuntimeCommandErrorClass | null;
   stdoutTail: string;
   stderrTail: string;
 };
@@ -147,6 +189,7 @@ export type ExecutionPacket = {
   trackedGitStatus: string[];
   verificationCommands: string[];
   verificationResults: VerificationCommandResult[];
+  runtimeErrors: RuntimeCommandError[];
   controlTowerReadiness: ControlTowerReadiness;
   externalWriteState: {
     writePerformed: false;
@@ -255,6 +298,7 @@ export type SystemMetrics = {
     listeningSockets: number | null;
     establishedConnections: number | null;
     error: string | null;
+    commandError: RuntimeCommandError | null;
   };
 };
 
@@ -273,6 +317,7 @@ export type AutonomousHealthSnapshot = {
   repoRoot: string;
   gitStatus: string[];
   trackedGitStatus: string[];
+  runtimeErrors: RuntimeCommandError[];
   system: SystemMetrics;
   notionAuth: {
     status: "authorized" | "unauthorized" | "unknown";
@@ -363,6 +408,120 @@ export const defaultVerificationCommands = [
 
 export const verificationCommandTimeoutMs = 120_000;
 export const verificationCommandMaxBuffer = 1024 * 1024;
+
+function tail(text: string, lineCount = 12): string {
+  return text.trim().split("\n").filter(Boolean).slice(-lineCount).join("\n");
+}
+
+function classifyCommandError(result: {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  error?: Error & { code?: string };
+}): RuntimeCommandErrorClass | null {
+  if (result.error?.code === "ENOENT") return "not_found";
+  if (result.error?.code === "ETIMEDOUT" || result.signal === "SIGTERM") return "timeout";
+  if (result.error) return "spawn_error";
+  if (result.status !== 0) return "non_zero_exit";
+  return null;
+}
+
+function formatCommand(command: string, args: readonly string[]): string {
+  return [command, ...args].join(" ");
+}
+
+function formatCommandFailure(result: RuntimeCommandResult): string {
+  return `${formatCommand(result.command, result.args)} failed (${result.errorClass ?? "unknown"}:${result.exitCode})`;
+}
+
+export function commandErrorFromResult(result: RuntimeCommandResult): RuntimeCommandError | null {
+  if (result.ok || !result.errorClass) return null;
+  return {
+    command: result.command,
+    args: result.args,
+    cwd: result.cwd,
+    exitCode: result.exitCode,
+    stderrTail: result.stderrTail,
+    errorClass: result.errorClass,
+    message: result.errorMessage ?? formatCommandFailure(result)
+  };
+}
+
+export function runCommandSoft(
+  command: string,
+  args: readonly string[] = [],
+  options?: {
+    cwd?: string;
+    shell?: boolean;
+    timeoutMs?: number;
+    maxBuffer?: number;
+  }
+): RuntimeCommandResult {
+  const result = spawnSync(command, [...args], {
+    cwd: options?.cwd,
+    encoding: "utf8",
+    shell: options?.shell,
+    timeout: options?.timeoutMs,
+    maxBuffer: options?.maxBuffer,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  const errorClass = classifyCommandError(result);
+  const exitCode = typeof result.status === "number" ? result.status : 1;
+
+  return {
+    command,
+    args: [...args],
+    cwd: options?.cwd ?? null,
+    ok: errorClass === null,
+    exitCode,
+    stdout,
+    stderr,
+    stdoutTail: tail(stdout),
+    stderrTail: tail(stderr),
+    errorClass,
+    errorMessage: result.error?.message ?? null
+  };
+}
+
+export function runCommandStrict(
+  command: string,
+  args: readonly string[] = [],
+  options?: Parameters<typeof runCommandSoft>[2]
+): RuntimeCommandResult {
+  const result = runCommandSoft(command, args, options);
+  if (!result.ok) {
+    throw new RuntimeCommandFailure(result);
+  }
+  return result;
+}
+
+function runtimeCommandErrorKey(error: RuntimeCommandError): string {
+  return [
+    error.command,
+    error.args.join("\u0000"),
+    error.cwd ?? "",
+    String(error.exitCode),
+    error.errorClass
+  ].join("\u0001");
+}
+
+function uniqueRuntimeCommandErrors(errors: readonly RuntimeCommandError[]): RuntimeCommandError[] {
+  const seen = new Set<string>();
+  return errors.filter((error) => {
+    const key = runtimeCommandErrorKey(error);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function runtimeCommandErrors(results: Array<RuntimeCommandResult | null | undefined>): RuntimeCommandError[] {
+  return results.flatMap((result) => {
+    const error = result ? commandErrorFromResult(result) : null;
+    return error ? [error] : [];
+  });
+}
 
 function read(filePath: string): string {
   return readFileSync(filePath, "utf8");
@@ -649,31 +808,38 @@ function readTaskStatusMap(currentRepoRoot: string, candidateIds: Set<string>): 
   return new Map(records.map((record) => [record.id, record]));
 }
 
+function parseGitStatus(output: string): string[] {
+  return output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function readGitStatus(options?: {
+  repoRoot?: string;
+  trackedOnly?: boolean;
+}): { entries: string[]; commandResult: RuntimeCommandResult } {
+  const result = runCommandSoft(
+    "git",
+    ["status", "--short", ...(options?.trackedOnly ? ["--untracked-files=no"] : [])],
+    {
+      cwd: options?.repoRoot ?? repoRoot
+    }
+  );
+  return {
+    entries: result.ok ? parseGitStatus(result.stdout) : [],
+    commandResult: result
+  };
+}
+
 export function getGitStatus(options?: { repoRoot?: string; trackedOnly?: boolean }): string[] {
-  try {
-    return execFileSync(
-      "git",
-      ["status", "--short", ...(options?.trackedOnly ? ["--untracked-files=no"] : [])],
-      {
-        cwd: options?.repoRoot ?? repoRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"]
-      }
-    )
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+  return readGitStatus(options).entries;
 }
 
 export function getCurrentBranch(currentRepoRoot = repoRoot): string {
-  return execFileSync("git", ["branch", "--show-current"], {
-    cwd: currentRepoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"]
-  }).trim();
+  return runCommandStrict("git", ["branch", "--show-current"], {
+    cwd: currentRepoRoot
+  }).stdout.trim();
 }
 
 function getCurrentBranchOrDefault(currentRepoRoot: string, fallback = "main"): string {
@@ -686,16 +852,32 @@ function getCurrentBranchOrDefault(currentRepoRoot: string, fallback = "main"): 
 }
 
 export function branchExists(branchName: string, currentRepoRoot = repoRoot): boolean {
-  try {
-    const output = execFileSync("git", ["branch", "--list", branchName], {
-      cwd: currentRepoRoot,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    }).trim();
-    return output.length > 0;
-  } catch {
-    return false;
-  }
+  return runCommandStrict("git", ["branch", "--list", branchName], {
+    cwd: currentRepoRoot
+  }).stdout.trim().length > 0;
+}
+
+function readCurrentBranch(currentRepoRoot: string): { branch: string; commandResult: RuntimeCommandResult } {
+  const commandResult = runCommandSoft("git", ["branch", "--show-current"], {
+    cwd: currentRepoRoot
+  });
+  return {
+    branch: commandResult.ok ? commandResult.stdout.trim() : "",
+    commandResult
+  };
+}
+
+function readBranchExists(
+  branchName: string,
+  currentRepoRoot: string
+): { exists: boolean; commandResult: RuntimeCommandResult } {
+  const commandResult = runCommandSoft("git", ["branch", "--list", branchName], {
+    cwd: currentRepoRoot
+  });
+  return {
+    exists: commandResult.ok ? commandResult.stdout.trim().length > 0 : false,
+    commandResult
+  };
 }
 
 function clampScore(value: number): number {
@@ -808,9 +990,11 @@ function compareScoredCandidates(
 export function buildFounderReport(
   selected: ScoredCandidate | null,
   gitStatus: string[],
-  mode: NextTaskMode
+  mode: NextTaskMode,
+  runtimeErrors: readonly RuntimeCommandError[] = []
 ): string {
   if (!selected) {
+    const hasRuntimeErrors = mode === "executor" && runtimeErrors.length > 0;
     return [
       "# Founder Report",
       "",
@@ -818,11 +1002,17 @@ export function buildFounderReport(
       "",
       "## Why",
       "",
-      "All candidates are blocked by approval gates or missing evidence.",
+      hasRuntimeErrors
+        ? `Executor command failures: ${runtimeErrors
+            .map((error) => formatCommand(error.command, error.args))
+            .join(", ")}.`
+        : "All candidates are blocked by approval gates or missing evidence.",
       "",
       "## Required Action",
       "",
-      mode === "executor"
+      hasRuntimeErrors
+        ? "Fix or classify the local command failure before local executor mode proceeds."
+        : mode === "executor"
         ? "Review blocked gates, tracked tree cleanliness, or missing evidence before local executor mode proceeds."
         : "Review blocked gates or add missing repo evidence before executor mode proceeds."
     ].join("\n");
@@ -898,6 +1088,7 @@ export function selectNextTask(options?: {
   mode?: NextTaskMode;
   gitStatus?: string[];
   trackedGitStatus?: string[];
+  runtimeErrors?: RuntimeCommandError[];
 }): NextTaskResult {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const mode = options?.mode ?? "planning";
@@ -905,9 +1096,21 @@ export function selectNextTask(options?: {
   const candidateFile = readJson<CandidateFile>(path.join(currentRepoRoot, ".autonomous", "task-candidates.json"));
   const candidateIds = new Set(candidateFile.candidates.map((candidate) => candidate.id));
   const taskStatuses = readTaskStatusMap(currentRepoRoot, candidateIds);
-  const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
-  const trackedGitStatus =
-    options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatusResult = options?.gitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatusResult = options?.trackedGitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatus = options?.gitStatus ?? gitStatusResult?.entries ?? [];
+  const trackedGitStatus = options?.trackedGitStatus ?? trackedGitStatusResult?.entries ?? [];
+  const runtimeErrors = uniqueRuntimeCommandErrors([
+    ...(options?.runtimeErrors ?? []),
+    ...runtimeCommandErrors([
+      gitStatusResult?.commandResult,
+      trackedGitStatusResult?.commandResult
+    ])
+  ]);
   const scored = candidateFile.candidates
     .map((candidate) =>
       scoreCandidate(candidate, {
@@ -918,9 +1121,10 @@ export function selectNextTask(options?: {
       })
     )
     .sort((left, right) => compareScoredCandidates(left, right, scoringModel));
-  const eligible = scored.filter((candidate) => candidate.eligible);
+  const executorRuntimeBlocked = mode === "executor" && runtimeErrors.length > 0;
+  const eligible = executorRuntimeBlocked ? [] : scored.filter((candidate) => candidate.eligible);
   const selected = eligible[0] ?? null;
-  const founderReport = buildFounderReport(selected, gitStatus, mode);
+  const founderReport = buildFounderReport(selected, gitStatus, mode, runtimeErrors);
   const externalGateProjection = readGateProjection(currentRepoRoot);
 
   return {
@@ -935,6 +1139,7 @@ export function selectNextTask(options?: {
     trackedGitStatus,
     scoringModel: summarizeScoringModel(scoringModel),
     externalGateProjection,
+    runtimeErrors,
     founderReport
   };
 }
@@ -1342,19 +1547,36 @@ export function prepareExecutionPacket(options?: {
   currentBranch?: string;
   gitStatus?: string[];
   trackedGitStatus?: string[];
+  runtimeErrors?: RuntimeCommandError[];
 }): ExecutionPacket {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const baseBranch = options?.baseBranch ?? "main";
-  const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
-  const trackedGitStatus =
-    options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatusResult = options?.gitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatusResult = options?.trackedGitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const currentBranchResult = options?.currentBranch ? null : readCurrentBranch(currentRepoRoot);
+  const gitStatus = options?.gitStatus ?? gitStatusResult?.entries ?? [];
+  const trackedGitStatus = options?.trackedGitStatus ?? trackedGitStatusResult?.entries ?? [];
+  const currentBranch = options?.currentBranch ?? currentBranchResult?.branch ?? "unknown";
+  let runtimeErrors = uniqueRuntimeCommandErrors([
+    ...(options?.runtimeErrors ?? []),
+    ...runtimeCommandErrors([
+      gitStatusResult?.commandResult,
+      trackedGitStatusResult?.commandResult,
+      currentBranchResult?.commandResult
+    ])
+  ]);
   const selection = selectNextTask({
     currentRepoRoot,
     mode: "executor",
     gitStatus,
-    trackedGitStatus
+    trackedGitStatus,
+    runtimeErrors
   });
-  const currentBranch = options?.currentBranch ?? getCurrentBranch(currentRepoRoot);
+  runtimeErrors = uniqueRuntimeCommandErrors([...runtimeErrors, ...selection.runtimeErrors]);
   const selected = selection.selected;
   const branchName = selected ? buildAutonomousBranchName(selected.id) : null;
   const blockedReasons: string[] = [];
@@ -1381,8 +1603,22 @@ export function prepareExecutionPacket(options?: {
     blockedReasons.push(`Local executor может стартовать только из \`${baseBranch}\`, сейчас \`${currentBranch}\`.`);
   }
 
-  if (options?.write && branchName && branchExists(branchName, currentRepoRoot)) {
-    blockedReasons.push(`Ветка \`${branchName}\` уже существует; cleanup или reuse нужно решить явно.`);
+  const hasInjectedGitState = Boolean(options?.currentBranch && options.gitStatus && options.trackedGitStatus);
+  if (options?.write && branchName && !hasInjectedGitState) {
+    const branchLookup = readBranchExists(branchName, currentRepoRoot);
+    const branchLookupError = commandErrorFromResult(branchLookup.commandResult);
+    if (branchLookupError) {
+      runtimeErrors.push(branchLookupError);
+    } else if (branchLookup.exists) {
+      blockedReasons.push(`Ветка \`${branchName}\` уже существует; cleanup или reuse нужно решить явно.`);
+    }
+  }
+  runtimeErrors = uniqueRuntimeCommandErrors(runtimeErrors);
+
+  if (runtimeErrors.length > 0) {
+    blockedReasons.push(
+      `Autonomous runtime command failure: ${runtimeErrors.map((error) => formatCommand(error.command, error.args)).join(", ")}.`
+    );
   }
   const controlTowerReadiness = buildControlTowerReadiness(
     blockedReasons,
@@ -1408,6 +1644,7 @@ export function prepareExecutionPacket(options?: {
     trackedGitStatus,
     verificationCommands: [...defaultVerificationCommands],
     verificationResults: [],
+    runtimeErrors,
     controlTowerReadiness,
     externalWriteState: {
       writePerformed: false,
@@ -1456,22 +1693,20 @@ export function runVerificationStack(
   currentRepoRoot = repoRoot
 ): VerificationCommandResult[] {
   return commands.map((command) => {
-    const result = spawnSync(command, {
+    const result = runCommandSoft(command, [], {
       cwd: currentRepoRoot,
-      encoding: "utf8",
       shell: true,
-      timeout: verificationCommandTimeoutMs,
+      timeoutMs: verificationCommandTimeoutMs,
       maxBuffer: verificationCommandMaxBuffer
     });
-    const stdout = result.stdout ?? "";
-    const stderr = result.stderr ?? "";
 
     return {
       command,
-      ok: result.status === 0,
-      exitCode: result.status ?? 1,
-      stdoutTail: stdout.trim().split("\n").slice(-12).join("\n"),
-      stderrTail: stderr.trim().split("\n").slice(-12).join("\n")
+      ok: result.ok,
+      exitCode: result.exitCode,
+      errorClass: result.errorClass,
+      stdoutTail: result.stdoutTail,
+      stderrTail: result.stderrTail
     };
   });
 }
@@ -1483,7 +1718,8 @@ function parseNetworkMetrics(output: string): SystemMetrics["network"] {
     status: "passed",
     listeningSockets,
     establishedConnections,
-    error: null
+    error: null,
+    commandError: null
   };
 }
 
@@ -1493,18 +1729,17 @@ export function collectSystemMetrics(options?: {
   const totalBytes = totalmem();
   const freeBytes = freemem();
   let network: SystemMetrics["network"];
-  try {
-    const output = execFileSync(options?.networkCommand ?? "netstat", ["-an"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    });
-    network = parseNetworkMetrics(output);
-  } catch (error) {
+  const networkResult = runCommandSoft(options?.networkCommand ?? "netstat", ["-an"]);
+  if (networkResult.ok) {
+    network = parseNetworkMetrics(networkResult.stdout);
+  } else {
+    const commandError = commandErrorFromResult(networkResult);
     network = {
       status: "unknown",
       listeningSockets: null,
       establishedConnections: null,
-      error: error instanceof Error ? error.message : "network metrics unavailable"
+      error: commandError?.message ?? "network metrics unavailable",
+      commandError
     };
   }
 
@@ -1525,27 +1760,50 @@ export function collectSystemMetrics(options?: {
 }
 
 export function collectGithubRuns(currentRepoRoot = repoRoot): GithubRunSummary[] {
+  return collectGithubRunsWithResult(currentRepoRoot).runs;
+}
+
+function collectGithubRunsWithResult(currentRepoRoot = repoRoot): {
+  runs: GithubRunSummary[];
+  commandResult: RuntimeCommandResult;
+  parseError: RuntimeCommandError | null;
+} {
+  const commandResult = runCommandSoft(
+    "gh",
+    [
+      "run",
+      "list",
+      "--limit",
+      "5",
+      "--json",
+      "status,conclusion,workflowName,headBranch,url"
+    ],
+    {
+      cwd: currentRepoRoot
+    }
+  );
+
+  if (!commandResult.ok) {
+    return { runs: [], commandResult, parseError: null };
+  }
+
   try {
-    const output = execFileSync(
-      "gh",
-      [
-        "run",
-        "list",
-        "--limit",
-        "5",
-        "--json",
-        "status,conclusion,workflowName,headBranch,url"
-      ],
-      {
-        cwd: currentRepoRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"]
+    const parsed = JSON.parse(commandResult.stdout) as GithubRunSummary[];
+    return { runs: Array.isArray(parsed) ? parsed : [], commandResult, parseError: null };
+  } catch (error) {
+    return {
+      runs: [],
+      commandResult,
+      parseError: {
+        command: commandResult.command,
+        args: commandResult.args,
+        cwd: commandResult.cwd,
+        exitCode: commandResult.exitCode,
+        stderrTail: commandResult.stderrTail,
+        errorClass: "spawn_error",
+        message: error instanceof Error ? error.message : "GitHub Actions JSON output is invalid"
       }
-    );
-    const parsed = JSON.parse(output) as GithubRunSummary[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+    };
   }
 }
 
@@ -1677,9 +1935,18 @@ export function buildAutonomousHealthSnapshot(options?: {
 }): AutonomousHealthSnapshot {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const generatedAt = options?.generatedAt ?? new Date().toISOString();
-  const gitStatus = options?.gitStatus ?? getGitStatus({ repoRoot: currentRepoRoot });
-  const trackedGitStatus =
-    options?.trackedGitStatus ?? getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatusResult = options?.gitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatusResult = options?.trackedGitStatus
+    ? null
+    : readGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatus = options?.gitStatus ?? gitStatusResult?.entries ?? [];
+  const trackedGitStatus = options?.trackedGitStatus ?? trackedGitStatusResult?.entries ?? [];
+  const gitRuntimeErrors = runtimeCommandErrors([
+    gitStatusResult?.commandResult,
+    trackedGitStatusResult?.commandResult
+  ]);
   const packet =
     options?.packet ??
     prepareExecutionPacket({
@@ -1688,15 +1955,25 @@ export function buildAutonomousHealthSnapshot(options?: {
       trackedGitStatus,
       currentBranch: getCurrentBranchOrDefault(currentRepoRoot),
       allowDirtyTracked: options?.allowDirtyTracked,
-      allowNonBaseBranch: options?.allowNonBaseBranch
+      allowNonBaseBranch: options?.allowNonBaseBranch,
+      runtimeErrors: gitRuntimeErrors
     });
   const system = options?.systemMetrics ?? collectSystemMetrics();
   const notionAuth = resolveNotionAuthStatus(
     readGateProjection(currentRepoRoot),
     options?.notionAuthStatus
   );
-  const githubRuns = options?.githubRuns ?? collectGithubRuns(currentRepoRoot);
+  const githubRunsResult = options?.githubRuns ? null : collectGithubRunsWithResult(currentRepoRoot);
+  const githubRuns = options?.githubRuns ?? githubRunsResult?.runs ?? [];
   const githubActions = resolveGithubActionsHealth(githubRuns);
+  const runtimeErrors = uniqueRuntimeCommandErrors([
+    ...gitRuntimeErrors,
+    ...runtimeCommandErrors([githubRunsResult?.commandResult])
+  ]);
+  if (githubRunsResult?.parseError) runtimeErrors.push(githubRunsResult.parseError);
+  if (system.network.commandError) runtimeErrors.push(system.network.commandError);
+  runtimeErrors.push(...packet.runtimeErrors);
+  const uniqueRuntimeErrors = uniqueRuntimeCommandErrors(runtimeErrors);
   const selfHealingRecommendations = buildSelfHealingRecommendations({
     projection: readGateProjection(currentRepoRoot),
     selected: packet.selected,
@@ -1726,6 +2003,7 @@ export function buildAutonomousHealthSnapshot(options?: {
     repoRoot: currentRepoRoot,
     gitStatus,
     trackedGitStatus,
+    runtimeErrors: uniqueRuntimeErrors,
     system,
     notionAuth,
     githubActions,
@@ -1973,13 +2251,20 @@ export function runLevelBCycle(options?: {
 }): LevelBCycleResult {
   const currentRepoRoot = options?.currentRepoRoot ?? repoRoot;
   const generatedAt = options?.generatedAt ?? new Date().toISOString();
-  const gitStatus = getGitStatus({ repoRoot: currentRepoRoot });
-  const trackedGitStatus = getGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatusResult = readGitStatus({ repoRoot: currentRepoRoot });
+  const trackedGitStatusResult = readGitStatus({ repoRoot: currentRepoRoot, trackedOnly: true });
+  const gitStatus = gitStatusResult.entries;
+  const trackedGitStatus = trackedGitStatusResult.entries;
+  const gitRuntimeErrors = runtimeCommandErrors([
+    gitStatusResult.commandResult,
+    trackedGitStatusResult.commandResult
+  ]);
   const nextTask = selectNextTask({
     currentRepoRoot,
     mode: "executor",
     gitStatus,
-    trackedGitStatus
+    trackedGitStatus,
+    runtimeErrors: gitRuntimeErrors
   });
   const executionPacket = prepareExecutionPacket({
     currentRepoRoot,
@@ -1987,8 +2272,21 @@ export function runLevelBCycle(options?: {
     gitStatus,
     trackedGitStatus,
     allowDirtyTracked: options?.allowDirtyTracked,
-    allowNonBaseBranch: options?.allowNonBaseBranch
+    allowNonBaseBranch: options?.allowNonBaseBranch,
+    runtimeErrors: gitRuntimeErrors
   });
+  if (gitRuntimeErrors.length > 0) {
+    executionPacket.runtimeErrors = uniqueRuntimeCommandErrors([
+      ...executionPacket.runtimeErrors,
+      ...gitRuntimeErrors
+    ]);
+    addExecutionBlocker(
+      executionPacket,
+      `Autonomous runtime command failure: ${gitRuntimeErrors
+        .map((error) => formatCommand(error.command, error.args))
+        .join(", ")}.`
+    );
+  }
   const health = buildAutonomousHealthSnapshot({
     currentRepoRoot,
     generatedAt,

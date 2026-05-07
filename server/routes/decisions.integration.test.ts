@@ -1,14 +1,16 @@
 import type { Express } from "express";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
 import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
 import { getCaseStore } from "../lib/caseStore";
 import { caseSummarySchema, type DecisionRecord } from "@shared/contracts";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
+let restoreFreshCatalogs: (() => void) | null = null;
 
 function markValidEvidenceFresh(): void {
   const catalogs = getCatalogsOrThrow();
@@ -81,6 +83,17 @@ beforeAll(async () => {
 });
 
 installStableRouteTestClock();
+
+beforeEach(() => {
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
+  );
+});
+
+afterEach(() => {
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
+});
 
 async function requestJson(
   method: "GET" | "POST",

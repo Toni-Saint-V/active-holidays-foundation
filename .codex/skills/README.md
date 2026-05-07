@@ -1,8 +1,12 @@
 # Active Holidays Compact Skill Catalog
 
-The visible repo-local catalog is intentionally small: 10 action skills, grouped by work type.
+The visible repo-local catalog is intentionally small: 11 action skills, grouped by work type.
 
 ## Visible Actions
+
+Super mode:
+
+- `ah-super-operator`
 
 Process:
 
@@ -28,15 +32,15 @@ Review:
 
 ## Hotkey Commands
 
-- `npm run ah`
-- `PROMPT="..." npm run ah:auto`
-- `npm run ah:verify`
-- `npm run ah:review`
-- `npm run ah:ui`
-- `npm run ah:ship`
-- `npm run ah:skills`
-- `npm run ah:auto`
-- `npm run ah:audit`
+Normal use:
+
+- `npm run do -- "задача"`
+- `npm run check`
+- `npm run help`
+
+Advanced menu:
+
+- `npm run ah -- advanced`
 
 ## Layout
 
@@ -52,6 +56,7 @@ Review:
 - Do not expose atomic helper rules as picker skills.
 - Do not recreate the 70-item list.
 - Keep global curated skills as companions instead of repo-local shadows.
+- Use `orchestrationMode` as an on/off depth switch for broad skill/subagent planning; do not create a second router.
 - UI still requires PNG approval before code.
 - Every real implementation still needs verification before final status.
 
