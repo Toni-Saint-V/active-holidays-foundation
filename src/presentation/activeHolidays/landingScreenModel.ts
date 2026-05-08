@@ -52,8 +52,8 @@ type LandingCopy = Omit<
 
 const routeByProduct: Record<ProductType, string> = {
   travel: "/result",
-  residency_es: "/residency-es",
-  insurance_adult: "/insurance-adult"
+  residency_es: "/result",
+  insurance_adult: "/result"
 };
 
 const productOrder: ProductType[] = ["travel", "residency_es", "insurance_adult"];

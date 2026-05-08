@@ -101,7 +101,7 @@ export function LandingScreen() {
             right={
               <HeaderButton
                 icon={<Menu className="h-5 w-5" />}
-                onClick={() => navigate("/profile")}
+                onClick={() => navigate(screenModel.cta.startPath)}
                 aria-label="Открыть меню"
               />
             }

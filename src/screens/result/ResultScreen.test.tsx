@@ -330,7 +330,7 @@ describe("ResultScreen", () => {
     );
 
     renderScreen(<ResultScreen productType="insurance_adult" />, [
-      "/insurance-adult?case=s1-rf-italy"
+      "/result?case=s1-rf-italy"
     ]);
 
     await waitFor(() => {

@@ -361,11 +361,11 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
             ))}
             <div className="mt-4">
               <Link
-                to={`/trust?case=${encodeURIComponent(caseData.id)}`}
+                to={`/human-review?case=${encodeURIComponent(caseData.id)}`}
                 className="text-sm font-semibold text-info"
                 onClick={() => setSheet(null)}
               >
-                Открыть экран доверия
+                Передать кейс эксперту
               </Link>
             </div>
           </div>

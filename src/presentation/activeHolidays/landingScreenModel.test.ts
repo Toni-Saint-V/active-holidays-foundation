@@ -21,7 +21,7 @@ describe("buildLandingScreenModel", () => {
 
     expect(model.eyebrow).toBe("умный помощник по страховке");
     expect(model.cta.startPath).toBe("/intake");
-    expect(model.cta.examplePath).toBe("/insurance-adult");
+    expect(model.cta.examplePath).toBe("/result");
     expect(model.ai.summary).toContain("покрытие");
   });
 });

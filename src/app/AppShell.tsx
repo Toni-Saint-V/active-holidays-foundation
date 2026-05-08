@@ -3,14 +3,10 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Maximize2,
   Minimize2,
-  Bell,
   Briefcase,
-  FileText,
   Home,
   ShieldCheck,
-  Sparkles,
-  Compass,
-  UserCircle2
+  Compass
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { morphPage } from "@/animations/variants";
@@ -20,11 +16,7 @@ const navItems = [
   { to: "/", label: "Главная", icon: Home },
   { to: "/intake", label: "Анкета", icon: Compass },
   { to: "/result", label: "Вердикт", icon: ShieldCheck },
-  { to: "/documents", label: "Документы", icon: FileText },
-  { to: "/trust", label: "Доверие", icon: Sparkles },
-  { to: "/human-review", label: "Проверка", icon: Briefcase },
-  { to: "/notifications", label: "Сигналы", icon: Bell },
-  { to: "/profile", label: "Профиль", icon: UserCircle2 }
+  { to: "/human-review", label: "Проверка", icon: Briefcase }
 ];
 
 export function AppShell() {
@@ -36,13 +28,7 @@ export function AppShell() {
         "/",
         "/intake",
         "/result",
-        "/human-review",
-        "/documents",
-        "/trust",
-        "/notifications",
-        "/profile",
-        "/residency-es",
-        "/insurance-adult"
+        "/human-review"
       ]),
     []
   );
