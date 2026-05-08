@@ -22,16 +22,6 @@ const navItems = [
 export function AppShell() {
   const location = useLocation();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const immersiveRoutes = useMemo(
-    () =>
-      new Set([
-        "/",
-        "/intake",
-        "/result",
-        "/human-review"
-      ]),
-    []
-  );
   const kioskMode = useMemo(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(location.search);
@@ -39,8 +29,7 @@ export function AppShell() {
     const iosStandalone = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
     return params.get("kiosk") === "1" || displayModeStandalone || iosStandalone;
   }, [location.search]);
-  const isImmersive = immersiveRoutes.has(location.pathname);
-  const hideAppChrome = isImmersive || kioskMode;
+  const hideAppChrome = true || kioskMode;
 
   useEffect(() => {
     if (typeof document === "undefined") return;

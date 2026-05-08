@@ -114,7 +114,7 @@ export function LandingScreen() {
             <h1 className="max-w-[360px] text-[58px] font-extrabold leading-[0.92] tracking-[-0.05em] text-textPrimary">
               <span className="block">{screenModel.headline[0]}</span>
               <span className="mt-1 block">{screenModel.headline[1]}</span>
-              <span className="mt-1 block text-success">{screenModel.headline[2]}</span>
+              <span className="mt-1 block text-accent">{screenModel.headline[2]}</span>
             </h1>
             <p className="max-w-[380px] text-[16px] leading-[1.35] text-textSecondary">
               {screenModel.subline}
