@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, ListChecks, Menu, ShieldCheck, Sparkles } from "lucide-react";
-import type { ProductType } from "@shared/contracts";
 import { useNavigate } from "react-router-dom";
 import { useCaseStore } from "@/state/caseStore";
-import { useProductAutopilot } from "@/hooks/useProductAutopilot";
 import { useScreenView } from "@/instrumentation/screenView";
 import { track } from "@/instrumentation/events";
 import { fadeRise, staggerChild, staggerParent } from "@/animations/variants";
@@ -13,8 +11,7 @@ import {
   HeaderButton,
   PrimaryCTA,
   ScreenHeader,
-  SectionLabel,
-  SurfacePill
+  SectionLabel
 } from "@/components/ah/ScreenCore";
 import { SemanticBridge } from "@/components/ah/SemanticBridge";
 import { AIInsightChip } from "@/components/ah/SignalBlocks";
@@ -42,8 +39,6 @@ export function LandingScreen() {
   const bootstrap = useCaseStore((state) => state.bootstrap);
   const scenarios = useCaseStore((state) => state.scenarios);
   const status = useCaseStore((state) => state.status);
-  const autopilotProduct = useProductAutopilot();
-  const [productType, setProductType] = useState<ProductType>(autopilotProduct.suggestion);
   const [activeBridgeNode, setActiveBridgeNode] = useState<string>("check");
   const [aiOpen, setAiOpen] = useState(false);
 
@@ -51,9 +46,10 @@ export function LandingScreen() {
     if (scenarios.length === 0) void bootstrap();
   }, [bootstrap, scenarios.length]);
 
+  const productType = "travel" as const;
   const selectedScenario = useMemo(
     () => scenarios.find((scenario) => scenario.productType === productType) ?? null,
-    [scenarios, productType]
+    [scenarios]
   );
   const screenModel = useMemo(
     () =>
@@ -101,8 +97,8 @@ export function LandingScreen() {
             right={
               <HeaderButton
                 icon={<Menu className="h-5 w-5" />}
-                onClick={() => navigate("/profile")}
-                aria-label="Открыть меню"
+                onClick={() => navigate("/human-review")}
+                aria-label="Открыть ручную проверку"
               />
             }
           />
@@ -120,21 +116,6 @@ export function LandingScreen() {
               {screenModel.subline}
             </p>
           </motion.div>
-        </motion.section>
-
-        <motion.section variants={staggerChild} className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {screenModel.productPills.map((item) => (
-            <SurfacePill
-              key={item.productType}
-              label={item.label}
-              active={item.productType === productType}
-              onClick={() => {
-                setProductType(item.productType);
-                setAiOpen(false);
-                track({ type: "cta_clicked", cta: `landing_switch_${item.productType}` });
-              }}
-            />
-          ))}
         </motion.section>
 
         <motion.section variants={staggerChild} className="grid gap-3">

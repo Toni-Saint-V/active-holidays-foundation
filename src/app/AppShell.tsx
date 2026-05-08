@@ -1,27 +1,27 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  Bell,
   Briefcase,
-  FileText,
   Home,
   ShieldCheck,
-  Sparkles,
   Compass,
-  UserCircle2
+  type LucideIcon
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { morphPage } from "@/animations/variants";
 import { ToastProvider } from "@/ui/Toast";
+import { m1AllowedPublicRoutes } from "@shared/contracts/m1Scope";
 
-const navItems = [
+type NavItem = {
+  to: (typeof m1AllowedPublicRoutes)[number];
+  label: string;
+  icon: LucideIcon;
+};
+
+const navItems: NavItem[] = [
   { to: "/", label: "Главная", icon: Home },
   { to: "/intake", label: "Анкета", icon: Compass },
   { to: "/result", label: "Вердикт", icon: ShieldCheck },
-  { to: "/documents", label: "Документы", icon: FileText },
-  { to: "/trust", label: "Доверие", icon: Sparkles },
-  { to: "/human-review", label: "Проверка", icon: Briefcase },
-  { to: "/notifications", label: "Сигналы", icon: Bell },
-  { to: "/profile", label: "Профиль", icon: UserCircle2 }
+  { to: "/human-review", label: "Проверка", icon: Briefcase }
 ];
 
 export function AppShell() {
@@ -50,7 +50,7 @@ export function AppShell() {
                   Active Holidays · Санкт-Петербург
                 </p>
                 <h1 className="mt-1 text-lg font-semibold text-textPrimary">
-                  Детерминированный помощник по поездкам
+                  Визовая готовность без догадок
                 </h1>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-borderStrong bg-surface-2 px-3 py-1 text-[11px] text-textSecondary">

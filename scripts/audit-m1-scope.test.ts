@@ -55,4 +55,28 @@ describe("audit-m1-scope", () => {
     expect(report.visibleNonM1Routes).toEqual(["/profile"]);
     expect(report.unknownRoutes).toEqual(["/experimental"]);
   });
+
+  it("treats M1-only nav entries as clean visible scope", () => {
+    const report = auditM1Scope({
+      routerSource: `
+        <Routes>
+          <Route index element={<Landing />} />
+          <Route path="/intake" element={<Intake />} />
+          <Route path="/result" element={<Result />} />
+          <Route path="/human-review" element={<Review />} />
+          <Route path="/profile" element={<Profile />} />
+        </Routes>
+      `,
+      appShellSource: `
+        const navItems = [
+          { to: "/", label: "Главная", icon: Home },
+          { to: "/intake", label: "Анкета", icon: Compass },
+          { to: "/result", label: "Вердикт", icon: ShieldCheck },
+          { to: "/human-review", label: "Проверка", icon: Briefcase }
+        ];
+      `
+    });
+
+    expect(report.visibleNonM1Routes).toEqual([]);
+  });
 });

@@ -56,7 +56,8 @@ const routeByProduct: Record<ProductType, string> = {
   insurance_adult: "/insurance-adult"
 };
 
-const productOrder: ProductType[] = ["travel", "residency_es", "insurance_adult"];
+const m1LandingProductType: ProductType = "travel";
+const productOrder: ProductType[] = [m1LandingProductType];
 
 const bridgeNodes: LandingScreenModel["bridge"]["nodes"] = [
   { id: "check", label: "Проверка", tone: "info" },
@@ -191,8 +192,9 @@ export function buildLandingScreenModel({
   productType: ProductType;
   selectedScenarioCaseId?: string | null;
 }): LandingScreenModel {
-  const copy = landingCopyByProduct[productType];
-  const route = routeByProduct[productType];
+  const resolvedProductType = productType === "travel" ? productType : m1LandingProductType;
+  const copy = landingCopyByProduct[resolvedProductType];
+  const route = routeByProduct[resolvedProductType];
   const query = selectedScenarioCaseId
     ? `?case=${encodeURIComponent(selectedScenarioCaseId)}`
     : "";
