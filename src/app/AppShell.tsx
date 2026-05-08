@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Bell,
@@ -26,23 +27,53 @@ const navItems = [
 
 export function AppShell() {
   const location = useLocation();
+  const kioskMode = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(location.search);
+    const displayModeStandalone = window.matchMedia("(display-mode: standalone)").matches;
+    const iosStandalone = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+    return params.get("kiosk") === "1" || displayModeStandalone || iosStandalone;
+  }, [location.search]);
   const isImmersive =
     location.pathname === "/" ||
     location.pathname === "/result" ||
     location.pathname === "/residency-es" ||
     location.pathname === "/insurance-adult";
+  const hideAppChrome = isImmersive || kioskMode;
+
+  useEffect(() => {
+    if (!kioskMode || typeof document === "undefined") return;
+    if (document.fullscreenElement) return;
+
+    const enterFullscreen = async () => {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        // Ignore: browser blocks fullscreen until explicit gesture in some contexts.
+      }
+    };
+
+    const onFirstTap = () => {
+      void enterFullscreen();
+    };
+
+    window.addEventListener("pointerdown", onFirstTap, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", onFirstTap);
+    };
+  }, [kioskMode]);
 
   return (
     <ToastProvider>
       <div
         className={[
           "relative flex min-h-screen w-full flex-col",
-          isImmersive
+          hideAppChrome
             ? "max-w-none px-0 pb-0 pt-0"
             : "max-w-none px-0 pb-28 pt-0 sm:pb-0"
         ].join(" ")}
       >
-        {isImmersive ? null : (
+        {hideAppChrome ? null : (
           <header className="sticky top-0 z-20 mb-3 border-b border-border bg-surface/92 px-4 py-3 shadow-soft backdrop-blur sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -95,7 +126,7 @@ export function AppShell() {
           </AnimatePresence>
         </main>
 
-        {!isImmersive && (
+        {!hideAppChrome && (
           <nav className="fixed bottom-0 left-0 right-0 z-20 flex w-full items-center justify-between gap-1 overflow-auto border-t border-border bg-surface/96 p-1.5 shadow-soft backdrop-blur sm:hidden">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink

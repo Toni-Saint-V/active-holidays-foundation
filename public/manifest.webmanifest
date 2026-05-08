@@ -1,0 +1,10 @@
+{
+  "name": "Active Holidays",
+  "short_name": "ActiveHolidays",
+  "description": "Active Holidays Foundation",
+  "start_url": "/?kiosk=1",
+  "display": "standalone",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "orientation": "portrait-primary"
+}
