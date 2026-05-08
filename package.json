@@ -40,6 +40,7 @@
     "ah:skills": "tsx scripts/codex/ah-command.ts skills",
     "ah:next": "tsx scripts/codex/ah-command.ts next",
     "ah:audit": "tsx scripts/codex/ah-command.ts audit",
+    "task:brief": "node --experimental-strip-types scripts/codex/generate-task-brief.ts",
     "verify:engine": "tsx scripts/verify-engine-drift.ts",
     "verify:engine:update": "tsx scripts/verify-engine-drift.ts --update",
     "skills:verify": "node --experimental-strip-types scripts/codex/verify-skills.ts",
