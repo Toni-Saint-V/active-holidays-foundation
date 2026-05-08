@@ -145,9 +145,11 @@ function okJson(body: unknown): Response {
 describe("apiClient strict productType parsing", () => {
   beforeEach(() => {
     configureApiBase("http://api.test");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 

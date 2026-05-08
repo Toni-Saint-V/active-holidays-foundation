@@ -1,7 +1,5 @@
 import { z } from "zod";
 import {
-  humanReviewManagerBriefRequestSchema,
-  humanReviewManagerBriefSchema,
   caseSchema,
   resultPayloadSchema,
   intakeQueueSchema,
@@ -21,8 +19,6 @@ import {
   humanReviewCasePacketResponseSchema,
   humanReviewResponseSchema,
   pathPreferencesSchema,
-  recommendationWhatIfBriefRequestSchema,
-  recommendationWhatIfBriefSchema,
   recommendationDetailRequestSchema,
   recommendationDetailSchema,
   recommendationShortlistSchema,
@@ -41,7 +37,6 @@ import {
   type DecisionLogEntry,
   type HumanReviewCreateRequest,
   type HumanReviewCasePacket,
-  type HumanReviewManagerBrief,
   type HumanReviewRequest,
   type IntakePreview,
   type IntakeQueue,
@@ -50,7 +45,6 @@ import {
   type ProductType,
   type RecommendationDetail,
   type RecommendationShortlist,
-  type RecommendationWhatIfBrief,
   type ResultPayload,
   type RuleMetadata,
   type ScenarioLabCompareRequest,
@@ -62,15 +56,8 @@ import {
 
 const DEFAULT_BASE = (() => {
   if (typeof window === "undefined") return "http://localhost:3001";
-  const envBase = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-    ?.VITE_API_BASE;
-  if (envBase && envBase.trim().length > 0) return envBase.trim().replace(/\/+$/, "");
-
-  const { protocol, hostname, origin } = window.location;
-  const isLocalHost =
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  if (isLocalHost) return `${protocol}//${hostname}:3001`;
-  return origin;
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:3001`;
 })();
 
 let baseUrl = DEFAULT_BASE;
@@ -225,20 +212,6 @@ export const apiClient = {
       }
     );
   },
-  async recommendationWhatIfBrief(
-    id: string,
-    payload: { candidateCaseId: string; offerId: string; offerLabel?: string }
-  ): Promise<RecommendationWhatIfBrief> {
-    const body = recommendationWhatIfBriefRequestSchema.parse(payload);
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/recommendations/what-if-brief`,
-      recommendationWhatIfBriefSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(body)
-      }
-    );
-  },
   async patchSignals(id: string, signals: CaseSignals) {
     return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {
       method: "POST",
@@ -277,20 +250,6 @@ export const apiClient = {
       humanReviewCasePacketResponseSchema
     );
     return response.packet;
-  },
-  async humanReviewManagerBrief(
-    id: string,
-    payload: { operatorContext?: string } = {}
-  ): Promise<HumanReviewManagerBrief> {
-    const body = humanReviewManagerBriefRequestSchema.parse(payload);
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/human-review/manager-brief`,
-      humanReviewManagerBriefSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(body)
-      }
-    );
   },
   async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
     const body = humanReviewCreateRequestSchema.parse(payload);
