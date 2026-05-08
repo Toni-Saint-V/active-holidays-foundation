@@ -144,14 +144,33 @@ function headerDescription(result: ResultPayload, hasOpenReview: boolean): strin
   return "Для этого кейса ручная проверка не обязательна, но можно передать его менеджеру вручную.";
 }
 
+function toUserFacingRuleText(explanation: string): string {
+  const normalized = explanation.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Нужно уточнение по кейсу у менеджера.";
+  if (/automation=|evidence|manual_only|R\d{2}|rule|repo=|scope=/i.test(normalized)) {
+    return "Нужно проверить источники и ограничения кейса вручную.";
+  }
+  if (/[A-Za-z]{4,}/.test(normalized)) {
+    return "Обнаружено техническое ограничение — решение передаётся менеджеру.";
+  }
+  return normalized.length > 170 ? `${normalized.slice(0, 167)}…` : normalized;
+}
+
 function humanReviewTriggers(ruleResults: RuleResult[]) {
+  const unique = new Set<string>();
   return ruleResults
     .filter((rule) => rule.fired && rule.output.type === "human_review_trigger")
     .map((rule) => ({
       id: rule.ruleId,
       title: "Причина проверки",
-      detail: rule.explanation
-    }));
+      detail: toUserFacingRuleText(rule.explanation)
+    }))
+    .filter((item) => {
+      const key = item.detail.toLowerCase();
+      if (unique.has(key)) return false;
+      unique.add(key);
+      return true;
+    });
 }
 
 function warningRows(ruleResults: RuleResult[]) {
@@ -160,8 +179,8 @@ function warningRows(ruleResults: RuleResult[]) {
     .map((rule) => ({
       id: rule.ruleId,
       severity: rule.output.severity ?? "medium",
-      label: rule.explanation.split(".")[0],
-      detail: rule.explanation,
+      label: toUserFacingRuleText(rule.explanation).split(".")[0],
+      detail: toUserFacingRuleText(rule.explanation),
       triggeredBy: [rule.ruleId],
       pulseAmplitude: pulseAmplitudeForSeverity(rule.output.severity)
     }));

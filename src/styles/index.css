@@ -51,6 +51,11 @@ body,
 
 body {
   background: var(--color-base);
+  scrollbar-width: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 a {

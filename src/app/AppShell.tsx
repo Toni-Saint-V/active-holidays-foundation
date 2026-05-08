@@ -36,14 +36,14 @@ export function AppShell() {
     <ToastProvider>
       <div
         className={[
-          "relative mx-auto flex min-h-screen w-full flex-col",
+          "relative flex min-h-screen w-full flex-col",
           isImmersive
             ? "max-w-none px-0 pb-0 pt-0"
-            : "max-w-4xl px-4 pb-28 pt-4 sm:px-6 sm:pb-4"
+            : "max-w-none px-0 pb-28 pt-0 sm:pb-0"
         ].join(" ")}
       >
         {isImmersive ? null : (
-          <header className="sticky top-3 z-20 mb-4 rounded-2xl border border-border bg-surface/90 p-4 shadow-soft backdrop-blur">
+          <header className="sticky top-0 z-20 mb-3 border-b border-border bg-surface/92 px-4 py-3 shadow-soft backdrop-blur sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.28em] text-textSecondary">
@@ -96,7 +96,7 @@ export function AppShell() {
         </main>
 
         {!isImmersive && (
-          <nav className="fixed bottom-3 left-1/2 z-20 flex w-[min(96vw,720px)] -translate-x-1/2 items-center justify-between gap-1 overflow-auto rounded-2xl border border-border bg-surface/95 p-1.5 shadow-soft backdrop-blur sm:hidden">
+          <nav className="fixed bottom-0 left-0 right-0 z-20 flex w-full items-center justify-between gap-1 overflow-auto border-t border-border bg-surface/96 p-1.5 shadow-soft backdrop-blur sm:hidden">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}

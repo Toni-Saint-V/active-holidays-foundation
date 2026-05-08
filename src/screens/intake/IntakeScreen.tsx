@@ -121,7 +121,7 @@ export function IntakeScreen() {
       variants={staggerParent}
       initial="initial"
       animate="animate"
-      className="grid gap-4"
+      className="grid gap-4 pb-24 sm:pb-6"
     >
       <motion.div variants={staggerChild}>
         <Card className="grid gap-3">

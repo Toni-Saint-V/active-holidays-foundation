@@ -96,6 +96,19 @@ const countryFlags: Record<string, string> = {
   US: "🇺🇸"
 };
 
+function normalizeUserReason(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  const normalized = reason.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (/automation=|evidence|manual_only|rule|R\d{2}/i.test(normalized)) {
+    return "Есть конфликт или устаревание источников — кейс передаётся на ручную проверку.";
+  }
+  if (/[A-Za-z]{4,}/.test(normalized)) {
+    return "Есть техническое ограничение по данным — нужен оператор для верификации.";
+  }
+  return normalized.length > 140 ? `${normalized.slice(0, 137)}…` : normalized;
+}
+
 function countryLabel(code: string | undefined): string | null {
   if (!code) return null;
   return countryLabels[code] ?? code;
@@ -238,8 +251,8 @@ function evidenceSignals(
       {
         id: "evidence",
         label:
-          result.trust.blockingReason ??
-          result.trust.humanReviewReason ??
+          normalizeUserReason(result.trust.blockingReason) ??
+          normalizeUserReason(result.trust.humanReviewReason) ??
           "Нужна ручная проверка",
         tone: "manual"
       },

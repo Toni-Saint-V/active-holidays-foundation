@@ -122,6 +122,18 @@ export function HumanReviewScreen() {
   });
   const openReview = screenModel.openReview !== null;
   const auditSection = screenModel.auditSection;
+  const priorityLabel: Record<"critical" | "high" | "medium", string> = {
+    critical: "критично",
+    high: "высокий приоритет",
+    medium: "средний приоритет"
+  };
+  const sourceLabel: Record<"evidence" | "documents" | "risk" | "scenario" | "request", string> = {
+    evidence: "источники",
+    documents: "документы",
+    risk: "риски",
+    scenario: "сценарий",
+    request: "запрос клиента"
+  };
 
   async function handleSubmit() {
     if (!activeCase) return;
@@ -162,7 +174,7 @@ export function HumanReviewScreen() {
       variants={staggerParent}
       initial="initial"
       animate="animate"
-      className="grid gap-4"
+      className="grid gap-4 pb-24 sm:pb-6"
     >
       <motion.section variants={staggerChild}>
         <Card>
@@ -312,6 +324,54 @@ export function HumanReviewScreen() {
           )}
         </Card>
       </motion.section>
+
+      {screenModel.packetSection && (
+        <motion.section variants={staggerChild}>
+          <Card>
+            <p className="text-sm font-medium text-textPrimary">{screenModel.packetSection.heading}</p>
+            <p className="mt-2 text-sm text-textSecondary">{screenModel.packetSection.reviewReason}</p>
+            <p className="mt-1 text-xs text-textMuted">{screenModel.packetSection.evidenceLabel}</p>
+            {screenModel.packetSection.scenarioLabel ? (
+              <p className="mt-1 text-xs text-textMuted">{screenModel.packetSection.scenarioLabel}</p>
+            ) : null}
+
+            <div className="mt-4 grid gap-2">
+              {screenModel.packetSection.checklist.map((item) => (
+                <div key={item.id} className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <p className="text-sm font-medium text-textPrimary">{item.title}</p>
+                  <p className="mt-1 text-xs text-textSecondary">{item.detail}</p>
+                  <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-textMuted">
+                    {priorityLabel[item.priority]} · {sourceLabel[item.source]}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {screenModel.packetSection.documentsToInspect.length > 0 ? (
+              <div className="mt-4 grid gap-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-textMuted">Проверить документы</p>
+                {screenModel.packetSection.documentsToInspect.map((doc) => (
+                  <div key={doc.id} className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-textSecondary">
+                    <p className="font-medium text-textPrimary">{doc.label}</p>
+                    <p className="mt-1 text-xs">{doc.detail}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {screenModel.packetSection.doNotAutoDecideNotes.length > 0 ? (
+              <div className="mt-4 grid gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-amber-100">Не автоматизировать</p>
+                {screenModel.packetSection.doNotAutoDecideNotes.map((note) => (
+                  <p key={note} className="text-xs text-amber-100/90">
+                    {note}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </Card>
+        </motion.section>
+      )}
 
       {screenModel.triggersSection && (
         <motion.section variants={staggerChild}>

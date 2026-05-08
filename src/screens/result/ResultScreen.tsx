@@ -8,6 +8,10 @@ import { EmptyState } from "@/ui/EmptyState";
 import { BottomSheet } from "@/ui/BottomSheet";
 import { useToast } from "@/ui/Toast";
 import { defaultCaseByProduct, findScenarioCaseId } from "@/lib/caseDefaults";
+import {
+  resolveCountryHeroImage,
+  resolveResultDestinationCountry
+} from "@/lib/countryHeroImage";
 import { useScreenView } from "@/instrumentation/screenView";
 import { track } from "@/instrumentation/events";
 import { fadeRise, staggerChild, staggerParent } from "@/animations/variants";
@@ -34,6 +38,13 @@ type ResultScreenProps = {
 };
 
 type SheetMode = "basis" | "compare" | "tools" | "ai" | null;
+
+const countryLabels: Record<string, string> = {
+  IT: "Италия",
+  ES: "Испания",
+  FR: "Франция",
+  GR: "Греция"
+};
 
 export function ResultScreen({ productType, screenName = "result" }: ResultScreenProps = {}) {
   useScreenView(screenName);
@@ -128,8 +139,8 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
 
   if (!activeResult || !activeCase) {
     return (
-      <div className="min-h-screen bg-base px-4 py-4">
-        <div className="mx-auto flex min-h-[calc(100dvh-32px)] max-w-[430px] items-center justify-center rounded-[32px] border border-border bg-surface">
+      <div className="min-h-screen bg-base px-4 py-5 sm:px-6">
+        <div className="flex min-h-[calc(100dvh-40px)] w-full items-center justify-center bg-surface/30">
           <p className="text-sm text-textSecondary">Собираем результат по кейсу…</p>
         </div>
       </div>
@@ -138,6 +149,11 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
 
   const result = activeResult;
   const caseData = activeCase;
+  const destinationCountry = resolveResultDestinationCountry(result, caseData);
+  const heroImage = resolveCountryHeroImage(destinationCountry);
+  const destinationLabel = destinationCountry
+    ? countryLabels[destinationCountry] ?? destinationCountry
+    : null;
   const model = buildResultScreenModel({
     result,
     scenarioLab: activeScenarioLab
@@ -171,9 +187,30 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         variants={staggerParent}
         initial="initial"
         animate="animate"
-        className="ah-ambient-frame min-h-screen bg-base px-4 py-4"
+        className="ah-ambient-frame min-h-screen bg-base px-4 py-5 sm:px-6"
       >
-        <div className="relative mx-auto flex min-h-[calc(100dvh-32px)] w-full max-w-[430px] flex-col gap-4">
+        {heroImage ? (
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+            <img
+              src={heroImage}
+              alt=""
+              aria-hidden
+              className="h-full w-full scale-[1.08] object-cover opacity-[0.5] blur-[1px]"
+            />
+            <div className="absolute inset-0 bg-base/44" />
+          </div>
+        ) : null}
+        <div className="relative flex min-h-[calc(100dvh-40px)] w-full max-w-none flex-col gap-4">
+          {heroImage && destinationLabel ? (
+            <div className="pointer-events-none absolute right-0 top-16 z-10 rounded-2xl border border-white/15 bg-black/25 p-1.5 backdrop-blur-sm">
+              <div className="h-20 w-20 overflow-hidden rounded-xl border border-white/10">
+                <img src={heroImage} alt="" aria-hidden className="h-full w-full object-cover" />
+              </div>
+              <p className="mt-1 text-center text-[10px] uppercase tracking-[0.12em] text-textSecondary">
+                {destinationLabel}
+              </p>
+            </div>
+          ) : null}
           <motion.div variants={staggerChild}>
             <ScreenHeader
               left={

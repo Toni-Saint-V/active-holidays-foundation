@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   caseOverrideSchema,
   caseSignalsSchema,
+  signalValueSchema,
   humanReviewCreateRequestSchema,
   humanReviewCreateResponseSchema,
   humanReviewCasePacketResponseSchema,
@@ -298,6 +299,19 @@ export function casesRouter(): Router {
       const store = getCaseStore();
       requireCase(id);
       const signals = (req.body as { signals: CaseSignals }).signals;
+      for (const signal of signals) {
+        const parsed = signalValueSchema.safeParse({
+          id: signal.id,
+          value: signal.value
+        });
+        if (!parsed.success) {
+          throw new HttpError(
+            400,
+            `Некорректное значение сигнала ${signal.id}.`,
+            "invalid_signal_value"
+          );
+        }
+      }
       const updated = store.patchSignals(id, signals);
       if (!updated) throw new HttpError(500, "Не удалось обновить сигналы.");
       const { result, record } = recordDecision(

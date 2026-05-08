@@ -398,4 +398,37 @@ describe("ResultScreen", () => {
       expect(screen.getByTestId("ai-recommendation-panel")).toBeInTheDocument();
     });
   });
+
+  it("renders a country hero background image for supported travel destination", () => {
+    useCaseStoreMock.mockReturnValue(createStore());
+
+    renderScreen(<ResultScreen />);
+
+    const hero = document.querySelector('img[src="/photos/landmark-it.webp"]');
+    expect(hero).toBeTruthy();
+  });
+
+  it("does not render a country hero background for unsupported destination", () => {
+    const baseStore = createStore();
+    useCaseStoreMock.mockReturnValue(
+      createStore({
+        activeResult: {
+          ...(baseStore.activeResult ?? {}),
+          primaryPath: {
+            ...(baseStore.activeResult?.primaryPath ?? {}),
+            destination: "DE"
+          }
+        },
+        activeCase: {
+          ...(baseStore.activeCase ?? {}),
+          signals: [{ id: "destination", value: "DE", source: "seed", capturedAt: "2026-04-17T10:00:00.000Z" }]
+        }
+      })
+    );
+
+    renderScreen(<ResultScreen />);
+
+    const hero = document.querySelector('img[src*="/photos/landmark-"]');
+    expect(hero).toBeNull();
+  });
 });

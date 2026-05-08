@@ -29,16 +29,16 @@ export function EvidenceStrip({
   return (
     <div
       className={cn(
-        "flex min-h-[56px] flex-wrap items-center gap-x-4 gap-y-2 rounded-[24px] border border-border bg-surface2 px-4 py-3",
+        "flex min-h-[56px] min-w-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-[24px] border border-border bg-surface2 px-4 py-3",
         className
       )}
     >
       {visibleSignals.map((signal, index) => (
-        <div key={signal.id} className="flex items-center gap-3 text-sm text-textSecondary">
+        <div key={signal.id} className="flex min-w-0 max-w-full items-center gap-3 text-sm text-textSecondary">
           <span className={cn("h-2.5 w-2.5 rounded-full", toneClass[signal.tone ?? "muted"])} />
-          <span className="font-medium text-textPrimary">{signal.label}</span>
+          <span className="min-w-0 break-words font-medium text-textPrimary">{signal.label}</span>
           {index < visibleSignals.length - 1 ? (
-            <span className="text-textMuted">•</span>
+            <span className="shrink-0 text-textMuted">•</span>
           ) : null}
         </div>
       ))}
