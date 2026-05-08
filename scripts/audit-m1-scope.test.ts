@@ -23,11 +23,11 @@ describe("audit-m1-scope", () => {
     const navPaths = collectNavItemPaths(`
       const navItems = [
         { to: "/", label: "Главная", icon: Home },
-        { to: "/documents", label: "Документы", icon: FileText }
+        { to: "/human-review", label: "Проверка", icon: Briefcase }
       ];
     `);
 
-    expect(navPaths).toEqual(["/", "/documents"]);
+    expect(navPaths).toEqual(["/", "/human-review"]);
   });
 
   it("reports non-M1 exposure without blocking current gaps", () => {
@@ -38,22 +38,22 @@ describe("audit-m1-scope", () => {
           <Route path="/intake" element={<Intake />} />
           <Route path="/result" element={<Result />} />
           <Route path="/human-review" element={<Review />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/legacy-lab" element={<LegacyLab />} />
           <Route path="/experimental" element={<Experiment />} />
         </Routes>
       `,
       appShellSource: `
         const navItems = [
           { to: "/", label: "Главная", icon: Home },
-          { to: "/profile", label: "Профиль", icon: UserCircle2 }
+          { to: "/legacy-lab", label: "Лаб", icon: UserCircle2 }
         ];
       `
     });
 
     expect(report.missingAllowedRoutes).toEqual([]);
-    expect(report.registeredNonM1Routes).toEqual(["/experimental", "/profile"]);
-    expect(report.visibleNonM1Routes).toEqual(["/profile"]);
-    expect(report.unknownRoutes).toEqual(["/experimental"]);
+    expect(report.registeredNonM1Routes).toEqual(["/experimental", "/legacy-lab"]);
+    expect(report.visibleNonM1Routes).toEqual(["/legacy-lab"]);
+    expect(report.unknownRoutes).toEqual(["/experimental", "/legacy-lab"]);
   });
 
   it("treats M1-only nav entries as clean visible scope", () => {
@@ -64,7 +64,7 @@ describe("audit-m1-scope", () => {
           <Route path="/intake" element={<Intake />} />
           <Route path="/result" element={<Result />} />
           <Route path="/human-review" element={<Review />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/legacy-lab" element={<LegacyLab />} />
         </Routes>
       `,
       appShellSource: `

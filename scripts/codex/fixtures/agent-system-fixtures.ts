@@ -395,10 +395,9 @@ export const AGENT_SYSTEM_FIXTURES: AgentSystemFixture[] = [
     id: "ah-result-flow",
     title: "Result flow integration",
     prompt:
-      "Нужно усилить result flow: compare, documents и human review states прямо внутри текущего result loop.",
+      "Нужно усилить result flow: compare и human review states прямо внутри текущего result loop.",
     files: [
       "src/screens/result/ResultScreen.tsx",
-      "src/screens/documents/DocumentsScreen.tsx",
       "src/screens/human-review/HumanReviewScreen.tsx"
     ],
     expectedPrimaryMode: "result-flow",

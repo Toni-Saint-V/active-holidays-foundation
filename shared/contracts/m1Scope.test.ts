@@ -21,14 +21,7 @@ describe("m1Scope contract", () => {
   });
 
   it("explicitly classifies known non-M1 routes", () => {
-    expect(m1KnownNonScopeRoutes.map((route) => route.path)).toEqual([
-      "/documents",
-      "/trust",
-      "/notifications",
-      "/profile",
-      "/residency-es",
-      "/insurance-adult"
-    ]);
+    expect(m1KnownNonScopeRoutes.map((route) => route.path)).toEqual([]);
     expect(m1KnownNonScopeRoutes.every((route) => route.reason && route.label)).toBe(true);
   });
 
@@ -43,9 +36,9 @@ describe("m1Scope contract", () => {
       kind: "allowed_m1",
       path: "/result"
     });
-    expect(classifyM1Route("/profile")).toMatchObject({
-      kind: "known_non_m1",
-      route: { path: "/profile" }
+    expect(classifyM1Route("/legacy-lab")).toEqual({
+      kind: "unknown",
+      path: "/legacy-lab"
     });
     expect(classifyM1Route("/experimental")).toEqual({
       kind: "unknown",

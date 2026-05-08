@@ -6,8 +6,7 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 
 - React 18
 - TypeScript strict
-- Vite
-- React Router v6
+- Next.js 14+ App Router
 - TailwindCSS
 - Framer Motion
 - Zustand
@@ -17,6 +16,23 @@ Phase 3 decision skeleton for a new `Active Holidays` codebase.
 - LangGraph
 - Tavily
 - SQLite-backed LangGraph checkpoint memory
+
+## M1 UI Surface (Next App Router)
+
+Current production UI routes are implemented in `src/app`:
+
+- `/` (Landing)
+- `/intake`
+- `/result`
+- `/human-review`
+
+Key contracts:
+
+- `src/lib/constants.ts` — verdict/country constants and copy matrix
+- `src/lib/countryData.ts` — per-country documents/window/risk data
+- `src/lib/verdict.ts` — deterministic mock verdict derivation
+- `src/lib/forbiddenCopy.ts` + `pnpm run verify:forbidden-copy` — doctrine copy guard
+- `public/photos/*` — graded visual assets with runtime fallback behavior
 
 ## Scripts
 

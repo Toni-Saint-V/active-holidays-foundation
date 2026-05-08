@@ -700,8 +700,6 @@ export const MODE_REGISTRY: ModeDefinition[] = [
     ],
     filePatterns: [
       "^src/screens/result/",
-      "^src/screens/trust/",
-      "^src/screens/documents/",
       "^src/screens/human-review/",
       "^src/state/caseStore"
     ],

@@ -17,38 +17,7 @@ export type M1KnownNonScopeRoute = {
   readonly label: string;
 };
 
-export const m1KnownNonScopeRoutes = [
-  {
-    path: "/documents",
-    reason: "supporting_surface",
-    label: "Document support surface, not a public M1 entry point"
-  },
-  {
-    path: "/trust",
-    reason: "supporting_surface",
-    label: "Trust support surface, not a public M1 entry point"
-  },
-  {
-    path: "/notifications",
-    reason: "account_or_notification",
-    label: "Notification surface is outside public M1"
-  },
-  {
-    path: "/profile",
-    reason: "account_or_notification",
-    label: "Account/profile surface is outside public M1"
-  },
-  {
-    path: "/residency-es",
-    reason: "separate_product_vertical",
-    label: "Residency vertical is outside public M1"
-  },
-  {
-    path: "/insurance-adult",
-    reason: "separate_product_vertical",
-    label: "Standalone insurance vertical is outside public M1"
-  }
-] as const satisfies readonly M1KnownNonScopeRoute[];
+export const m1KnownNonScopeRoutes: readonly M1KnownNonScopeRoute[] = [];
 
 export type M1RequiredCapability = {
   readonly id: string;
