@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import {
@@ -139,6 +139,60 @@ export function auditM1Scope(options: {
   };
 }
 
+function walkFiles(dir: string, out: string[] = []): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(fullPath, out);
+      continue;
+    }
+    out.push(fullPath);
+  }
+  return out;
+}
+
+function toPublicRoute(appDir: string, pageFile: string): string {
+  const rel = path.relative(appDir, pageFile).split(path.sep).join("/");
+  if (rel === "page.tsx") return "/";
+
+  const routePath = rel
+    .replace(/\/page\.tsx$/, "")
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .filter((segment) => !segment.startsWith("("))
+    .filter((segment) => !segment.startsWith("@"))
+    .join("/");
+
+  return `/${routePath}`;
+}
+
+function collectNextRoutePaths(appDir: string): string[] {
+  const files = walkFiles(appDir).filter((filePath) => filePath.endsWith("/page.tsx"));
+  const routes = files
+    .map((filePath) => toPublicRoute(appDir, filePath))
+    .filter((routePath) => routePath !== "/_not-found");
+  return uniqueSorted(routes);
+}
+
+function collectNextVisibleHrefPaths(appDir: string): string[] {
+  const files = walkFiles(appDir).filter((filePath) => filePath.endsWith(".tsx"));
+  const routes: string[] = [];
+  const hrefRegex = /href\s*=\s*["'](\/[^"']*)["']/g;
+
+  for (const filePath of files) {
+    const source = readSource(filePath);
+    let match = hrefRegex.exec(source);
+    while (match) {
+      const href = match[1];
+      if (href !== "/_not-found") routes.push(href);
+      match = hrefRegex.exec(source);
+    }
+  }
+
+  return uniqueSorted(routes);
+}
+
 function describeClassification(routePath: string): string {
   const classification: M1RouteClassification = classifyM1Route(routePath);
   if (classification.kind === "allowed_m1") return "allowed M1 route";
@@ -161,12 +215,30 @@ function printList(title: string, values: readonly string[]): void {
 
 function main(): void {
   const root = process.cwd();
-  const report = auditM1Scope({
-    routerSource: readSource(path.join(root, "src/app/router.tsx")),
-    appShellSource: readSource(path.join(root, "src/app/AppShell.tsx"))
-  });
+  const appDir = path.join(root, "src/app");
+  const nextAppPages = collectNextRoutePaths(appDir);
 
-  console.log("M1 scope audit (non-blocking)");
+  const report: M1ScopeAuditReport =
+    nextAppPages.length > 0
+      ? {
+          registeredRoutes: nextAppPages,
+          visibleNavRoutes: collectNextVisibleHrefPaths(appDir),
+          missingAllowedRoutes: m1AllowedPublicRoutes.filter(
+            (routePath) => !nextAppPages.includes(routePath)
+          ),
+          registeredNonM1Routes: nonM1Paths(nextAppPages),
+          visibleNonM1Routes: nonM1Paths(collectNextVisibleHrefPaths(appDir)),
+          unknownRoutes: uniqueSorted([
+            ...unknownPaths(nextAppPages),
+            ...unknownPaths(collectNextVisibleHrefPaths(appDir))
+          ])
+        }
+      : auditM1Scope({
+          routerSource: readSource(path.join(root, "src/app/router.tsx")),
+          appShellSource: readSource(path.join(root, "src/app/AppShell.tsx"))
+        });
+
+  console.log("M1 scope audit");
   printList("Allowed public M1 routes", m1AllowedPublicRoutes);
   printList("Registered routes", report.registeredRoutes);
   printList("Visible nav routes", report.visibleNavRoutes);
@@ -191,7 +263,20 @@ function main(): void {
   }
 
   printList("Unknown route classifications", report.unknownRoutes);
-  console.log("Result: audit only; this command intentionally exits 0 until visible UI gating is approved.");
+
+  const violations = [
+    ...report.missingAllowedRoutes,
+    ...report.registeredNonM1Routes,
+    ...report.visibleNonM1Routes,
+    ...report.unknownRoutes
+  ];
+
+  if (violations.length > 0) {
+    console.error("Result: FAIL (M1 scope violations detected)");
+    process.exit(1);
+  }
+
+  console.log("Result: PASS (M1 scope clean)");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
