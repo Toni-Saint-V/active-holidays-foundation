@@ -30,6 +30,22 @@ const navItems = [
 export function AppShell() {
   const location = useLocation();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const immersiveRoutes = useMemo(
+    () =>
+      new Set([
+        "/",
+        "/intake",
+        "/result",
+        "/human-review",
+        "/documents",
+        "/trust",
+        "/notifications",
+        "/profile",
+        "/residency-es",
+        "/insurance-adult"
+      ]),
+    []
+  );
   const kioskMode = useMemo(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(location.search);
@@ -37,11 +53,7 @@ export function AppShell() {
     const iosStandalone = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
     return params.get("kiosk") === "1" || displayModeStandalone || iosStandalone;
   }, [location.search]);
-  const isImmersive =
-    location.pathname === "/" ||
-    location.pathname === "/result" ||
-    location.pathname === "/residency-es" ||
-    location.pathname === "/insurance-adult";
+  const isImmersive = immersiveRoutes.has(location.pathname);
   const hideAppChrome = isImmersive || kioskMode;
 
   useEffect(() => {
@@ -100,11 +112,12 @@ export function AppShell() {
         <button
           type="button"
           onClick={() => void toggleFullscreen()}
-          className="fixed right-2 top-20 z-40 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface/92 px-2.5 text-[11px] font-semibold text-textPrimary shadow-soft backdrop-blur transition hover:border-borderStrong hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:right-5 sm:top-5 sm:h-11 sm:px-3 sm:text-sm"
+          className="fixed right-2 top-5 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-border bg-surface/92 px-3 text-[11px] font-semibold text-textPrimary shadow-soft backdrop-blur transition hover:border-borderStrong hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:right-5 sm:h-11 sm:px-3.5 sm:text-sm"
           aria-label={isFullscreen ? "Выйти из полноэкранного режима" : "Включить полноэкранный режим"}
+          title={isFullscreen ? "Выйти из полноэкранного режима" : "Включить полноэкранный режим"}
         >
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          <span className="hidden sm:inline">{isFullscreen ? "Свернуть" : "Полный экран"}</span>
+          <span>{isFullscreen ? "Свернуть" : "Полный экран"}</span>
         </button>
 
         {hideAppChrome ? null : (

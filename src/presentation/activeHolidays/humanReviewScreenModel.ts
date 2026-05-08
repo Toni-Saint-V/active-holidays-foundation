@@ -134,24 +134,24 @@ function openRequest(request: HumanReviewRequest | null): HumanReviewRequest | n
 
 function headerDescription(result: ResultPayload, hasOpenReview: boolean): string {
   if (hasOpenReview) {
-    return "Статус запроса живёт на сервере и показывается честно: без выдуманного ETA и без повторного пересчёта кейса.";
+    return "Запрос уже в работе: показываем реальный статус и следующий шаг без лишних обещаний.";
   }
 
   if (result.verdict === "HUMAN_REVIEW") {
-    return "Автомат ушёл в ручную проверку: есть неоднозначности, которые должен закрыть человек.";
+    return "Есть неоднозначности по рискам или данным — кейс должен закрыть эксперт.";
   }
 
-  return "Для этого кейса ручная проверка не обязательна, но можно передать его менеджеру вручную.";
+  return "Ручная проверка не обязательна, но можно передать кейс эксперту для дополнительной верификации.";
 }
 
 function toUserFacingRuleText(explanation: string): string {
   const normalized = explanation.replace(/\s+/g, " ").trim();
   if (!normalized) return "Нужно уточнение по кейсу у менеджера.";
   if (/automation=|evidence|manual_only|R\d{2}|rule|repo=|scope=/i.test(normalized)) {
-    return "Нужно проверить источники и ограничения кейса вручную.";
+    return "Нужно вручную проверить источники и ограничения кейса перед следующим шагом.";
   }
   if (/[A-Za-z]{4,}/.test(normalized)) {
-    return "Обнаружено техническое ограничение — решение передаётся менеджеру.";
+    return "Есть техническое ограничение данных — решение передаётся эксперту.";
   }
   return normalized.length > 170 ? `${normalized.slice(0, 167)}…` : normalized;
 }
@@ -290,7 +290,7 @@ export function buildHumanReviewScreenModel({
                 text:
                   request.durability === "persisted"
                     ? "Статус ручной проверки хранится на сервере и вернётся после обновления страницы или повторного открытия кейса."
-                    : "Статус ручной проверки хранится только в текущей сессии сервера. Если сервер перезапустится, попросим отправить запрос заново, а не покажем фейковый pipeline.",
+                    : "Статус запроса временный: если сессия сбросится, попросим отправить кейс повторно.",
                 tone: "notice" as const
               }
             ]
@@ -341,7 +341,7 @@ export function buildHumanReviewScreenModel({
           primaryActionLabel: "Передать менеджеру",
           secondaryActionLabel: "Открыть кейс",
           availabilityNote:
-            "Обычно отвечаем в течение рабочего дня. Пока backend не стал durable, здесь нет fake ETA и нет обещаний, что статус переживёт restart."
+            "Обычно отвечаем в течение рабочего дня. Если сессия прервётся, попросим отправить кейс повторно, чтобы не показывать недостоверный статус."
         },
     triggersSection:
       triggerItems.length > 0

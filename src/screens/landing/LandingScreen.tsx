@@ -87,7 +87,7 @@ export function LandingScreen() {
       animate="animate"
       className="ah-ambient-frame min-h-screen bg-base"
     >
-      <div className="relative flex min-h-screen w-full max-w-none flex-col gap-6 px-2 py-3 sm:px-3 sm:py-4">
+      <div className="relative flex min-h-screen w-full max-w-none flex-col gap-6 px-0 py-0">
         <motion.div variants={staggerChild}>
           <ScreenHeader
             left={

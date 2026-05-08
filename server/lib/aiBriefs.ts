@@ -83,9 +83,9 @@ function evidenceStatusLabel(status: string): string {
 }
 
 function freshnessStatusLabel(status: string): string {
-  if (status === "fresh") return "актуальны";
-  if (status === "stale") return "устарели";
-  if (status === "unknown") return "неизвестная актуальность";
+  if (status === "fresh") return "подтверждена";
+  if (status === "stale") return "устарела";
+  if (status === "unknown") return "не подтверждена";
   return status;
 }
 
@@ -103,10 +103,18 @@ function normalizeUiCopy(value: string): string {
     .replace(/escalation note/gi, "примечание для эскалации")
     .replace(/evidence gate/gi, "проверка источников")
     .replace(/EVIDENCE_GATE:([A-Z0-9_-]+)/g, "правило источников $1")
+    .replace(/\bautomation=([a-z0-9_-]+)/gi, "режим: $1")
     .replace(/\bstale\b/gi, "устарел")
     .replace(/\bsafe_auto\b/gi, "авто-проверка")
     .replace(/\bmanual_only\b/gi, "только вручную")
     .replace(/\bhuman_review\b/gi, "ручная проверка")
+    .replace(/\bautomation=авто-проверка/gi, "режим: авто-проверка")
+    .replace(/\bR\d{2}\b/gi, "источник")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/\s*:\s*/g, ": ")
+    .replace(/,\s*,/g, ", ")
+    .replace(/\brepo=[^,\s]+/gi, "")
+    .replace(/\bscope=[^,\s]+/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -173,11 +181,35 @@ function fallbackManagerBrief(input: {
   packet: HumanReviewCasePacket;
   operatorContext?: string;
 }): HumanReviewManagerBrief {
+  const userFacingReviewReason = (() => {
+    const normalized = normalizeUiCopy(input.packet.reviewReason);
+    if (
+      /(правило источников|источников источник|режим:\s*авто-проверка|manual_only|evidence|R\\d{2})/i.test(
+        normalized
+      )
+    ) {
+      return "источники требуют ручной проверки перед финальным выводом.";
+    }
+    return normalized;
+  })();
+
+  const normalizeChecklistDetail = (detail: string): string => {
+    const normalized = normalizeUiCopy(detail);
+    if (
+      /(R\d{2}|правило источников|режим:\s*авто-проверка|manual_only|evidence|источников источник)/i.test(
+        normalized
+      )
+    ) {
+      return "Проверка источников требует ручной верификации перед любым выводом по кейсу.";
+    }
+    return normalized;
+  };
+
   const checklist = (input.packet.operatorChecklist ?? [])
     .slice(0, 4)
     .map(
       (item, index) =>
-        `${index + 1}. ${normalizeUiCopy(item.title)} — ${normalizeUiCopy(item.detail)} (${priorityLabel(item.priority)})`
+        `${index + 1}. ${normalizeUiCopy(item.title)}: ${normalizeChecklistDetail(item.detail)} (${priorityLabel(item.priority)})`
     );
 
   const doNotAutoNotes = input.packet.doNotAutoDecideNotes ?? [];
@@ -198,19 +230,19 @@ function fallbackManagerBrief(input: {
   const riskLine = input.packet.riskSummary?.criticalRisk
     ? `Критичный риск: ${input.packet.riskSummary.criticalRisk.label}.`
     : null;
-  const evidenceLine = `Источники ${evidenceStatusLabel(
+  const evidenceLine = `Источники: ${evidenceStatusLabel(
     input.packet.evidence.evidenceStatus
-  )}, актуальность ${freshnessStatusLabel(input.packet.evidence.freshnessStatus)}.`;
+  )}; актуальность ${freshnessStatusLabel(input.packet.evidence.freshnessStatus)}.`;
 
   const replyDraft = [
-    `Принял кейс ${input.caseData.id} в ручную проверку.`,
-    `Сейчас проверяем: ${normalizeUiCopy(input.packet.reviewReason)}.`,
+    `Принял кейс ${input.caseData.title} в ручную проверку.`,
+    `Сейчас проверяем: ${userFacingReviewReason}`,
     evidenceLine,
     docsLine,
     input.packet.scenario
       ? `Сценарий: ${normalizeUiCopy(input.packet.scenario.title)}. Следующий шаг: ${normalizeUiCopy(input.packet.scenario.nextActionLabel)}.`
       : `Следующий шаг из текущего вердикта: ${input.packet.currentResult.nextAction.label}.`,
-    "Проверю документы и ограничения вручную, затем вернусь с точным статусом и следующим действием."
+    "Проверю документы, ограничения и риски вручную, затем вернусь с точным статусом и конкретным следующим действием."
   ]
     .filter(Boolean)
     .join(" ");
@@ -346,15 +378,27 @@ function sanitizeManagerBrief(
   output: z.infer<typeof managerBriefModelSchema>,
   source: "openai" | "fallback"
 ): HumanReviewManagerBrief {
+  const cleanedFirstChecks = output.firstChecks
+    .map((item) => normalizeUiCopy(item))
+    .map((line) => {
+      if (
+        /(правило источников|режим:\s*авто-проверка|источник:\s*устарел|источников источник|manual_only|evidence)/i.test(
+          line
+        )
+      ) {
+        return "Проверить источники и их актуальность: подтвердить свежие данные до любого вывода по кейсу.";
+      }
+      return line;
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+
   const fallback = fallbackManagerBrief(input);
   return humanReviewManagerBriefSchema.parse({
     ...fallback,
     source,
     managerSummary: normalizeUiCopy(output.managerSummary) || fallback.managerSummary,
-    firstChecks:
-      output.firstChecks.map((item) => item.trim()).filter(Boolean).slice(0, 4).length > 0
-        ? output.firstChecks.map((item) => normalizeUiCopy(item)).filter(Boolean).slice(0, 4)
-        : fallback.firstChecks,
+    firstChecks: cleanedFirstChecks.length > 0 ? cleanedFirstChecks : fallback.firstChecks,
     userReplyDraft: normalizeUiCopy(output.userReplyDraft) || fallback.userReplyDraft,
     escalationNote: normalizeUiCopy(output.escalationNote) || fallback.escalationNote,
     disclaimer:

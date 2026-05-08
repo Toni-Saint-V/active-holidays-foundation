@@ -100,11 +100,17 @@ function normalizeUserReason(reason: string | null | undefined): string | null {
   if (!reason) return null;
   const normalized = reason.replace(/\s+/g, " ").trim();
   if (!normalized) return null;
-  if (/automation=|evidence|manual_only|rule|R\d{2}/i.test(normalized)) {
-    return "Есть конфликт или устаревание источников — кейс передаётся на ручную проверку.";
+  if (/EVIDENCE_GATE|evidence|stale|conflict|freshness/i.test(normalized)) {
+    return "Есть конфликт или устаревание источников — автомат не может безопасно подтвердить маршрут.";
+  }
+  if (/manual_only|human_review|automation=|safe_auto/i.test(normalized)) {
+    return "Кейс требует ручной проверки: автомат не завершает решение без оператора.";
+  }
+  if (/rule|R\d{2}/i.test(normalized)) {
+    return "Сработало критичное правило риска — нужен оператор для финального решения.";
   }
   if (/[A-Za-z]{4,}/.test(normalized)) {
-    return "Есть техническое ограничение по данным — нужен оператор для верификации.";
+    return "Есть техническое ограничение по данным — нужна ручная верификация.";
   }
   return normalized.length > 140 ? `${normalized.slice(0, 137)}…` : normalized;
 }
@@ -291,25 +297,38 @@ function aiInsight(
   recommendedScenario: ScenarioLabPayload["scenarios"][number] | null,
   missingDocs: DocumentsReadinessItem[]
 ): ResultScreenModel["ai"] {
+  const criticalRiskDetail = result.criticalRisk?.detail?.trim() || null;
+  const reviewReason =
+    normalizeUserReason(result.trust.humanReviewReason) ??
+    normalizeUserReason(result.trust.blockingReason) ??
+    "Нужна ручная проверка по риску и источникам.";
+
   if (result.verdict === "HUMAN_REVIEW") {
     return {
-      summary: "AI: подготовьте кейс для менеджера — автомат не может честно подтвердить маршрут",
+      summary: "AI: кейс уходит в контур менеджера — сначала закрой причину остановки, потом назначай следующий шаг",
       reasons: [
-        "Система не показывает подтверждённый путь, пока кейс не разберёт человек.",
-        "Лучше передать материалы сразу, чем пытаться пройти дальше вслепую."
+        reviewReason,
+        criticalRiskDetail
+          ? `Критичный риск: ${criticalRiskDetail}`
+          : "До решения оператора не фиксируем обещания пользователю по сроку и исходу."
       ],
-      action: "Следующий шаг: открыть ручную проверку и передать текущий пакет."
+      action:
+        "Следующий шаг: передать кейс менеджеру с контекстом, выпиской и подтверждением ключевого риска."
     };
   }
 
   if (missingDocs.length > 0) {
+    const primaryGap = missingDocs[0];
     return {
-      summary: `AI: сначала ${missingDocs[0].label.toLowerCase()} — это блокирует следующий шаг`,
+      summary: `AI: сначала закрой «${primaryGap.label}» — без этого следующий шаг даёт слабый результат`,
       reasons: [
-        "Движок уже показал рабочий маршрут, но пакет ещё не закреплён.",
-        "Чем раньше закрыть недостающий документ, тем проще следующий переход."
+        `Документный контур сейчас: ${documentsCountLabel(missingDocs.length)} без подтверждения.`,
+        criticalRiskDetail
+          ? `Параллельно держим под контролем риск: ${criticalRiskDetail}`
+          : "Сначала закрепляем обязательный пакет, потом открываем переход по маршруту."
       ],
-      action: "Следующий шаг: открыть документы и закрыть обязательный чеклист."
+      action:
+        "Следующий шаг: открыть документы, закрыть первый блокер и только после этого переходить к действию."
     };
   }
 
@@ -319,45 +338,47 @@ function aiInsight(
       recommendedScenario.safetyStatus === "human_review_only"
     ) {
       return {
-        summary: `AI: сценарий «${recommendedScenario.title}» нельзя запускать автоматически`,
+        summary: `AI: сценарий «${recommendedScenario.title}» не готов к авто-переходу`,
         reasons: [
-          recommendedScenario.blockingReason ??
-            recommendedScenario.humanReviewReason ??
-            "Движок требует ручной проверки до любого следующего шага.",
-          "Сценарий остаётся видимым как причина остановки, а не как совет к действию."
+          normalizeUserReason(recommendedScenario.blockingReason) ??
+            normalizeUserReason(recommendedScenario.humanReviewReason) ??
+            "Сценарий требует ручной верификации перед запуском.",
+          "Используем его как диагностический сигнал риска, а не как мгновенный план действий."
         ],
-        action: "Следующий шаг: открыть ручную проверку и передать материалы менеджеру."
+        action: "Следующий шаг: передать сценарий менеджеру и закрепить безопасный маршрут вручную."
       };
     }
 
     if (recommendedScenario.safetyStatus === "degraded_usable") {
       return {
-        summary: `AI: «${recommendedScenario.title}» — запасной сценарий, не улучшение`,
+        summary: `AI: «${recommendedScenario.title}» — допустимый fallback, но не лучший путь`,
         reasons: [
-          "Он может быть применим, но уступает текущему маршруту по части результата.",
-          "Сравнение нужно читать как fallback, а не как рекомендацию заменить основной путь."
+          "Сценарий рабочий, но по качеству уступает текущему маршруту по ключевым условиям.",
+          "Его стоит держать как страхующий вариант, а не переключать пользователя немедленно."
         ],
-        action: "Следующий шаг: сравнить сценарий с текущим маршрутом перед любым переключением."
+        action:
+          "Следующий шаг: сравнить сценарии по документам и рискам, затем принимать решение о переключении."
       };
     }
 
     return {
-      summary: `AI: проверьте сценарий «${recommendedScenario.title}» — он может усилить путь`,
+      summary: `AI: сценарий «${recommendedScenario.title}» может усилить текущий маршрут`,
       reasons: [
-        "У вас уже есть рабочий маршрут, поэтому сравнение помогает улучшать, а не спасать кейс.",
-        "Сценарии ниже не подменяют основной путь и остаются compare-only."
+        "Базовый маршрут уже рабочий, поэтому сравнение используется для усиления качества, а не для спасения кейса.",
+        "Решение о переключении принимается только после сверки рисков и следующего действия."
       ],
-      action: "Следующий шаг: открыть сценарии и сравнить усиление без смены базового маршрута."
+      action:
+        "Следующий шаг: открыть сравнение и подтвердить, что усиление не увеличивает операционные риски."
     };
   }
 
   return {
-    summary: "AI: маршрут подтверждён — можно переходить к следующему действию",
+    summary: "AI: маршрут подтверждён — фокус на дисциплине исполнения шага без отклонений",
     reasons: [
-      "Основной путь уже зафиксирован детерминированным движком.",
-      "Сейчас важно не распыляться и пройти основной шаг без лишних отклонений."
+      "Ключевые сигналы уже согласованы и путь не требует экстренного пересмотра.",
+      "Максимальный эффект сейчас даёт точное выполнение следующего шага в нужной последовательности."
     ],
-    action: `Следующий шаг: ${result.nextAction.label}.`
+    action: `Следующий шаг: ${result.nextAction.label}. Зафиксируй выполнение и вернись к проверке статуса.`
   };
 }
 

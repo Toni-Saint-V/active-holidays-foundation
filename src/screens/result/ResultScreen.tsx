@@ -139,7 +139,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
 
   if (!activeResult || !activeCase) {
     return (
-      <div className="min-h-screen bg-base px-2 py-3 sm:px-3 sm:py-4">
+      <div className="min-h-screen bg-base px-0 py-0">
         <div className="flex min-h-screen w-full items-center justify-center bg-surface/30">
           <p className="text-sm text-textSecondary">Собираем результат по кейсу…</p>
         </div>
@@ -187,7 +187,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         variants={staggerParent}
         initial="initial"
         animate="animate"
-        className="ah-ambient-frame min-h-screen bg-base px-2 py-3 sm:px-3 sm:py-4"
+        className="ah-ambient-frame min-h-screen bg-base px-0 py-0"
       >
         {heroImage ? (
           <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
