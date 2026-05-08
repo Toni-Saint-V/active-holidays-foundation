@@ -1,6 +1,6 @@
 ---
 name: ah-backend-contracts
-description: Active Holidays: backend/domain/contracts. Используй для routes, shared contracts, decision engine, persistence, reliability, bugfix root cause и production hardening.
+description: 'Active Holidays: backend/domain/contracts. Используй для routes, shared contracts, decision engine, persistence, reliability, bugfix root cause и production hardening.'
 ---
 
 # AH Backend Contracts
@@ -34,4 +34,3 @@ Keep server, shared contracts, domain logic, and persistence correct and extenda
 - No server-only data leaks to browser code.
 - No raw storage shapes in UI.
 - No silent contract drift.
-

@@ -1,6 +1,6 @@
 ---
 name: ah-super-operator
-description: Active Holidays: максимальный execution режим. Используй для broad/high-stakes задач, когда нужно собрать лучший микс skills, agents, проверки, review и handoff без mega-prompt шума.
+description: 'Active Holidays: максимальный execution режим. Используй для broad/high-stakes задач, когда нужно собрать лучший микс skills, agents, проверки, review и handoff без mega-prompt шума.'
 ---
 
 # AH Super Operator

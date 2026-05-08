@@ -1,6 +1,6 @@
 ---
 name: ah-control-protocol
-description: Active Holidays: главный протокол работы. Используй для старта сложной задачи, выбора режима, PNG-gate для UI, JSON/handoff дисциплины и защиты от лишних действий.
+description: 'Active Holidays: главный протокол работы. Используй для старта сложной задачи, выбора режима, PNG-gate для UI, JSON/handoff дисциплины и защиты от лишних действий.'
 ---
 
 # AH Control Protocol

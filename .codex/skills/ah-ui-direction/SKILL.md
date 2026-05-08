@@ -1,6 +1,6 @@
 ---
 name: ah-ui-direction
-description: Active Holidays: UI направление и макеты. Используй для PNG-концепта, визуальной критики, hierarchy, CTA, mobile-first, copy и premium restraint до реализации.
+description: 'Active Holidays: UI направление и макеты. Используй для PNG-концепта, визуальной критики, hierarchy, CTA, mobile-first, copy и premium restraint до реализации.'
 ---
 
 # AH UI Direction
@@ -36,4 +36,3 @@ Define a strong UI direction before implementation.
 - No UI implementation before approved PNG.
 - No generic SaaS card soup.
 - No decorative complexity that weakens the decision flow.
-

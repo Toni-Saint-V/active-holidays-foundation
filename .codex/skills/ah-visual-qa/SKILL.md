@@ -1,6 +1,6 @@
 ---
 name: ah-visual-qa
-description: Active Holidays: проверка UI и сценариев. Используй для Playwright, screenshots, browser sanity, golden scenarios и proof перед сдачей.
+description: 'Active Holidays: проверка UI и сценариев. Используй для Playwright, screenshots, browser sanity, golden scenarios и proof перед сдачей.'
 ---
 
 # AH Visual QA
@@ -34,4 +34,3 @@ Prove the changed product surface works in real conditions.
 - No "done" without verification.
 - Screenshots are proof after implementation, not a substitute for pre-implementation PNG approval.
 - Do not hide unrun checks.
-

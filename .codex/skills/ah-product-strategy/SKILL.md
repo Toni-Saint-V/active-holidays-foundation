@@ -1,6 +1,6 @@
 ---
 name: ah-product-strategy
-description: Active Holidays: продуктовая задача. Используй для определения следующего сильного шага, Notion/Lovable/Cursor handoff, продуктовой критики и phase-gate решений.
+description: 'Active Holidays: продуктовая задача. Используй для определения следующего сильного шага, Notion/Lovable/Cursor handoff, продуктовой критики и phase-gate решений.'
 ---
 
 # AH Product Strategy
@@ -32,4 +32,3 @@ Turn product ambiguity into one strong executable next step.
 - Do not invent user stories, labels, metrics, or source-of-truth facts.
 - Do not turn product tasks into technical busywork.
 - Keep next steps concrete and executable.
-

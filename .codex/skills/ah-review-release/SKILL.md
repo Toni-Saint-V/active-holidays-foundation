@@ -1,6 +1,6 @@
 ---
 name: ah-review-release
-description: Active Holidays: ревью и релиз. Используй для bank-grade review, multi-lens review, QA self-review, release readiness, merge/block verdict и фикса findings.
+description: 'Active Holidays: ревью и релиз. Используй для bank-grade review, multi-lens review, QA self-review, release readiness, merge/block verdict и фикса findings.'
 ---
 
 # AH Review Release
@@ -35,4 +35,3 @@ Make ship/block decisions based on findings and proof, not vibes.
 - Do not praise.
 - Do not call work complete with failing checks.
 - Do not bury blockers under summary.
-

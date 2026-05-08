@@ -1,6 +1,6 @@
 ---
 name: ah-ai-trust-layer
-description: Active Holidays: AI/trust слой. Используй для OpenAI recommendations, prompts, cache/state, fallback, observability и границы "AI explains, engine decides".
+description: 'Active Holidays: AI/trust слой. Используй для OpenAI recommendations, prompts, cache/state, fallback, observability и границы "AI explains, engine decides".'
 ---
 
 # AH AI Trust Layer
@@ -36,4 +36,3 @@ Keep AI useful while preventing it from owning deterministic decisions.
 - AI never overrides deterministic verdicts, ranking ownership, or human-review escalation.
 - No hidden fallback that looks like a confident AI answer.
 - Prompts must be grounded in current JSON facts.
-
