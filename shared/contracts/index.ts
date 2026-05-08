@@ -25,5 +25,6 @@ export * from "./decisions";
 export * from "./health";
 export * from "./scenarioLab";
 export * from "./recommendations";
+export * from "./aiBriefs";
 export * from "./m1Scope";
 export * from "./publicReadiness";

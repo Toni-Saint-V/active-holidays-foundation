@@ -1,6 +1,7 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
 import {
+  humanReviewManagerBriefRequestSchema,
   caseOverrideSchema,
   caseSignalsSchema,
   signalValueSchema,
@@ -11,6 +12,7 @@ import {
   humanReviewTransitionRequestSchema,
   humanReviewTransitionResponseSchema,
   pathPreferencesSchema,
+  recommendationWhatIfBriefRequestSchema,
   recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
   caseSummarySchema,
@@ -32,6 +34,10 @@ import {
 } from "../lib/humanReviewLearning";
 import { getHumanReviewLearningStore } from "../lib/humanReviewLearningStore";
 import { extractHumanReviewBlockers } from "../lib/humanReviewBlockers";
+import {
+  buildHumanReviewManagerBrief,
+  buildRecommendationWhatIfBrief,
+} from "../lib/aiBriefs";
 import {
   buildRecommendationDetail,
   buildRecommendationShortlist,
@@ -291,6 +297,43 @@ export function casesRouter(): Router {
   );
 
   router.post(
+    "/:id/recommendations/what-if-brief",
+    validateParams(caseIdParams),
+    validateBody(recommendationWhatIfBriefRequestSchema),
+    async (req, res) => {
+      const id = getId(req);
+      const baselineCase = requireCase(id);
+      const payload = recommendationWhatIfBriefRequestSchema.parse(req.body);
+      const candidateCase = requireCase(payload.candidateCaseId);
+
+      if (!ensureSameScenarioFamily(getCaseStore(), baselineCase.id, candidateCase.id)) {
+        throw new HttpError(
+          400,
+          "What-if brief можно собирать только для сценариев из одной fork-цепочки.",
+          "scenario_family_mismatch"
+        );
+      }
+
+      const comparison = buildScenarioCompareResponse({
+        store: getCaseStore(),
+        baselineCase,
+        candidateCase,
+        computeResult
+      }).comparison;
+
+      const brief = await buildRecommendationWhatIfBrief({
+        caseId: baselineCase.id,
+        candidateCaseId: candidateCase.id,
+        offerId: payload.offerId,
+        offerLabel: payload.offerLabel,
+        comparison
+      });
+
+      res.json(brief);
+    }
+  );
+
+  router.post(
     "/:id/signals",
     validateParams(caseIdParams),
     validateBody(z.object({ signals: caseSignalsSchema })),
@@ -417,6 +460,33 @@ export function casesRouter(): Router {
     const packet = buildHumanReviewCasePacket({ caseData, request, result });
     res.json(humanReviewCasePacketResponseSchema.parse({ packet }));
   });
+
+  router.post(
+    "/:id/human-review/manager-brief",
+    validateParams(caseIdParams),
+    validateBody(humanReviewManagerBriefRequestSchema.default({})),
+    async (req, res) => {
+      const caseData = requireCase(getId(req));
+      const request = getCaseStore().activeHumanReviewFor(caseData.id);
+      if (!request) {
+        throw new HttpError(
+          404,
+          `Для кейса ${caseData.id} нет активного запроса ручной проверки.`,
+          "human_review_packet_not_found"
+        );
+      }
+      const payload = humanReviewManagerBriefRequestSchema.parse(req.body);
+      const result = computeResult(caseData);
+      const packet = buildHumanReviewCasePacket({ caseData, request, result });
+      const brief = await buildHumanReviewManagerBrief({
+        caseData,
+        request,
+        packet,
+        operatorContext: payload.operatorContext
+      });
+      res.json(brief);
+    }
+  );
 
   router.post(
     "/:id/human-review",

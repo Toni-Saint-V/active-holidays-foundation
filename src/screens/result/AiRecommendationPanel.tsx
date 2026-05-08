@@ -4,6 +4,7 @@ import type {
   RecommendationDetail,
   RecommendationFit,
   RecommendationShortlist,
+  RecommendationWhatIfBrief,
   ScenarioLabCompareResponse
 } from "@shared/contracts";
 import { ApiError, apiClient } from "@/lib/apiClient";
@@ -70,6 +71,11 @@ export function AiRecommendationPanel({
     Record<string, ScenarioLabCompareResponse>
   >({});
   const [compareErrors, setCompareErrors] = useState<Record<string, string>>({});
+  const [whatIfStatus, setWhatIfStatus] = useState<Record<string, Status>>({});
+  const [whatIfBriefs, setWhatIfBriefs] = useState<Record<string, RecommendationWhatIfBrief>>(
+    {}
+  );
+  const [whatIfErrors, setWhatIfErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +91,9 @@ export function AiRecommendationPanel({
       setCompareLoadingOfferId(null);
       setCompareResults({});
       setCompareErrors({});
+      setWhatIfStatus({});
+      setWhatIfBriefs({});
+      setWhatIfErrors({});
 
       try {
         const response = await apiClient.recommendationShortlist(caseId);
@@ -154,6 +163,9 @@ export function AiRecommendationPanel({
   );
   const activeCompare = selectedOfferId ? compareResults[selectedOfferId] ?? null : null;
   const activeCompareError = selectedOfferId ? compareErrors[selectedOfferId] ?? null : null;
+  const activeWhatIfBrief = selectedOfferId ? whatIfBriefs[selectedOfferId] ?? null : null;
+  const activeWhatIfError = selectedOfferId ? whatIfErrors[selectedOfferId] ?? null : null;
+  const activeWhatIfStatus = selectedOfferId ? whatIfStatus[selectedOfferId] ?? "idle" : "idle";
   const comparison = activeCompare?.comparison ?? null;
   const compareBaselineTone = comparison
     ? verdictTone[comparison.baseline.outcome.verdict]
@@ -200,6 +212,34 @@ export function AiRecommendationPanel({
       }));
     } finally {
       setCompareLoadingOfferId((current) => (current === offerId ? null : current));
+    }
+  }
+
+  async function handleBuildWhatIfBrief() {
+    if (!activeDetail || !activeCompare) return;
+    const offerId = activeDetail.offerId;
+    setWhatIfStatus((current) => ({ ...current, [offerId]: "loading" }));
+    setWhatIfErrors((current) => {
+      const next = { ...current };
+      delete next[offerId];
+      return next;
+    });
+
+    try {
+      const response = await apiClient.recommendationWhatIfBrief(caseId, {
+        candidateCaseId: activeCompare.candidateCase.id,
+        offerId: activeDetail.offerId,
+        offerLabel: activeDetail.title
+      });
+      setWhatIfBriefs((current) => ({ ...current, [offerId]: response }));
+      setWhatIfStatus((current) => ({ ...current, [offerId]: "ready" }));
+    } catch (error) {
+      setWhatIfStatus((current) => ({ ...current, [offerId]: "error" }));
+      setWhatIfErrors((current) => ({
+        ...current,
+        [offerId]:
+          error instanceof Error ? error.message : "Не удалось собрать AI-вывод по what-if."
+      }));
     }
   }
 
@@ -496,6 +536,71 @@ export function AiRecommendationPanel({
                     <p className="mt-1 text-sm text-textSecondary">
                       {comparison.candidate.actionPlan.detail}
                     </p>
+                  </div>
+
+                  <div className="rounded-xl border border-ai/25 bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-textMuted">
+                          What-if Copilot
+                        </p>
+                        <p className="mt-1 text-sm text-textSecondary">
+                          Короткий AI-вывод по текущему compare: что реально изменилось и что делать дальше.
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={activeWhatIfBrief ? "secondary" : "primary"}
+                        loading={activeWhatIfStatus === "loading"}
+                        onClick={() => void handleBuildWhatIfBrief()}
+                      >
+                        {activeWhatIfBrief ? "Обновить AI-вывод" : "Собрать AI-вывод"}
+                      </Button>
+                    </div>
+
+                    {activeWhatIfError ? (
+                      <p className="mt-3 text-sm text-textSecondary">{activeWhatIfError}</p>
+                    ) : null}
+
+                    {activeWhatIfBrief ? (
+                      <div className="mt-3 grid gap-3">
+                        <div className="rounded-xl bg-surface p-3">
+                          <p className="text-sm font-semibold text-textPrimary">
+                            {activeWhatIfBrief.headline}
+                          </p>
+                          <p className="mt-1 text-sm text-textSecondary">
+                            {activeWhatIfBrief.verdictDeltaSummary}
+                          </p>
+                          <p className="mt-1 text-sm text-textSecondary">
+                            {activeWhatIfBrief.confidenceDeltaSummary}
+                          </p>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <div className="rounded-xl bg-surface p-3">
+                            <p className="text-[11px] uppercase tracking-wide text-textMuted">
+                              Приоритетные шаги
+                            </p>
+                            <ul className="mt-2 grid gap-2 text-sm text-textPrimary">
+                              {activeWhatIfBrief.priorityActions.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="rounded-xl bg-surface p-3">
+                            <p className="text-[11px] uppercase tracking-wide text-textMuted">
+                              Риск-callout
+                            </p>
+                            <p className="mt-2 text-sm text-textPrimary">
+                              {activeWhatIfBrief.riskCallout}
+                            </p>
+                            <p className="mt-2 text-xs text-textSecondary">
+                              {activeWhatIfBrief.operatorNote}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-textMuted">{activeWhatIfBrief.disclaimer}</p>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3">

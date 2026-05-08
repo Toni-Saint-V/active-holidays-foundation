@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Briefcase, Phone } from "lucide-react";
+import { Briefcase, Copy, Phone, Sparkles } from "lucide-react";
 import { useCaseStore } from "@/state/caseStore";
-import type { HumanReviewChannel } from "@shared/contracts";
+import type { HumanReviewChannel, HumanReviewManagerBrief } from "@shared/contracts";
 import { Badge, Button, Card, Chip } from "@/ui/primitives";
 import { RiskPulse } from "@/ui/RiskPulse";
 import { TimelineStep } from "@/ui/TimelineStep";
@@ -12,6 +12,7 @@ import { useScreenView } from "@/instrumentation/screenView";
 import { useToast } from "@/ui/Toast";
 import { staggerChild, staggerParent } from "@/animations/variants";
 import { findHumanReviewCaseId } from "@/lib/caseDefaults";
+import { apiClient } from "@/lib/apiClient";
 import { buildHumanReviewScreenModel } from "@/presentation/activeHolidays";
 
 export function HumanReviewScreen() {
@@ -23,6 +24,11 @@ export function HumanReviewScreen() {
   const [channel, setChannel] = useState<HumanReviewChannel>("email");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
+  const [managerBriefStatus, setManagerBriefStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [managerBrief, setManagerBrief] = useState<HumanReviewManagerBrief | null>(null);
+  const [managerBriefError, setManagerBriefError] = useState<string | null>(null);
   const caseIdFromUrl = searchParams.get("case");
   const {
     activeCase,
@@ -93,6 +99,9 @@ export function HumanReviewScreen() {
     setChannel("email");
     setContact("");
     setMessage("");
+    setManagerBriefStatus("idle");
+    setManagerBrief(null);
+    setManagerBriefError(null);
   }, [activeCase?.id]);
 
   if (status === "error") {
@@ -166,6 +175,36 @@ export function HumanReviewScreen() {
         error instanceof Error ? error.message : "Не удалось отправить запрос менеджеру.",
         "error"
       );
+    }
+  }
+
+  async function handleGenerateManagerBrief() {
+    if (!activeCase) return;
+    setManagerBriefStatus("loading");
+    setManagerBriefError(null);
+    try {
+      const brief = await apiClient.humanReviewManagerBrief(activeCase.id, {
+        operatorContext: message.trim() || undefined
+      });
+      if (!mountedRef.current) return;
+      setManagerBrief(brief);
+      setManagerBriefStatus("ready");
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setManagerBriefStatus("error");
+      setManagerBriefError(
+        error instanceof Error ? error.message : "Не удалось собрать AI-пакет менеджеру."
+      );
+    }
+  }
+
+  async function handleCopyManagerDraft() {
+    if (!managerBrief) return;
+    try {
+      await navigator.clipboard.writeText(managerBrief.userReplyDraft);
+      toast.push("Черновик ответа скопирован в буфер.", "success");
+    } catch {
+      toast.push("Не удалось скопировать черновик.", "error");
     }
   }
 
@@ -367,6 +406,78 @@ export function HumanReviewScreen() {
                     {note}
                   </p>
                 ))}
+              </div>
+            ) : null}
+          </Card>
+        </motion.section>
+      )}
+
+      {screenModel.packetSection && (
+        <motion.section variants={staggerChild}>
+          <Card>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-textPrimary">AI-пакет менеджеру</p>
+                <p className="mt-1 text-sm text-textSecondary">
+                  Собираем короткий handoff: summary, first checks и черновик ответа пользователю.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                leadingIcon={<Sparkles className="h-4 w-4" />}
+                loading={managerBriefStatus === "loading"}
+                onClick={() => void handleGenerateManagerBrief()}
+              >
+                {managerBrief ? "Обновить пакет" : "Собрать пакет"}
+              </Button>
+            </div>
+
+            {managerBriefError ? (
+              <div className="mt-3 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                {managerBriefError}
+              </div>
+            ) : null}
+
+            {managerBrief ? (
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-xl bg-surface-2 px-4 py-3">
+                  <p className="text-sm font-medium text-textPrimary">{managerBrief.managerSummary}</p>
+                </div>
+
+                <div className="rounded-xl bg-surface-2 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-textMuted">Первые проверки</p>
+                  <ul className="mt-2 grid gap-2 text-sm text-textPrimary">
+                    {managerBrief.firstChecks.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl bg-surface-2 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-textMuted">Черновик ответа пользователю</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-textPrimary">
+                    {managerBrief.userReplyDraft}
+                  </p>
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      leadingIcon={<Copy className="h-4 w-4" />}
+                      onClick={() => void handleCopyManagerDraft()}
+                    >
+                      Копировать черновик
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.18em] text-amber-100">
+                    Escalation note
+                  </p>
+                  <p className="mt-2 text-sm text-amber-100/90">{managerBrief.escalationNote}</p>
+                </div>
+
+                <p className="text-xs text-textMuted">{managerBrief.disclaimer}</p>
               </div>
             ) : null}
           </Card>
