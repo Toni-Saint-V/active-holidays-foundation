@@ -70,6 +70,10 @@ vi.mock("./ResultCompareSurface", () => ({
 }));
 
 const useCaseStoreMock = vi.mocked(useCaseStore);
+const routerFuture = {
+  v7_relativeSplatPath: true,
+  v7_startTransition: true
+} as const;
 
 function createStore(overrides: Partial<Record<string, unknown>> = {}) {
   const activeResult = {
@@ -243,7 +247,13 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 function renderScreen(screenNode: ReactNode, initialEntries = ["/"]) {
-  return render(<MemoryRouter initialEntries={initialEntries}>{screenNode}</MemoryRouter>);
+  return (
+    render(
+      <MemoryRouter future={routerFuture} initialEntries={initialEntries}>
+        {screenNode}
+      </MemoryRouter>
+    )
+  );
 }
 
 describe("ResultScreen", () => {

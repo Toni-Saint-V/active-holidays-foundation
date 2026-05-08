@@ -53,6 +53,10 @@ vi.mock("@/ui/Toast", () => ({
 }));
 
 const useCaseStoreMock = vi.mocked(useCaseStore);
+const routerFuture = {
+  v7_relativeSplatPath: true,
+  v7_startTransition: true
+} as const;
 
 function createStore(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -161,7 +165,7 @@ function createStore(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 function renderScreen(node: ReactNode) {
-  return render(<MemoryRouter>{node}</MemoryRouter>);
+  return render(<MemoryRouter future={routerFuture}>{node}</MemoryRouter>);
 }
 
 describe("HumanReviewScreen", () => {
@@ -220,7 +224,7 @@ describe("HumanReviewScreen", () => {
       })
     );
     view.rerender(
-      <MemoryRouter>
+      <MemoryRouter future={routerFuture}>
         <HumanReviewScreen />
       </MemoryRouter>
     );
