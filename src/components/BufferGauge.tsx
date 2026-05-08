@@ -19,10 +19,10 @@ export function BufferGauge({ days }: { days: number }) {
         />
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>Порог</span>
+        <span>Критично</span>
         <span>Буфер</span>
-        <span>С запасом</span>
-        <span>Безопасно</span>
+        <span>Запас</span>
+        <span>ОК</span>
       </div>
     </div>
   )

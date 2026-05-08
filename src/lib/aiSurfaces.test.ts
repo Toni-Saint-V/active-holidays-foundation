@@ -37,4 +37,33 @@ describe('screen AI quality gate', () => {
       expect(output.quality.criteria.every((criterion) => criterion.score >= 90)).toBe(true)
     }
   })
+
+  it('keeps public AI copy compact and hides internal scoring language', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+
+    const landing = await buildLandingAi({ country: 'IT' })
+    const result = await buildResultAi({
+      country: 'IT',
+      verdict: 'GO_WITH_CONDITIONS',
+      daysToTrip: 18,
+      departureDate: '2026-06-20',
+      returnDate: '2026-06-29',
+      topRisk: 'Очереди в визовых центрах май–август.',
+      missingItems: [],
+    })
+
+    const visibleCopy = [
+      landing.title,
+      ...landing.bullets,
+      landing.note,
+      result.title,
+      ...result.timeline.flatMap((item) => [item.horizon, item.action]),
+      result.contrarian,
+      result.tripwire,
+    ].join(' ')
+
+    expect(visibleCopy).not.toMatch(/90\/100|порог|fallback|Критерий качества/i)
+    expect(landing.bullets.every((item) => item.length <= 54)).toBe(true)
+    expect(result.timeline.every((item) => item.action.length <= 72)).toBe(true)
+  })
 })

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import planeImg from '../../public/photos/plane.webp'
 import { AHEyebrow } from '@/components/AHEyebrow'
-import { AIQualityBadge } from '@/components/AIQualityBadge'
 import { AmberCTA } from '@/components/AmberCTA'
 import { CountryChipCard } from '@/components/CountryChipCard'
 import { PlaneMotif } from '@/components/PlaneMotif'
@@ -17,10 +16,16 @@ import type { CountryCode } from '@/lib/constants'
 
 const COUNTRY_ORDER: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
 const LANDING_FALLBACK_BULLETS = [
-  'Главный выигрыш даёт ранняя фиксация окна подачи, а не подача в последний момент.',
-  'Качество одного связного пакета документов важнее объёма случайных вложений.',
-  'Если дедлайн близко, безопаснее заранее переключаться на ручную проверку.',
+  'Сначала проверяем окно подачи и слот.',
+  'Потом сверяем деньги, даты и маршрут.',
+  'Если есть разрыв — ведём к эксперту.',
 ]
+
+function compactText(value: string | undefined, fallback: string, max = 96) {
+  const text = (value ?? fallback).replace(/\s+/g, ' ').trim()
+  if (text.length <= max) return text
+  return `${text.slice(0, max - 1).trim()}…`
+}
 
 export default function LandingPage() {
   const router = useRouter()
@@ -28,6 +33,7 @@ export default function LandingPage() {
   const [planeImageBroken, setPlaneImageBroken] = useState(false)
   const [aiInsight, setAiInsight] = useState<LandingAiOutput | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const visibleBullets = aiInsight?.bullets ?? LANDING_FALLBACK_BULLETS
 
   const selectedLabel = useMemo(() => {
     if (!selectedCountry) return 'Выберите страну — покажем окно подачи и главный риск.'
@@ -98,22 +104,31 @@ export default function LandingPage() {
 
           <div className="mt-3 min-h-20 text-[12px] font-light text-muted-foreground/50">{selectedLabel}</div>
 
-          <div className="mt-4 rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/10 to-transparent p-4">
-            <div className="ah-eyebrow">AI СЛОЙ</div>
-            <p className="mt-1 text-[15px] font-semibold text-primary">
-              {aiInsight?.title ?? 'AI Навигатор момента'}
+          <div className="mt-4 border-y border-primary/20 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="ah-eyebrow">AI-фокус</div>
+              <span className="h-2 w-2 shrink-0 rounded-full ah-glow-dot" aria-hidden />
+            </div>
+            <p className="mt-2 max-w-[520px] text-[15px] font-semibold leading-snug text-primary">
+              {aiInsight?.title ?? 'Фокус: окно подачи'}
             </p>
-            {aiLoading ? (
-              <p className="mt-2 text-[13px] text-foreground/70">Собираем персональную стратегию для вашего кейса…</p>
-            ) : (
-              <ul className="mt-2 space-y-2 text-[13px] leading-snug text-foreground/85">
-                {(aiInsight?.bullets ?? LANDING_FALLBACK_BULLETS).map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-3 text-[12px] text-muted-foreground">{aiInsight?.note ?? 'Выберите страну и обновите подсказку.'}</p>
-            <AIQualityBadge quality={aiInsight?.quality} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {visibleBullets.slice(0, 3).map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-foreground/78"
+                >
+                  {compactText(item, 'Проверить ключевой риск', 54)}
+                </span>
+              ))}
+            </div>
+            <p className="mt-3 max-w-[460px] text-[12px] leading-snug text-muted-foreground">
+              {compactText(
+                aiLoading && !aiInsight ? 'Базовый фокус уже готов; уточняем по выбранной стране.' : aiInsight?.note,
+                'Выберите страну — покажем главное узкое место.',
+                92
+              )}
+            </p>
           </div>
 
           <div className="mt-12">

@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { AHInsight } from '@/components/AHInsight'
-import { AIQualityBadge } from '@/components/AIQualityBadge'
 import { AmberCTA } from '@/components/AmberCTA'
 import { BufferGauge } from '@/components/BufferGauge'
 import { MockPreviewBadge } from '@/components/MockPreviewBadge'
@@ -32,17 +31,23 @@ const VERDICT_TABS: VerdictKind[] = ['GO', 'GO_WITH_CONDITIONS', 'NOT_NOW', 'HUM
 const RESULT_FALLBACK_TIMELINE = [
   {
     horizon: '0–24 ч',
-    action: 'Соберите финальный список документов в одном порядке.',
+    action: 'Проверьте даты, бронь, билеты и выписку.',
   },
   {
     horizon: '24–48 ч',
-    action: 'Проверьте целостность дат и подтверждений.',
+    action: 'Зафиксируйте слот или резервный сценарий.',
   },
   {
     horizon: '48–72 ч',
-    action: 'Зафиксируйте следующий шаг и не размазывайте фокус по новым задачам.',
+    action: 'Соберите финальный пакет перед оплатой.',
   },
 ]
+
+function compactText(value: string | undefined, fallback: string, max = 84) {
+  const text = (value ?? fallback).replace(/\s+/g, ' ').trim()
+  if (text.length <= max) return text
+  return `${text.slice(0, max - 1).trim()}…`
+}
 
 function parseCountry(value: string | null): CountryCode {
   if (!value) return 'IT'
@@ -88,6 +93,8 @@ export function ResultPageClient() {
     : derivedVerdict
 
   const countryEntry = COUNTRIES[country]
+  const riskyDocuments = countryEntry.documents.filter((doc) => doc.flag === 'risk')
+  const primaryDocuments = countryEntry.documents.slice(0, 2)
   const hasBlur = Boolean(IMAGE_BLURS[country])
   const missingItems = useMemo(() => {
     const misses: string[] = []
@@ -114,6 +121,11 @@ export function ResultPageClient() {
     if (returnDate) qp.set('return', returnDate)
     return `/human-review?${qp.toString()}`
   }, [country, departureDate, returnDate, verdict])
+  const visibleTimeline = resultAi?.timeline ?? RESULT_FALLBACK_TIMELINE
+  const visibleTripwire =
+    resultAi?.tripwire ?? (daysToTrip <= 14 ? 'Если нет финального пакета сегодня — ведите к эксперту.' : 'Если слот или выписка не подтверждены — не двигайте кейс дальше.')
+  const visibleContrarian =
+    resultAi?.contrarian ?? 'Не добавляйте документы “для веса”: сначала уберите противоречие в датах и деньгах.'
 
   useEffect(() => {
     let cancelled = false
@@ -193,39 +205,55 @@ export function ResultPageClient() {
           <BufferGauge days={daysToTrip} />
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <section className="ah-card-base rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+        <div className="mt-8 grid grid-cols-1 border-y border-white/10 md:grid-cols-3">
+          <section className="border-b border-white/10 py-4 md:border-b-0 md:border-r md:border-white/10 md:pr-5">
             <div className="ah-eyebrow">Окно подачи</div>
-            <p className="mt-2 text-[14px] text-foreground/90">{countryEntry.optimalWindow}</p>
-            <span
-              className={cn(
-                'mt-3 inline-flex h-2.5 w-2.5 rounded-full',
-                verdict === 'GO'
-                  ? 'bg-ok'
-                  : verdict === 'NOT_NOW'
-                    ? 'bg-warn'
-                    : verdict === 'HUMAN_REVIEW'
-                      ? 'bg-foreground/70'
-                      : 'bg-primary'
-              )}
-            />
+            <div className="mt-2 flex items-center gap-2">
+              <span
+                className={cn(
+                  'inline-flex h-2.5 w-2.5 rounded-full',
+                  verdict === 'GO'
+                    ? 'bg-ok'
+                    : verdict === 'NOT_NOW'
+                      ? 'bg-warn'
+                      : verdict === 'HUMAN_REVIEW'
+                        ? 'bg-foreground/70'
+                        : 'bg-primary'
+                )}
+              />
+              <p className="text-[15px] font-medium text-foreground/92">{countryEntry.optimalWindow}</p>
+            </div>
           </section>
 
-          <section className="ah-card-base rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+          <section className="border-b border-white/10 py-4 md:border-b-0 md:border-r md:border-white/10 md:px-5">
             <div className="ah-eyebrow">Документы</div>
-            <ul className="mt-2 space-y-2 text-[13px]">
-              {countryEntry.documents.map((doc) => (
-                <li key={doc.name} className={doc.flag === 'risk' ? 'text-primary' : 'text-ok'}>
-                  <span className="mr-2">{doc.flag === 'risk' ? '⚠' : '✓'}</span>
-                  <span className="text-foreground/88">{doc.name}</span>
-                </li>
+            <p className="mt-2 text-[15px] font-medium text-foreground/92">
+              {countryEntry.documents.length} пунктов · {riskyDocuments.length || 'без'} риск
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {primaryDocuments.map((doc) => (
+                <span key={doc.name} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-foreground/72">
+                  {compactText(doc.name, doc.name, 42)}
+                </span>
               ))}
-            </ul>
+            </div>
+            <details className="mt-3 text-[12px] text-muted-foreground">
+              <summary className="inline-flex min-h-[44px] cursor-pointer items-center text-primary">Показать список</summary>
+              <ul className="mt-1 space-y-1.5">
+                {countryEntry.documents.map((doc) => (
+                  <li key={doc.name} className={doc.flag === 'risk' ? 'text-primary' : 'text-foreground/78'}>
+                    {doc.flag === 'risk' ? '⚠' : '✓'} {doc.name}
+                  </li>
+                ))}
+              </ul>
+            </details>
           </section>
 
-          <section className="ah-card-base rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+          <section className="py-4 md:pl-5">
             <div className="ah-eyebrow">Главный риск</div>
-            <p className="mt-2 text-[13px] leading-snug text-foreground/85">{countryEntry.topRisk}</p>
+            <p className="mt-2 text-[15px] font-medium leading-snug text-foreground/92">
+              {compactText(countryEntry.topRisk, countryEntry.topRisk, 118)}
+            </p>
           </section>
         </div>
 
@@ -233,29 +261,37 @@ export function ResultPageClient() {
           <AHInsight>{VERDICT_INSIGHT[verdict]}</AHInsight>
         </div>
 
-        <section className="mt-6 rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/10 to-transparent p-4">
-          <div className="ah-eyebrow">AI СЛОЙ</div>
-          <p className="mt-1 text-[16px] font-semibold text-primary">
-            {resultAi?.title ?? 'AI План атаки 72 часа'}
-          </p>
-
-          {resultAiLoading ? (
-            <p className="mt-2 text-[13px] text-foreground/70">Собираем сценарный план по вашему вердикту…</p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                {(resultAi?.timeline ?? RESULT_FALLBACK_TIMELINE).map((step) => (
-                  <div key={`${step.horizon}:${step.action}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                    <div className="text-[11px] uppercase tracking-[0.12em] text-primary">{step.horizon}</div>
-                    <p className="mt-1 text-[12px] leading-snug text-foreground/85">{step.action}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[13px] text-foreground/88">Контринсайт: {resultAi?.contrarian ?? 'Уточняем стратегию...'}</p>
-              <p className="text-[13px] text-orange-300">Триггер риска: {resultAi?.tripwire ?? 'Уточняем триггер...'}</p>
-              <AIQualityBadge quality={resultAi?.quality} />
+        <section className="mt-6 border-y border-primary/20 py-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="ah-eyebrow">AI-фокус</div>
+              <p className="mt-1 max-w-[620px] text-[16px] font-semibold leading-snug text-primary">
+                {compactText(resultAi?.title, 'Фокус на 72 часа', 72)}
+              </p>
             </div>
-          )}
+            <p className="max-w-[360px] text-[12px] leading-snug text-foreground/72 md:text-right">
+              {compactText(visibleTripwire, 'Если ключевой документ не подтверждён — ведём к эксперту.', 96)}
+            </p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {visibleTimeline.map((step) => (
+              <div key={`${step.horizon}:${step.action}`} className="border-l border-white/10 pl-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-primary">{step.horizon}</div>
+                <p className="mt-1 text-[11px] leading-snug text-foreground/78">
+                  {compactText(step.action, 'Проверить ключевой риск.', 64)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 max-w-[760px] text-[12px] leading-snug text-muted-foreground">
+            {compactText(
+              resultAiLoading && !resultAi ? `${visibleContrarian} Уточняем детали.` : visibleContrarian,
+              'Не расширяйте пакет: сначала уберите противоречия в датах и документах.',
+              128
+            )}
+          </p>
         </section>
 
         <div className="mt-8 space-y-3">

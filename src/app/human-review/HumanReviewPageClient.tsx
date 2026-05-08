@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
-import { AIQualityBadge } from '@/components/AIQualityBadge'
 import { AmberCTA } from '@/components/AmberCTA'
 import { MockPreviewBadge } from '@/components/MockPreviewBadge'
 import { RouteMap } from '@/components/RouteMap'
@@ -161,7 +160,7 @@ export function HumanReviewPageClient() {
 
         {aiPack && (
           <section className="mt-4 rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/10 to-transparent p-4">
-            <div className="ah-eyebrow">AI СЛОЙ</div>
+            <div className="ah-eyebrow">Бриф эксперта</div>
             <p className="mt-1 text-[16px] font-semibold text-primary">{aiPack.title}</p>
             <p className="mt-2 text-[13px] text-foreground/88">{aiPack.urgency}</p>
 
@@ -184,7 +183,6 @@ export function HumanReviewPageClient() {
             </div>
 
             <p className="mt-3 text-[13px] text-foreground/88">{aiPack.packetSummary}</p>
-            <AIQualityBadge quality={aiPack.quality} />
             <button
               type="button"
               onClick={() => setContext((prev) => (prev ? `${prev}\n\n${aiPack.packetSummary}` : aiPack.packetSummary))}

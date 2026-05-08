@@ -43,7 +43,7 @@ type QualityStatus = AiQuality['status']
 
 const AI_QUALITY_THRESHOLD = 90
 const EXPERT_SYSTEM_RULES =
-  'Качество ниже 90/100 запрещено. Пиши как топ-эксперт по визовым кейсам: конкретно, проверяемо, с риском, следующим действием и без общих фраз. Не обещай результат, не давай юридических гарантий, не используй проценты успеха.'
+  'Слабые и общие ответы запрещены. Пиши как топ-эксперт по визовым кейсам: конкретно, проверяемо, с риском, следующим действием и без общих фраз. Не обещай результат, не давай юридических гарантий, не используй проценты успеха.'
 
 let cachedClient: OpenAI | null | undefined
 
@@ -210,7 +210,7 @@ function evaluateQuality(args: {
     score,
     threshold: AI_QUALITY_THRESHOLD,
     status: score >= AI_QUALITY_THRESHOLD ? args.status : 'fallback_upgraded',
-    label: score >= AI_QUALITY_THRESHOLD ? 'Экспертный уровень 90+/100' : 'Ответ заменён экспертным fallback',
+    label: score >= AI_QUALITY_THRESHOLD ? 'Готово для публичного интерфейса' : 'Заменено на экспертный текст',
     criteria,
   }
 }
@@ -267,13 +267,13 @@ function fallbackLanding(input: LandingAiInput): LandingAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'ваша страна'
   const draft = {
     source: 'fallback',
-    title: 'AI Навигатор момента',
+    title: 'Фокус: не страна, а узкое место',
     bullets: [
-      `Для направления «${country}» сначала фиксируйте окно подачи и слот: это главный рычаг, если до вылета меньше 30 дней.`,
-      'Соберите одну непротиворечивую связку: даты поездки, бронь проживания, билеты и финансовые подтверждения без разрывов.',
-      'Следующий шаг сегодня: проверьте слот, выписку и маршрут до оплаты страховки; если есть разрыв, включайте ручную проверку.',
+      `${country}: проверьте окно подачи`,
+      'Соберите финансы, даты, бронь, маршрут',
+      'Уточните слот; риск в датах — эксперту',
     ],
-    note: 'Критерий качества: подсказка должна дать риск, действие и ближайший шаг, иначе она заменяется fallback.',
+    note: 'Следующий шаг сегодня: проверьте окно подачи.',
   } satisfies Omit<LandingAiOutput, 'quality'>
 
   return withQuality({
@@ -296,7 +296,7 @@ export async function buildLandingAi(input: LandingAiInput): Promise<LandingAiOu
         constraints: {
           bullets: 3,
           tone: 'премиальный, экспертный, практичный, без банальности',
-          qualityThreshold: AI_QUALITY_THRESHOLD,
+          maxVisibleCharsPerBullet: 54,
         },
         context: {
           country: input.country ? COUNTRY_LABEL[input.country] : null,
@@ -364,7 +364,7 @@ export async function buildIntakeAi(input: IntakeAiInput): Promise<IntakeAiOutpu
         constraints: {
           rewriteMaxChars: 320,
           proofPoints: '2-3 пункта',
-          qualityThreshold: AI_QUALITY_THRESHOLD,
+          outputStyle: 'short expert rewrite, no generic reassurance',
         },
         context: {
           country: input.country ? COUNTRY_LABEL[input.country] : null,
@@ -404,26 +404,26 @@ function fallbackResult(input: ResultAiInput): ResultAiOutput {
   const country = COUNTRY_LABEL[input.country]
   const draft = {
     source: 'fallback',
-    title: 'AI План атаки 72 часа',
+    title: 'AI-фокус: снять один риск, не раздувать пакет',
     timeline: [
       {
         horizon: '0–24 ч',
-        action: `Закройте критичный разрыв по «${country}»: проверьте даты, бронь жилья, билеты и финансовые файлы одной версией.`,
+        action: `${country}: проверьте даты, бронь, билеты и выписку.`,
       },
       {
         horizon: '24–48 ч',
-        action: 'Соберите финальный пакет в одном порядке, подготовьте резервный слот подачи и проверьте срок возврата паспорта.',
+        action: 'Зафиксируйте слот или резервный сценарий подачи.',
       },
       {
         horizon: '48–72 ч',
-        action: `Проведите финальный контроль риска «${input.topRisk}» и переходите к действию по текущему вердикту без лишних итераций.`,
+        action: 'Соберите финальный пакет перед оплатой и отправкой.',
       },
     ],
-    contrarian: 'Контринтуитивно, но лишние «улучшения» в последний день чаще вредят: важнее не добавить документ, а убрать противоречие в датах.',
+    contrarian: 'Не добавляйте документы “для веса”: сначала уберите противоречие в датах, деньгах и маршруте.',
     tripwire:
       input.daysToTrip <= 14
-        ? 'Тревожный триггер: если нет финального пакета сегодня, переключайтесь на ручную проверку без ожидания.'
-        : 'Тревожный триггер: если ключевой документ не подтверждён за 72 часа, пересоберите маршрут подачи.',
+        ? 'Если сегодня нет финального пакета, ведите кейс к эксперту.'
+        : `Триггер: ${input.topRisk}`,
   } satisfies Omit<ResultAiOutput, 'quality'>
 
   return withQuality({
@@ -456,7 +456,7 @@ export async function buildResultAi(input: ResultAiInput): Promise<ResultAiOutpu
           returnDate: input.returnDate ?? null,
           topRisk: input.topRisk,
           missingItems: input.missingItems ?? [],
-          qualityThreshold: AI_QUALITY_THRESHOLD,
+          outputStyle: 'short premium signal, no long paragraphs',
         },
       },
       null,
@@ -545,7 +545,7 @@ export async function buildHumanReviewAi(input: HumanReviewAiInput): Promise<Hum
           fullName: input.fullName,
           contact: input.contact,
           context: input.context ?? '',
-          qualityThreshold: AI_QUALITY_THRESHOLD,
+          outputStyle: 'operator brief, concise and specific',
         },
       },
       null,

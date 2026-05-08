@@ -4,7 +4,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
-import { AIQualityBadge } from '@/components/AIQualityBadge'
 import { StepRail } from '@/components/StepRail'
 import { fetchIntakeAi } from '@/lib/aiSurfaceClient'
 import type { IntakeAiOutput } from '@/lib/aiSurfaceContracts'
@@ -274,7 +273,7 @@ export function IntakePageClient() {
 
                   {intakeAi && (
                     <div className="rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/10 to-transparent p-4">
-                      <div className="ah-eyebrow">AI СЛОЙ</div>
+                      <div className="ah-eyebrow">AI-редактор</div>
                       <p className="mt-1 text-[15px] font-semibold text-primary">{intakeAi.title}</p>
                       <p className="mt-2 text-[13px] leading-snug text-foreground/90">{intakeAi.rewrite}</p>
                       <button
@@ -290,7 +289,6 @@ export function IntakePageClient() {
                         ))}
                       </ul>
                       <p className="mt-2 text-[12px] text-muted-foreground">{intakeAi.riskAngle}</p>
-                      <AIQualityBadge quality={intakeAi.quality} />
                     </div>
                   )}
                 </>
