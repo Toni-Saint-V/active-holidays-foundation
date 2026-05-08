@@ -17,7 +17,7 @@ Use this file after [index.md](/Users/user/Projects/active-holidays-foundation/.
 - Start with the `Core` bundle only. Add `Optional` skills only when the touched surface truly needs them.
 - If `orchestrationMode.status` is `enabled`, scan all matching packs/candidates and load every relevant skill for the real risk surface instead of stopping at the first two.
 - If visible Russian copy changes, add `ah-ui-direction`.
-- If the task is non-trivial, finish with `ah-review-release`, `ah-review-release`, and `ah-review-release`.
+- If the task is non-trivial, finish with `ah-review-release`.
 - If the task is a review, PR gate, or merge-readiness check, add `ah-review-release`.
 - If the task touches result, trust, compare, recommendation, or `human-review`, add `ah-review-release`.
 - If the task touches `.cursor/mcp.json`, `.agents/plugins/marketplace.json`, or `plugins/*/.codex-plugin/plugin.json`, add `ah-repo-automation`.
@@ -46,14 +46,11 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
 
 ### AI recommendation boundary fix
 
 Core:
 
-- `ah-ai-trust-layer`
-- `ah-ai-trust-layer`
 - `ah-ai-trust-layer`
 - `ah-review-release`
 - `ah-visual-qa`
@@ -62,15 +59,12 @@ Optional:
 
 - `ah-backend-contracts` when degraded-state UX or retry logic changes
 - `ah-ai-trust-layer` when prompt text or model payload changes
-- `ai-observability` when request-path visibility or source flags change
-- `ah-ai-trust-layer` only when model/tool behavior itself changes
+- `.codex/skills/_internal/ai-observability.md` when request-path visibility or source flags change
 - `ah-result-flow` only when the result-loop UI contract changes
 - `ah-ui-direction` when disclaimers or recommendation copy changes
 
 Finish:
 
-- `ah-review-release`
-- `ah-review-release`
 - `ah-review-release`
 
 ### Structured contract or schema change
@@ -79,7 +73,6 @@ Core:
 
 - `ah-backend-contracts`
 - `ah-visual-qa`
-- `ah-backend-contracts`
 
 Optional:
 
@@ -91,15 +84,12 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
-- `ah-review-release`
 
 ### Result flow integration change
 
 Core:
 
 - `ah-result-flow`
-- `ah-ui-direction`
 - `ah-ui-direction`
 - `ah-review-release`
 - `ah-ui-implementation`
@@ -114,8 +104,6 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
-- `ah-review-release`
 
 ### Premium UI or UX refinement
 
@@ -123,10 +111,7 @@ Core:
 
 - `ah-control-protocol`
 - `ah-ui-implementation`
-- `ah-ui-implementation`
 - `ah-ui-direction`
-- `ah-ui-direction`
-- `ah-ui-implementation`
 
 Optional:
 
@@ -138,8 +123,6 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
-- `ah-review-release`
 
 ### Reliability or fallback hardening
 
@@ -147,9 +130,7 @@ Core:
 
 - `ah-backend-contracts`
 - `ah-ai-trust-layer`
-- `ah-backend-contracts`
 - `ah-review-release`
-- `ah-backend-contracts`
 
 Optional:
 
@@ -161,15 +142,12 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
-- `ah-review-release`
 
 ### Regression-test expansion
 
 Core:
 
 - `ah-visual-qa`
-- `ah-review-release`
 - `ah-review-release`
 
 Optional:
@@ -182,7 +160,6 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
 
 ### Plugin / MCP surface governance
 
@@ -190,7 +167,6 @@ Use this bundle only when plugin or MCP surface is the actual dominant problem, 
 
 Core:
 
-- `ah-repo-automation`
 - `ah-repo-automation`
 - `ah-backend-contracts`
 
@@ -203,15 +179,11 @@ Optional:
 Finish:
 
 - `ah-review-release`
-- `ah-review-release`
-- `ah-review-release`
 
 ### Final multi-lens review of a moderate change
 
 Core:
 
-- `ah-review-release`
-- `ah-review-release`
 - `ah-review-release`
 
 Optional:

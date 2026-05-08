@@ -10,6 +10,17 @@
 - Prefer the strongest real implementation over broad fake completeness.
 - Repo-local custom Codex skills live in `.codex/skills` and should stay versioned with the repository when they affect this project's workflow.
 
+## Source Of Truth Order
+
+- Follow `AI_ROUTER.md` as the root entrypoint and canonical truth-order contract for execution.
+- Truth precedence is:
+  1. repo code, contracts, and tests
+  2. `AGENTS.md`
+  3. `docs/product-canon-v1.md`
+  4. relevant `.codex/skills/*` docs
+  5. Notion only when the task explicitly requires it
+  6. `reports/*` as evidence only, not active instruction
+
 ## Project Ownership Rules
 
 - Keep the whole Active Holidays project in view, not just the current file or isolated task.
@@ -20,7 +31,7 @@
 
 ## Notion Discipline Rules
 
-- When Notion is part of the workflow and access exists, treat it as a living source of truth, not passive reference material.
+- When Notion is part of the workflow and access exists, treat it as a living external source and keep it aligned with repo reality.
 - Reconcile repo reality with Notion before making major planning, scope, or status claims.
 - Keep task framing, progress, and execution state aligned between the implementation and Notion.
 - After meaningful progress, scope change, or decision change, update the relevant Notion artifact or prepare the exact update block immediately.
@@ -81,7 +92,10 @@
 - `skill-system-governance` is not a new abstraction layer; it is the maintenance mode for the existing router and operating docs.
 - Move to `plugin-surface` only when plugin or MCP files are the dominant changed surface.
 
-## Phase 1 Boundary
+## Phase 1 Boundary (Historical Scaffold)
+
+- This boundary is historical context from early scaffold work.
+- It is not an active delivery gate for current repo tasks.
 
 - Allowed: scaffold, routing, theme, tooling, client shell, server health route.
 - Deferred: decision engine, data model, real API routes, AI interactions.

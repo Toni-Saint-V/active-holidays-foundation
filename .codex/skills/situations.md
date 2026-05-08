@@ -24,7 +24,7 @@ For every non-trivial task:
 - keep ordinary discussion natural, but structure specs, handoffs, risks and acceptance criteria
 - if UI code is involved, stop for PNG approval before implementation
 - use deep orchestration only when the task is broad, ambiguous, high-risk, or explicitly asks for skill/subagent planning
-- finish non-trivial work with `ah-review-release`, `ah-review-release`, and `ah-review-release`
+- finish non-trivial work with `ah-review-release`
 
 ## Situation Map
 
@@ -42,7 +42,7 @@ Use when the owner asks for the next strongest task, daily control, roadmap focu
 Use when changing visible UI, layout, spacing, hierarchy, components, CTA weight, or Russian on-screen copy.
 
 - `primary_mode`: `premium-ui`
-- core skills: `ah-ui-implementation`, `ah-ui-implementation`, `ah-ui-direction`, `ah-ui-direction`, `ah-ui-implementation`
+- core skills: `ah-ui-implementation`, `ah-ui-direction`
 - add: `ah-visual-qa` for browser proof, `ah-visual-qa` for motion/dense UI
 - hard gate: PNG preview and explicit approval before UI code
 - verify: targeted UI tests, browser screenshot proof when implemented, `npm run typecheck`
@@ -52,7 +52,7 @@ Use when changing visible UI, layout, spacing, hierarchy, components, CTA weight
 Use when preparing or reviewing a Lovable task, especially route-level UI work.
 
 - `primary_mode`: `premium-ui` for UI surfaces; `skill-system-governance` if the work is only prompt/process cleanup
-- core skills: `ah-control-protocol`, `ah-product-strategy`, `ah-ui-direction`, `ah-ui-direction`
+- core skills: `ah-control-protocol`, `ah-product-strategy`, `ah-ui-direction`
 - add: `ah-backend-contracts` when the prompt risks backend/domain/API drift
 - output: one route or coherent flow, static `?state=` fixtures, exact Russian copy, explicit forbidden scope
 - hard ban: backend, stores, services, API wiring, localStorage, telemetry, invented labels/copy
@@ -62,7 +62,7 @@ Use when preparing or reviewing a Lovable task, especially route-level UI work.
 Use when improving the decision loop after intake.
 
 - `primary_mode`: `result-flow`
-- core skills: `ah-result-flow`, `ah-ui-direction`, `ah-ui-direction`, `ah-review-release`, `ah-ui-implementation`
+- core skills: `ah-result-flow`, `ah-ui-direction`, `ah-review-release`, `ah-ui-implementation`
 - add: `ah-backend-contracts` for route/state/contracts, `ah-ai-trust-layer` for compare/recommendation semantics
 - output: strengthened existing loop, not a detached side screen
 - verify: targeted component/integration tests, `npm run typecheck`
@@ -72,8 +72,8 @@ Use when improving the decision loop after intake.
 Use when AI touches recommendations, explanations, prompt text, fallback behavior, or ownership boundaries.
 
 - `primary_mode`: `ai-recommendation-boundary`
-- core skills: `ah-ai-trust-layer`, `ah-ai-trust-layer`, `ah-ai-trust-layer`, `ah-review-release`, `ah-visual-qa`
-- add: `ah-ai-trust-layer` for prompts, `ai-observability` for generation-path visibility, `ah-ai-trust-layer` for tool behavior
+- core skills: `ah-ai-trust-layer`, `ah-review-release`, `ah-visual-qa`
+- add: `ah-ai-trust-layer` for prompts and tool behavior, `.codex/skills/_internal/ai-observability.md` for generation-path visibility
 - rule: AI explains current facts; deterministic engine owns verdicts, ranking, next actions and compare outcomes
 - verify: recommendation tests, route integration tests, `npm run typecheck`, `npm run verify:engine` if semantics changed
 
@@ -82,7 +82,7 @@ Use when AI touches recommendations, explanations, prompt text, fallback behavio
 Use when changing shared payloads, route validation, API callers, screen models, or cross-layer types.
 
 - `primary_mode`: `contract-boundary`
-- core skills: `ah-backend-contracts`, `ah-visual-qa`, `ah-backend-contracts`
+- core skills: `ah-backend-contracts`, `ah-visual-qa`
 - add: `ah-backend-contracts` if driven by a defect, `ah-product-strategy` for rollout notes
 - rule: update contract and real callers together; do not leave compatibility guesses
 - verify: targeted contract/route tests, `npm run typecheck`, `npm run test`
@@ -92,7 +92,7 @@ Use when changing shared payloads, route validation, API callers, screen models,
 Use when something fails, disappears, leaks across cases, or breaks under partial data.
 
 - `primary_mode`: `reliability-hardening`
-- core skills: `ah-backend-contracts`, `ah-backend-contracts`, `ah-ai-trust-layer`, `ah-backend-contracts`, `ah-review-release`
+- core skills: `ah-backend-contracts`, `ah-ai-trust-layer`, `ah-review-release`
 - add: `ah-visual-qa` when deterministic semantics may drift
 - output: root cause, smallest safe fix, degraded state remains useful
 - verify: regression test for the failure, `npm run typecheck`
@@ -102,7 +102,7 @@ Use when something fails, disappears, leaks across cases, or breaks under partia
 Use when the main job is adding proof, not changing product behavior.
 
 - `primary_mode`: `regression-proof`
-- core skills: `ah-visual-qa`, `ah-review-release`, `ah-review-release`
+- core skills: `ah-visual-qa`, `ah-review-release`
 - add: `ah-backend-contracts` for contract coverage, `ah-review-release` for trust-critical flows
 - output: narrow regression proof tied to a known risk
 - verify: targeted test command, `npm run verify:engine` when engine/scenario semantics are involved
@@ -112,7 +112,7 @@ Use when the main job is adding proof, not changing product behavior.
 Use when the user asks "can this merge?", "review", "findings", or final ship/block status.
 
 - `primary_mode`: `review-gate`
-- core skills: `ah-review-release`, `ah-review-release`, `ah-review-release`, `ah-review-release`
+- core skills: `ah-review-release`
 - add: `ah-review-release` for result/trust/AI/user-facing diffs
 - output: findings first, ordered by severity; then residual risk and verification gaps
 - rule: no "ready" without evidence
@@ -138,7 +138,7 @@ Deep orchestration hotkeys:
 Use when plugin or MCP files are the dominant changed surface.
 
 - `primary_mode`: `plugin-surface`
-- core skills: `ah-repo-automation`, `ah-repo-automation`, `ah-backend-contracts`
+- core skills: `ah-repo-automation`, `ah-backend-contracts`
 - add: global `plugin-creator` only when a real repo-local plugin scaffold is justified
 - rule: prefer existing runtime plugins and shared skills before adding a local plugin
 - verify: relevant plugin/MCP checks and repo-local skill checks
@@ -158,16 +158,16 @@ Use when the implementation is done or the main output is a transferable artifac
 | Situation | Primary mode | First skills |
 | --- | --- | --- |
 | Next task / control brief | detected by `skills:autopilot` | `ah-repo-automation`, `ah-product-strategy` |
-| UI / visual / CTA | `premium-ui` | `ah-ui-implementation`, `ah-ui-implementation`, `ah-ui-direction` |
+| UI / visual / CTA | `premium-ui` | `ah-ui-implementation`, `ah-ui-direction` |
 | Lovable prompt | `premium-ui` or `skill-system-governance` | `ah-product-strategy`, `ah-ui-direction` |
 | Result loop | `result-flow` | `ah-result-flow`, `ah-review-release` |
-| AI recommendation | `ai-recommendation-boundary` | `ah-ai-trust-layer`, `ah-ai-trust-layer` |
+| AI recommendation | `ai-recommendation-boundary` | `ah-ai-trust-layer`, `ah-review-release` |
 | Contract/API/schema | `contract-boundary` | `ah-backend-contracts`, `ah-visual-qa` |
-| Bug/fallback | `reliability-hardening` | `ah-backend-contracts`, `ah-backend-contracts` |
+| Bug/fallback | `reliability-hardening` | `ah-backend-contracts`, `ah-ai-trust-layer` |
 | Tests/proof | `regression-proof` | `ah-visual-qa`, `ah-review-release` |
-| Review/merge | `review-gate` | `ah-review-release`, `ah-review-release` |
+| Review/merge | `review-gate` | `ah-review-release` |
 | Skills/automations/router | `skill-system-governance` | `ah-repo-automation`, `ah-backend-contracts` |
-| Plugin/MCP | `plugin-surface` | `ah-repo-automation`, `ah-repo-automation` |
+| Plugin/MCP | `plugin-surface` | `ah-repo-automation`, `ah-backend-contracts` |
 | Docs/handoff | work's existing mode | `ah-product-strategy`, `ah-review-release` |
 
 ## Efficiency Rule
