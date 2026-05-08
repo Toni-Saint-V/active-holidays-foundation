@@ -62,8 +62,15 @@ import {
 
 const DEFAULT_BASE = (() => {
   if (typeof window === "undefined") return "http://localhost:3001";
-  const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:3001`;
+  const envBase = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+    ?.VITE_API_BASE;
+  if (envBase && envBase.trim().length > 0) return envBase.trim().replace(/\/+$/, "");
+
+  const { protocol, hostname, origin } = window.location;
+  const isLocalHost =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  if (isLocalHost) return `${protocol}//${hostname}:3001`;
+  return origin;
 })();
 
 let baseUrl = DEFAULT_BASE;
