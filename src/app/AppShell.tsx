@@ -1,6 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  Maximize2,
+  Minimize2,
   Bell,
   Briefcase,
   FileText,
@@ -27,6 +29,7 @@ const navItems = [
 
 export function AppShell() {
   const location = useLocation();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const kioskMode = useMemo(() => {
     if (typeof window === "undefined") return false;
     const params = new URLSearchParams(location.search);
@@ -40,6 +43,14 @@ export function AppShell() {
     location.pathname === "/residency-es" ||
     location.pathname === "/insurance-adult";
   const hideAppChrome = isImmersive || kioskMode;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const sync = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
 
   useEffect(() => {
     if (!kioskMode || typeof document === "undefined") return;
@@ -63,6 +74,19 @@ export function AppShell() {
     };
   }, [kioskMode]);
 
+  async function toggleFullscreen() {
+    if (typeof document === "undefined") return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Browser policy may block fullscreen without explicit gesture in some contexts.
+    }
+  }
+
   return (
     <ToastProvider>
       <div
@@ -73,6 +97,16 @@ export function AppShell() {
             : "max-w-none px-0 pb-28 pt-0 sm:pb-0"
         ].join(" ")}
       >
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className="fixed right-2 top-20 z-40 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface/92 px-2.5 text-[11px] font-semibold text-textPrimary shadow-soft backdrop-blur transition hover:border-borderStrong hover:bg-surface2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:right-5 sm:top-5 sm:h-11 sm:px-3 sm:text-sm"
+          aria-label={isFullscreen ? "Выйти из полноэкранного режима" : "Включить полноэкранный режим"}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          <span className="hidden sm:inline">{isFullscreen ? "Свернуть" : "Полный экран"}</span>
+        </button>
+
         {hideAppChrome ? null : (
           <header className="sticky top-0 z-20 mb-3 border-b border-border bg-surface/92 px-4 py-3 shadow-soft backdrop-blur sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">

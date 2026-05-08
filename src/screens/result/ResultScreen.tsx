@@ -139,8 +139,8 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
 
   if (!activeResult || !activeCase) {
     return (
-      <div className="min-h-screen bg-base px-4 py-5 sm:px-6">
-        <div className="flex min-h-[calc(100dvh-40px)] w-full items-center justify-center bg-surface/30">
+      <div className="min-h-screen bg-base px-2 py-3 sm:px-3 sm:py-4">
+        <div className="flex min-h-screen w-full items-center justify-center bg-surface/30">
           <p className="text-sm text-textSecondary">Собираем результат по кейсу…</p>
         </div>
       </div>
@@ -187,7 +187,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
         variants={staggerParent}
         initial="initial"
         animate="animate"
-        className="ah-ambient-frame min-h-screen bg-base px-4 py-5 sm:px-6"
+        className="ah-ambient-frame min-h-screen bg-base px-2 py-3 sm:px-3 sm:py-4"
       >
         {heroImage ? (
           <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -200,7 +200,7 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
             <div className="absolute inset-0 bg-base/44" />
           </div>
         ) : null}
-        <div className="relative flex min-h-[calc(100dvh-40px)] w-full max-w-none flex-col gap-4">
+        <div className="relative flex min-h-screen w-full max-w-none flex-col gap-4">
           {heroImage && destinationLabel ? (
             <div className="pointer-events-none absolute right-0 top-16 z-10 rounded-2xl border border-white/15 bg-black/25 p-1.5 backdrop-blur-sm">
               <div className="h-20 w-20 overflow-hidden rounded-xl border border-white/10">
@@ -275,14 +275,14 @@ export function ResultScreen({ productType, screenName = "result" }: ResultScree
           </motion.section>
 
           <motion.section variants={staggerChild} className="grid gap-4">
-            <div className="flex items-end justify-between gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="grid gap-1">
                 <SectionLabel tone="need">{model.workSection.eyebrow}</SectionLabel>
-                <h2 className="text-[32px] font-extrabold leading-[1] tracking-[-0.03em] text-textPrimary">
+                <h2 className="break-words text-[28px] font-extrabold leading-[1] tracking-[-0.03em] text-textPrimary sm:text-[32px]">
                   {model.workSection.heading}
                 </h2>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex w-full items-center gap-4 sm:w-auto">
                 <UtilityLink onClick={() => setSheet("basis")}>Основание</UtilityLink>
                 <UtilityLink onClick={() => setSheet("compare")}>Сравнить</UtilityLink>
               </div>

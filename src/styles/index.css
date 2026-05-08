@@ -40,6 +40,7 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
 }
 
 html,
@@ -49,12 +50,22 @@ body,
   margin: 0;
 }
 
+html {
+  scrollbar-width: none;
+}
+
 body {
   background: var(--color-base);
   scrollbar-width: none;
 }
 
 body::-webkit-scrollbar {
+  display: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 

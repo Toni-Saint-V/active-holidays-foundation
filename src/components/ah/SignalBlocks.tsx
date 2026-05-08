@@ -68,12 +68,12 @@ export function AIInsightChip({
       <button
         type="button"
         onClick={onToggle}
-        className="ah-ai-breathe inline-flex min-h-[44px] items-center gap-3 rounded-full border border-ai/25 bg-surface2 px-4 py-2 text-left transition hover:border-ai/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai/40"
+        className="ah-ai-breathe inline-flex min-h-[44px] items-start gap-3 rounded-[24px] border border-ai/25 bg-surface2 px-4 py-2 text-left transition hover:border-ai/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai/40 sm:items-center sm:rounded-full"
       >
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-ai/18 text-ai">
           <Sparkles className="h-3.5 w-3.5" />
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-textPrimary">
+        <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-textPrimary">
           {summary}
         </span>
       </button>

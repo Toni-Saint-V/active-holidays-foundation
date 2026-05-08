@@ -52,7 +52,7 @@ export function SemanticBridge({
           : undefined
       }
       className={cn(
-        "rounded-[32px] border border-border bg-[rgba(11,12,15,0.92)] px-5 py-5 shadow-soft",
+        "rounded-[28px] border border-border bg-[rgba(11,12,15,0.92)] px-3 py-4 shadow-soft sm:rounded-[32px] sm:px-5 sm:py-5",
         className
       )}
     >
@@ -61,9 +61,9 @@ export function SemanticBridge({
         <BridgeChip align="right">{rightChip}</BridgeChip>
       </div>
 
-      <div className="relative mt-8">
-        <div className="ah-route-line absolute left-5 right-5 top-[18px] h-[4px] rounded-full bg-route/55" />
-        <div className="relative flex items-start justify-between px-5">
+      <div className="relative mt-6 sm:mt-8">
+        <div className="ah-route-line absolute left-3 right-3 top-[18px] h-[4px] rounded-full bg-route/55 sm:left-5 sm:right-5" />
+        <div className="relative flex items-start justify-between px-3 sm:px-5">
           {nodes.map((node, index) => {
             const isActive = node.id === activeNodeId;
             return (
@@ -75,7 +75,7 @@ export function SemanticBridge({
                   event.stopPropagation();
                   onNodeSelect?.(node.id);
                 }}
-                className="relative flex w-[96px] flex-col items-center gap-6 text-center transition focus-visible:outline-none"
+                className="relative flex w-[84px] flex-col items-center gap-4 text-center transition focus-visible:outline-none sm:w-[96px] sm:gap-6"
                 style={{
                   marginLeft: index === 0 ? 0 : undefined,
                   marginRight: index === nodes.length - 1 ? 0 : undefined
@@ -90,7 +90,7 @@ export function SemanticBridge({
                 />
                 <span
                   className={cn(
-                    "text-[11px] font-bold uppercase tracking-[0.24em]",
+                    "text-[10px] font-bold uppercase tracking-[0.16em] sm:text-[11px] sm:tracking-[0.24em]",
                     isActive ? "text-textPrimary" : "text-textMuted"
                   )}
                 >
@@ -115,7 +115,7 @@ function BridgeChip({
   return (
     <div
       className={cn(
-        "inline-flex h-11 items-center rounded-full border border-border bg-surface2 px-5 text-xl font-semibold text-textPrimary",
+        "inline-flex min-h-[44px] items-center rounded-full border border-border bg-surface2 px-4 py-1.5 text-lg font-semibold leading-tight text-textPrimary sm:h-11 sm:px-5 sm:py-0 sm:text-xl",
         align === "right" && "justify-end text-right"
       )}
     >

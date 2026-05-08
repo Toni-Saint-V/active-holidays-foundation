@@ -413,23 +413,28 @@ export function HumanReviewScreen() {
       )}
 
       {screenModel.packetSection && (
-        <motion.section variants={staggerChild}>
+        <motion.section variants={staggerChild} className="mx-auto w-full max-w-[980px]">
           <Card>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+            <div className="grid gap-4">
+              <div className="grid gap-3 text-center sm:grid-cols-[1fr_auto] sm:items-start sm:text-left">
+                <div>
                 <p className="text-sm font-medium text-textPrimary">AI-пакет менеджеру</p>
                 <p className="mt-1 text-sm text-textSecondary">
-                  Собираем короткий handoff: summary, first checks и черновик ответа пользователю.
+                  Собираем короткий пакет передачи: резюме, первые проверки и черновик ответа пользователю.
                 </p>
+                </div>
+                <div className="flex justify-center sm:justify-end">
+                  <Button
+                    size="sm"
+                    leadingIcon={<Sparkles className="h-4 w-4" />}
+                    loading={managerBriefStatus === "loading"}
+                    onClick={() => void handleGenerateManagerBrief()}
+                    className="min-w-[172px]"
+                  >
+                    {managerBrief ? "Обновить пакет" : "Собрать пакет"}
+                  </Button>
+                </div>
               </div>
-              <Button
-                size="sm"
-                leadingIcon={<Sparkles className="h-4 w-4" />}
-                loading={managerBriefStatus === "loading"}
-                onClick={() => void handleGenerateManagerBrief()}
-              >
-                {managerBrief ? "Обновить пакет" : "Собрать пакет"}
-              </Button>
             </div>
 
             {managerBriefError ? (
@@ -472,7 +477,7 @@ export function HumanReviewScreen() {
 
                 <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-amber-100">
-                    Escalation note
+                    Уточнение для эскалации
                   </p>
                   <p className="mt-2 text-sm text-amber-100/90">{managerBrief.escalationNote}</p>
                 </div>

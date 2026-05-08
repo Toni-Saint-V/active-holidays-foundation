@@ -73,6 +73,44 @@ function formatDelta(value: number): string {
   return `${points > 0 ? "+" : ""}${points} п.п.`;
 }
 
+function evidenceStatusLabel(status: string): string {
+  if (status === "valid") return "проверены";
+  if (status === "stale") return "устарели";
+  if (status === "missing") return "неполные";
+  if (status === "conflicting") return "конфликтуют";
+  if (status === "manual_only") return "только ручная проверка";
+  return status;
+}
+
+function freshnessStatusLabel(status: string): string {
+  if (status === "fresh") return "актуальны";
+  if (status === "stale") return "устарели";
+  if (status === "unknown") return "неизвестная актуальность";
+  return status;
+}
+
+function priorityLabel(priority: string): string {
+  if (priority === "critical") return "критично";
+  if (priority === "high") return "высокий приоритет";
+  return "средний приоритет";
+}
+
+function normalizeUiCopy(value: string): string {
+  return value
+    .replace(/handoff/gi, "пакет передачи")
+    .replace(/summary/gi, "резюме")
+    .replace(/first checks?/gi, "первые проверки")
+    .replace(/escalation note/gi, "примечание для эскалации")
+    .replace(/evidence gate/gi, "проверка источников")
+    .replace(/EVIDENCE_GATE:([A-Z0-9_-]+)/g, "правило источников $1")
+    .replace(/\bstale\b/gi, "устарел")
+    .replace(/\bsafe_auto\b/gi, "авто-проверка")
+    .replace(/\bmanual_only\b/gi, "только вручную")
+    .replace(/\bhuman_review\b/gi, "ручная проверка")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function fallbackWhatIfBrief(input: {
   caseId: string;
   candidateCaseId: string;
@@ -84,23 +122,30 @@ function fallbackWhatIfBrief(input: {
   const baseline = comparison.baseline.outcome;
   const candidate = comparison.candidate.outcome;
   const candidatePlan = comparison.candidate.actionPlan;
+  const signalShiftCount = comparison.delta.changedSignalIds?.length ?? 0;
+  const preferenceShiftCount = comparison.delta.changedPreferenceIds?.length ?? 0;
   const stepActions = candidatePlan.steps
-    .slice(0, 3)
+    .slice(0, 2)
     .map((step) => `${step.label}: ${step.detail}`);
-  const priorityActions =
-    stepActions.length > 0
-      ? stepActions
-      : [
-          candidatePlan.headline,
-          candidatePlan.detail,
-          "Откройте полный сценарий и следуйте только шагам из candidate-форка."
-        ].slice(0, 3);
+  const priorityActions = [
+    ...stepActions,
+    comparison.delta.nextActionChanged
+      ? `Синхронизировать следующий шаг: «${baseline.nextActionLabel}» → «${candidate.nextActionLabel}».`
+      : "Следующий шаг не меняется — усиление идёт за счёт качества пакета и порядка действий.",
+    comparison.delta.documentsReadyDelta < 0
+      ? "После сдвига документов стало меньше: сначала восстановите базовый пакет перед переходом."
+      : "Документный контур не просел: можно двигаться по шагам candidate-сценария без потери базы."
+  ]
+    .filter(Boolean)
+    .slice(0, 3);
 
-  const riskCallout =
-    candidatePlan.escalationReason ??
-    (comparison.delta.humanReviewChanged
-      ? "После сдвига сценарий требует ручной проверки менеджером."
-      : "Критичной эскалации не видно, но шаги нужно подтверждать через compare.");
+  const riskCallout = candidatePlan.escalationReason
+    ? `Ключевой риск: ${candidatePlan.escalationReason}`
+    : comparison.delta.humanReviewChanged
+      ? "Сдвиг уводит в ручную проверку: запускать автоматически нельзя, только через менеджера."
+      : comparison.delta.verdictChanged
+        ? "Вердикт меняется, поэтому нужен ручной контроль перехода между сценариями."
+        : "Критичной эскалации не видно, но сценарий остаётся compare-only до ручной сверки рисков.";
 
   return recommendationWhatIfBriefSchema.parse({
     version: "recommendation-whatif-brief.v1",
@@ -110,16 +155,15 @@ function fallbackWhatIfBrief(input: {
     source: "fallback",
     generatedAt: new Date().toISOString(),
     headline: input.offerLabel
-      ? `Если сместить маршрут в сторону «${input.offerLabel}»`
-      : "Если сместить маршрут по альтернативному сценарию",
+      ? `Если сместить маршрут в сторону «${input.offerLabel}»: что реально изменится`
+      : "Если сместить маршрут по альтернативному сценарию: фактический эффект",
     verdictDeltaSummary: `${verdictLabel[baseline.verdict]} → ${verdictLabel[candidate.verdict]}`,
     confidenceDeltaSummary: `${formatPercent(baseline.confidence)} → ${formatPercent(candidate.confidence)} (${formatDelta(comparison.delta.confidenceDelta)})`,
     priorityActions,
     riskCallout,
-    operatorNote:
-      "AI-слой объясняет сдвиг, но финальное решение по сценарию подтверждает только детерминированный compare.",
+    operatorNote: `Сдвиг основан на ${signalShiftCount} сигналах и ${preferenceShiftCount} предпочтениях. Подтверждение — только через детерминированный compare.`,
     disclaimer:
-      "Краткий разбор собран сервером без модели и опирается на текущий сравниваемый fork-сценарий."
+      "Краткий разбор собран сервером без модели и опирается на фактические данные текущего compare."
   });
 }
 
@@ -129,25 +173,44 @@ function fallbackManagerBrief(input: {
   packet: HumanReviewCasePacket;
   operatorContext?: string;
 }): HumanReviewManagerBrief {
-  const checklist = input.packet.operatorChecklist
+  const checklist = (input.packet.operatorChecklist ?? [])
     .slice(0, 4)
-    .map((item) => `${item.title}: ${item.detail}`);
+    .map(
+      (item, index) =>
+        `${index + 1}. ${normalizeUiCopy(item.title)} — ${normalizeUiCopy(item.detail)} (${priorityLabel(item.priority)})`
+    );
 
-  const note =
-    input.packet.doNotAutoDecideNotes[0] ??
-    "До решения оператора не обещать пользователю исход кейса.";
+  const doNotAutoNotes = input.packet.doNotAutoDecideNotes ?? [];
+  const note = doNotAutoNotes[0]
+    ? normalizeUiCopy(doNotAutoNotes[0])
+    : "До решения оператора не обещать пользователю исход кейса.";
 
   const contextLine = input.operatorContext
     ? `Контекст от оператора: ${input.operatorContext}`
     : null;
+  const docsLine =
+    (input.packet.documentsToInspect?.length ?? 0) > 0
+      ? `Приоритет по документам: ${input.packet.documentsToInspect
+          .slice(0, 2)
+          .map((item) => item.label)
+          .join(", ")}.`
+      : null;
+  const riskLine = input.packet.riskSummary?.criticalRisk
+    ? `Критичный риск: ${input.packet.riskSummary.criticalRisk.label}.`
+    : null;
+  const evidenceLine = `Источники ${evidenceStatusLabel(
+    input.packet.evidence.evidenceStatus
+  )}, актуальность ${freshnessStatusLabel(input.packet.evidence.freshnessStatus)}.`;
 
   const replyDraft = [
     `Принял кейс ${input.caseData.id} в ручную проверку.`,
-    `Причина: ${input.packet.reviewReason}`,
+    `Сейчас проверяем: ${normalizeUiCopy(input.packet.reviewReason)}.`,
+    evidenceLine,
+    docsLine,
     input.packet.scenario
-      ? `Сценарий: ${input.packet.scenario.title}. Следующий шаг: ${input.packet.scenario.nextActionLabel}.`
+      ? `Сценарий: ${normalizeUiCopy(input.packet.scenario.title)}. Следующий шаг: ${normalizeUiCopy(input.packet.scenario.nextActionLabel)}.`
       : `Следующий шаг из текущего вердикта: ${input.packet.currentResult.nextAction.label}.`,
-    "Сверю документы и evidence-блокеры, вернусь с точным статусом после ручной проверки."
+    "Проверю документы и ограничения вручную, затем вернусь с точным статусом и следующим действием."
   ]
     .filter(Boolean)
     .join(" ");
@@ -159,9 +222,10 @@ function fallbackManagerBrief(input: {
     source: "fallback",
     generatedAt: new Date().toISOString(),
     managerSummary: [
-      `Кейс ${input.caseData.title} ушёл в ручную проверку.`,
-      `Evidence: ${input.packet.evidence.evidenceStatus}/${input.packet.evidence.freshnessStatus}.`,
+      `Кейс ${input.caseData.title} переведён в ручную проверку.`,
+      evidenceLine,
       `Вердикт сейчас: ${verdictLabel[input.packet.currentResult.verdict]}.`,
+      riskLine,
       contextLine
     ]
       .filter(Boolean)
@@ -170,7 +234,7 @@ function fallbackManagerBrief(input: {
     userReplyDraft: replyDraft,
     escalationNote: note,
     disclaimer:
-      "Пакет менеджера собран без модели и опирается на текущий human-review packet движка."
+      "Пакет собран сервером без модели на основе фактов human-review packet."
   });
 }
 
@@ -211,11 +275,12 @@ function managerInput(input: {
 }): string {
   return JSON.stringify(
     {
-      task: "Собери короткий manager packet для ручной проверки кейса Active Holidays.",
+      task: "Собери короткий пакет менеджера для ручной проверки кейса Active Holidays.",
       rules: [
         "Пиши только по фактам JSON и только по-русски.",
         "Не придумывай новые причины, проверки, обещания, SLA или исходы.",
-        "Сформируй: краткий summary, список first checks, черновик ответа пользователю, escalation note."
+        "Сформируй: краткое резюме, список первых проверок, черновик ответа пользователю и заметку для эскалации.",
+        "Каждый пункт первых проверок должен быть конкретным действием, а не общим советом."
       ],
       context: {
         case: {
@@ -254,16 +319,16 @@ function sanitizeWhatIfBrief(
   return recommendationWhatIfBriefSchema.parse({
     ...fallback,
     source,
-    headline: output.headline.trim() || fallback.headline,
-    verdictDeltaSummary: output.verdictDeltaSummary.trim() || fallback.verdictDeltaSummary,
+    headline: normalizeUiCopy(output.headline) || fallback.headline,
+    verdictDeltaSummary: normalizeUiCopy(output.verdictDeltaSummary) || fallback.verdictDeltaSummary,
     confidenceDeltaSummary:
-      output.confidenceDeltaSummary.trim() || fallback.confidenceDeltaSummary,
+      normalizeUiCopy(output.confidenceDeltaSummary) || fallback.confidenceDeltaSummary,
     priorityActions:
       output.priorityActions.map((item) => item.trim()).filter(Boolean).slice(0, 3).length > 0
-        ? output.priorityActions.map((item) => item.trim()).filter(Boolean).slice(0, 3)
+        ? output.priorityActions.map((item) => normalizeUiCopy(item)).filter(Boolean).slice(0, 3)
         : fallback.priorityActions,
-    riskCallout: output.riskCallout.trim() || fallback.riskCallout,
-    operatorNote: output.operatorNote.trim() || fallback.operatorNote,
+    riskCallout: normalizeUiCopy(output.riskCallout) || fallback.riskCallout,
+    operatorNote: normalizeUiCopy(output.operatorNote) || fallback.operatorNote,
     disclaimer:
       source === "openai"
         ? "AI-слой объясняет уже посчитанный compare и не подменяет решение движка."
@@ -285,13 +350,13 @@ function sanitizeManagerBrief(
   return humanReviewManagerBriefSchema.parse({
     ...fallback,
     source,
-    managerSummary: output.managerSummary.trim() || fallback.managerSummary,
+    managerSummary: normalizeUiCopy(output.managerSummary) || fallback.managerSummary,
     firstChecks:
       output.firstChecks.map((item) => item.trim()).filter(Boolean).slice(0, 4).length > 0
-        ? output.firstChecks.map((item) => item.trim()).filter(Boolean).slice(0, 4)
+        ? output.firstChecks.map((item) => normalizeUiCopy(item)).filter(Boolean).slice(0, 4)
         : fallback.firstChecks,
-    userReplyDraft: output.userReplyDraft.trim() || fallback.userReplyDraft,
-    escalationNote: output.escalationNote.trim() || fallback.escalationNote,
+    userReplyDraft: normalizeUiCopy(output.userReplyDraft) || fallback.userReplyDraft,
+    escalationNote: normalizeUiCopy(output.escalationNote) || fallback.escalationNote,
     disclaimer:
       source === "openai"
         ? "AI-слой собрал черновой manager packet, но решение по кейсу остаётся за оператором."
@@ -316,7 +381,7 @@ export async function buildRecommendationWhatIfBrief(input: {
         {
           role: "system",
           content:
-            "Ты объясняешь what-if сравнение в Active Holidays. Работай только по фактам JSON. Пиши коротко, по-русски и без обещаний исхода."
+            "Ты ведущий риск-аналитик Active Holidays. Дай экспертный разбор сценарного сдвига: только по JSON-фактам, по-русски, без догадок и без обещаний исхода."
         },
         {
           role: "user",
@@ -355,7 +420,7 @@ export async function buildHumanReviewManagerBrief(input: {
         {
           role: "system",
           content:
-            "Ты помощник оператора Active Holidays. Собирай manager brief только по JSON-фактам, по-русски, без обещаний результата кейса."
+            "Ты senior-оператор Active Holidays. Собери плотный и практичный менеджерский бриф: только по JSON-фактам, по-русски, без воды, без обещаний результата кейса."
         },
         {
           role: "user",
