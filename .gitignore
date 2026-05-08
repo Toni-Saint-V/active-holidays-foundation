@@ -36,3 +36,4 @@ reports.zip
 tmp/
 research_*/
 research_*.zip
+.vercel
