@@ -119,6 +119,26 @@ function normalizeUiCopy(value: string): string {
     .trim();
 }
 
+function clampCopy(value: string, max: number): string {
+  if (value.length <= max) return value;
+  const cut = value.slice(0, Math.max(0, max - 1)).trim();
+  return cut.endsWith(".") ? cut : `${cut}.`;
+}
+
+function ensureCopyWindow(
+  value: string,
+  bounds: { min: number; max: number; fallback: string }
+): string {
+  const normalized = normalizeUiCopy(value);
+  if (!normalized) return bounds.fallback;
+  if (normalized.length > bounds.max) return clampCopy(normalized, bounds.max);
+  if (normalized.length < bounds.min) {
+    const padded = `${normalized} ${bounds.fallback}`.trim();
+    return clampCopy(padded, bounds.max);
+  }
+  return normalized;
+}
+
 function fallbackWhatIfBrief(input: {
   caseId: string;
   candidateCaseId: string;
@@ -207,9 +227,16 @@ function fallbackManagerBrief(input: {
 
   const checklist = (input.packet.operatorChecklist ?? [])
     .slice(0, 4)
-    .map(
-      (item, index) =>
-        `${index + 1}. ${normalizeUiCopy(item.title)}: ${normalizeChecklistDetail(item.detail)} (${priorityLabel(item.priority)})`
+    .map((item, index) =>
+      ensureCopyWindow(
+        `${index + 1}. ${normalizeUiCopy(item.title)}: ${normalizeChecklistDetail(item.detail)} (${priorityLabel(item.priority)}). Зафиксировать риск и следующее действие без обещаний исхода.`,
+        {
+          min: 40,
+          max: 240,
+          fallback:
+            "Проверка должна завершаться конкретным выводом для пользователя и команды."
+        }
+      )
     );
 
   const doNotAutoNotes = input.packet.doNotAutoDecideNotes ?? [];
@@ -217,9 +244,6 @@ function fallbackManagerBrief(input: {
     ? normalizeUiCopy(doNotAutoNotes[0])
     : "До решения оператора не обещать пользователю исход кейса.";
 
-  const contextLine = input.operatorContext
-    ? `Контекст от оператора: ${input.operatorContext}`
-    : null;
   const docsLine =
     (input.packet.documentsToInspect?.length ?? 0) > 0
       ? `Приоритет по документам: ${input.packet.documentsToInspect
@@ -233,19 +257,56 @@ function fallbackManagerBrief(input: {
   const evidenceLine = `Источники: ${evidenceStatusLabel(
     input.packet.evidence.evidenceStatus
   )}; актуальность ${freshnessStatusLabel(input.packet.evidence.freshnessStatus)}.`;
+  const nextStepLine = input.packet.scenario
+    ? `Следующий шаг по сценарию: ${normalizeUiCopy(input.packet.scenario.nextActionLabel)}.`
+    : `Следующий шаг по текущему вердикту: ${normalizeUiCopy(input.packet.currentResult.nextAction.label)}.`;
+  const fallbackChecks = [
+    ensureCopyWindow(`1. Подтвердить причину ручной проверки: ${userFacingReviewReason}`, {
+      min: 40,
+      max: 240,
+      fallback: "Нужно явно зафиксировать, какой риск блокирует автоматическое продолжение."
+    }),
+    ensureCopyWindow(`2. Сверить доказательную базу: ${evidenceLine}`, {
+      min: 40,
+      max: 240,
+      fallback:
+        "Проверить источники и их актуальность до любого решения по маршруту и документам."
+    }),
+    ensureCopyWindow(
+      docsLine
+        ? `3. Проверить документы: ${docsLine}`
+        : "3. Проверить документы: подтвердить, что обязательный пакет не имеет скрытых пробелов.",
+      {
+        min: 40,
+        max: 240,
+        fallback: "Без документной сверки нельзя безопасно фиксировать следующий шаг."
+      }
+    ),
+    ensureCopyWindow(`4. Согласовать действие с пользователем: ${nextStepLine}`, {
+      min: 40,
+      max: 240,
+      fallback: "После сверки рисков зафиксировать следующий шаг в понятной формулировке."
+    })
+  ];
 
-  const replyDraft = [
+  const replyDraft = ensureCopyWindow(
+    [
     `Принял кейс ${input.caseData.title} в ручную проверку.`,
     `Сейчас проверяем: ${userFacingReviewReason}`,
     evidenceLine,
     docsLine,
-    input.packet.scenario
-      ? `Сценарий: ${normalizeUiCopy(input.packet.scenario.title)}. Следующий шаг: ${normalizeUiCopy(input.packet.scenario.nextActionLabel)}.`
-      : `Следующий шаг из текущего вердикта: ${input.packet.currentResult.nextAction.label}.`,
-    "Проверю документы, ограничения и риски вручную, затем вернусь с точным статусом и конкретным следующим действием."
+    nextStepLine,
+    "Проверю риски и документы вручную, затем вернусь с точным статусом и конкретным действием."
   ]
     .filter(Boolean)
-    .join(" ");
+    .join(" "),
+    {
+      min: 45,
+      max: 240,
+      fallback:
+        "После ручной проверки вернусь с подтверждённым статусом и следующим действием по кейсу."
+    }
+  );
 
   return humanReviewManagerBriefSchema.parse({
     version: "human-review-manager-brief.v1",
@@ -253,18 +314,29 @@ function fallbackManagerBrief(input: {
     requestId: input.request.id,
     source: "fallback",
     generatedAt: new Date().toISOString(),
-    managerSummary: [
+    managerSummary: ensureCopyWindow(
+      [
       `Кейс ${input.caseData.title} переведён в ручную проверку.`,
       evidenceLine,
       `Вердикт сейчас: ${verdictLabel[input.packet.currentResult.verdict]}.`,
-      riskLine,
-      contextLine
+      riskLine
     ]
       .filter(Boolean)
       .join(" "),
-    firstChecks: checklist.length > 0 ? checklist : [input.packet.reviewReason],
+      {
+        min: 45,
+        max: 170,
+        fallback:
+          "Кейс требует ручной проверки по рискам и источникам перед фиксацией следующего шага."
+      }
+    ),
+    firstChecks: checklist.length > 0 ? checklist : fallbackChecks,
     userReplyDraft: replyDraft,
-    escalationNote: note,
+    escalationNote: ensureCopyWindow(note, {
+      min: 45,
+      max: 220,
+      fallback: "Эскалировать кейс, если источники конфликтуют или риск нельзя снять документами."
+    }),
     disclaimer:
       "Пакет собран сервером без модели на основе фактов human-review packet."
   });
@@ -379,14 +451,29 @@ function sanitizeManagerBrief(
   source: "openai" | "fallback"
 ): HumanReviewManagerBrief {
   const cleanedFirstChecks = output.firstChecks
-    .map((item) => normalizeUiCopy(item))
+    .map((item) =>
+      ensureCopyWindow(item, {
+        min: 40,
+        max: 240,
+        fallback:
+          "Проверка должна завершаться подтверждённым решением и понятным следующим действием."
+      })
+    )
     .map((line) => {
       if (
         /(правило источников|режим:\s*авто-проверка|источник:\s*устарел|источников источник|manual_only|evidence)/i.test(
           line
         )
       ) {
-        return "Проверить источники и их актуальность: подтвердить свежие данные до любого вывода по кейсу.";
+        return ensureCopyWindow(
+          "Проверить источники и их актуальность: подтвердить свежие данные до любого вывода по кейсу и следующему действию.",
+          {
+            min: 40,
+            max: 240,
+            fallback:
+              "Проверить источник, документ и риск перед коммуникацией следующего шага пользователю."
+          }
+        );
       }
       return line;
     })
@@ -397,10 +484,22 @@ function sanitizeManagerBrief(
   return humanReviewManagerBriefSchema.parse({
     ...fallback,
     source,
-    managerSummary: normalizeUiCopy(output.managerSummary) || fallback.managerSummary,
+    managerSummary: ensureCopyWindow(normalizeUiCopy(output.managerSummary), {
+      min: 45,
+      max: 170,
+      fallback: fallback.managerSummary
+    }),
     firstChecks: cleanedFirstChecks.length > 0 ? cleanedFirstChecks : fallback.firstChecks,
-    userReplyDraft: normalizeUiCopy(output.userReplyDraft) || fallback.userReplyDraft,
-    escalationNote: normalizeUiCopy(output.escalationNote) || fallback.escalationNote,
+    userReplyDraft: ensureCopyWindow(normalizeUiCopy(output.userReplyDraft), {
+      min: 45,
+      max: 240,
+      fallback: fallback.userReplyDraft
+    }),
+    escalationNote: ensureCopyWindow(normalizeUiCopy(output.escalationNote), {
+      min: 45,
+      max: 220,
+      fallback: fallback.escalationNote
+    }),
     disclaimer:
       source === "openai"
         ? "AI-слой собрал черновой manager packet, но решение по кейсу остаётся за оператором."
