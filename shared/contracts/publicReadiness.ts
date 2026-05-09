@@ -21,7 +21,11 @@ export const publicReadinessReasonSchema = z.enum([
   "human_review_required",
   "documents_blocked",
   "conditions_remaining",
-  "clean_ready"
+  "clean_ready",
+  "evidence_stale",
+  "evidence_missing",
+  "evidence_conflicting",
+  "evidence_manual_only"
 ]);
 export type PublicReadinessReason = z.infer<typeof publicReadinessReasonSchema>;
 
@@ -71,14 +75,24 @@ function hasHardBlocker(input: PublicReadinessInput): boolean {
   );
 }
 
+function evidenceReasons(input: PublicReadinessInput): PublicReadinessReason[] {
+  if (input.trust.evidenceStatus === "stale") return ["evidence_stale"];
+  if (input.trust.evidenceStatus === "missing") return ["evidence_missing"];
+  if (input.trust.evidenceStatus === "conflicting") return ["evidence_conflicting"];
+  if (input.trust.evidenceStatus === "manual_only") return ["evidence_manual_only"];
+  return [];
+}
+
 export function derivePublicReadiness(
   input: PublicReadinessInput
 ): PublicReadinessProjection {
+  const evidence = evidenceReasons(input);
+
   if (input.assumptionsCount > 0) {
     return {
       state: "insufficient_data",
       sourceVerdict: input.verdict,
-      reasons: ["missing_required_input"]
+      reasons: ["missing_required_input", ...evidence]
     };
   }
 
@@ -87,7 +101,8 @@ export function derivePublicReadiness(
       state: "not_ready_blocked",
       sourceVerdict: input.verdict,
       reasons: [
-        input.primaryPathPresent ? "hard_blocker" : "no_available_path"
+        input.primaryPathPresent ? "hard_blocker" : "no_available_path",
+        ...evidence
       ]
     };
   }
@@ -96,7 +111,7 @@ export function derivePublicReadiness(
     return {
       state: "needs_human_review",
       sourceVerdict: input.verdict,
-      reasons: ["human_review_required"]
+      reasons: ["human_review_required", ...evidence]
     };
   }
 
@@ -104,7 +119,7 @@ export function derivePublicReadiness(
     return {
       state: "not_ready_fixable",
       sourceVerdict: input.verdict,
-      reasons: ["documents_blocked"]
+      reasons: ["documents_blocked", ...evidence]
     };
   }
 
@@ -116,14 +131,14 @@ export function derivePublicReadiness(
     return {
       state: "ready",
       sourceVerdict: input.verdict,
-      reasons: ["clean_ready"]
+      reasons: ["clean_ready", ...evidence]
     };
   }
 
   return {
     state: "almost_ready",
     sourceVerdict: input.verdict,
-    reasons: ["conditions_remaining"]
+    reasons: ["conditions_remaining", ...evidence]
   };
 }
 

@@ -110,6 +110,7 @@ describe("recommendation HTTP surface", () => {
     expect(parsed.source).toBe("fallback");
     expect(parsed.items.length).toBeGreaterThan(0);
     expect(parsed.recommendedOfferId).toBeTruthy();
+    expect(parsed.uncertainty.reasons).toContain("model_unavailable");
   });
 
   it("returns a structured detail view for a shortlisted offer", async () => {
@@ -131,6 +132,8 @@ describe("recommendation HTTP surface", () => {
     expect(parsed.offerId).toBe(offerId);
     expect(parsed.source).toBe("fallback");
     expect(parsed.whyThisFits.length).toBeGreaterThan(0);
+    expect(parsed.uncertainty.reasons).toContain("model_unavailable");
+    expect(parsed.trustSignals.join(" ")).not.toMatch(/confidence|score|\/100|\d{1,3}%/i);
   });
 
   it("does not expose baseline nextAction steps in alternative detail", async () => {
@@ -243,5 +246,15 @@ describe("recommendation HTTP surface", () => {
     expect(detail.fit).not.toBe("best_match");
     expect(detail.nextSteps).not.toContain(result.nextAction.label);
     expect(detail.nextSteps).not.toContain(result.nextAction.detail);
+    const mergedDetailCopy = [
+      detail.title,
+      detail.summary,
+      ...detail.whyThisFits,
+      ...detail.watchouts,
+      ...detail.trustSignals
+    ].join(" ");
+    expect(mergedDetailCopy).not.toContain(result.nextAction.label);
+    expect(mergedDetailCopy).not.toContain(result.nextAction.detail);
+    expect(mergedDetailCopy).not.toMatch(/confidence|score|\/100|\d{1,3}%/i);
   });
 });

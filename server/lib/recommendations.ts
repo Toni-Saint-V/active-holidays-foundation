@@ -7,6 +7,8 @@ import {
   isTravelOffer,
   recommendationDetailSchema,
   recommendationShortlistSchema,
+  type RecommendationUncertainty,
+  type RecommendationUncertaintyReason,
   type Case,
   type Offer,
   type RecommendationDetail,
@@ -47,6 +49,11 @@ type NormalizedOffer = {
   score: number;
   eligible: boolean;
 };
+
+type FallbackUncertaintyReason =
+  | "model_unavailable"
+  | "model_response_unusable"
+  | null;
 
 let openaiClient: OpenAI | null | undefined;
 
@@ -148,6 +155,123 @@ function fitForOffer(result: ResultPayload, offer: NormalizedOffer): Recommendat
   return "good_option";
 }
 
+function confidenceWord(value: string): string {
+  return value.toLowerCase().replace(/ё/g, "е");
+}
+
+function leaksInternalLanguage(value: string): boolean {
+  const normalized = confidenceWord(value);
+  if (
+    normalized.includes("score") ||
+    normalized.includes("confidence") ||
+    normalized.includes("ruleResults".toLowerCase()) ||
+    normalized.includes("audittrail") ||
+    normalized.includes("внутрен") ||
+    normalized.includes("диагност") ||
+    normalized.includes("скрыт")
+  ) {
+    return true;
+  }
+  return /\b\d{1,3}\/100\b/.test(normalized);
+}
+
+function referencesUnsupportedConfidence(value: string): boolean {
+  const normalized = confidenceWord(value);
+  const claimLexemes = [
+    "высокая вероятность",
+    "низкая вероятность",
+    "вероятность",
+    "шанс",
+    "шансы",
+    "скорее всего",
+    "почти точно",
+    "гарант",
+    "гарантия",
+    "guaranteed",
+    "likely approval",
+    "approval chance",
+    "high confidence",
+    "low confidence"
+  ];
+  if (claimLexemes.some((lexeme) => normalized.includes(lexeme))) return true;
+
+  if (!/\b\d{1,3}%\b/.test(normalized)) return false;
+  return (
+    normalized.includes("уверен") ||
+    normalized.includes("уверенность") ||
+    normalized.includes("вероят") ||
+    normalized.includes("шанс")
+  );
+}
+
+function safePublicText(candidate: string | undefined, fallback: string): string {
+  const text = candidate?.trim();
+  if (!text) return fallback;
+  if (leaksInternalLanguage(text)) return fallback;
+  if (referencesUnsupportedConfidence(text)) return fallback;
+  return text;
+}
+
+function buildUncertainty(
+  result: ResultPayload,
+  fallbackReason: FallbackUncertaintyReason = null
+): RecommendationUncertainty {
+  const reasons: RecommendationUncertaintyReason[] = [];
+  if (result.trust.evidenceStatus === "stale") reasons.push("evidence_stale");
+  if (result.trust.evidenceStatus === "missing") reasons.push("evidence_missing");
+  if (result.trust.evidenceStatus === "conflicting") reasons.push("evidence_conflicting");
+  if (result.trust.evidenceStatus === "manual_only") reasons.push("evidence_manual_only");
+  if (result.assumptions.length > 0) reasons.push("assumptions_present");
+  if (fallbackReason) reasons.push(fallbackReason);
+
+  const uniqueReasons = Array.from(new Set(reasons));
+  const status = uniqueReasons.some(
+    (reason) => reason === "evidence_conflicting" || reason === "evidence_manual_only"
+  )
+    ? "manual_review"
+    : uniqueReasons.length > 0
+      ? "uncertain"
+      : "clear";
+
+  if (status === "clear") {
+    return {
+      status,
+      reasons: uniqueReasons,
+      note: "Данные консистентны: используйте разбор как навигацию по текущему решению."
+    };
+  }
+
+  if (status === "manual_review") {
+    return {
+      status,
+      reasons: uniqueReasons,
+      note: "Есть конфликт или manual-only источник: финальное решение подтверждает только эксперт."
+    };
+  }
+
+  return {
+    status,
+    reasons: uniqueReasons,
+    note: "Есть ограничения по данным: перед действием перепроверьте результат и актуальность доказательств."
+  };
+}
+
+function removeBaselineActionLeak(
+  value: string,
+  result: ResultPayload,
+  fit: RecommendationFit,
+  fallback: string
+): string {
+  if (fit === "best_match") return value;
+  const baselineLabel = result.nextAction.label.toLowerCase();
+  const baselineDetail = result.nextAction.detail.toLowerCase();
+  const normalized = value.toLowerCase();
+  if (normalized.includes(baselineLabel) || normalized.includes(baselineDetail)) {
+    return fallback;
+  }
+  return value;
+}
+
 function documentsWatchout(result: ResultPayload): string | null {
   if (result.documents.readyCount >= result.documents.requiredCount) return null;
   const missing = result.documents.items
@@ -178,15 +302,12 @@ function deterministicRecommendedOfferId(
   return result.primaryPath?.id ?? offers[0]?.offerId ?? null;
 }
 
-function fallbackFitReason(
-  offer: NormalizedOffer,
-  fit: RecommendationFit
-): string {
+function fallbackFitReason(fit: RecommendationFit): string {
   if (fit === "best_match") {
-    return `Этот вариант сейчас лучше всего согласован с результатом движка и score ${offer.score.toFixed(2)}.`;
+    return "Этот вариант сейчас лучше всего согласован с текущим решением движка.";
   }
   if (fit === "good_option") {
-    return `Это рабочая альтернатива с score ${offer.score.toFixed(2)}.`;
+    return "Это рабочая альтернатива для compare перед финальным действием.";
   }
   return "Вариант полезен для сравнения, но часть условий пока не проходит.";
 }
@@ -211,7 +332,7 @@ function deterministicDetailNextSteps(
   if (fit !== "best_match") {
     return [
       "Запустите «Проверить движком», чтобы получить отдельный fork-сценарий для этого варианта.",
-      "Сверьте вердикт, confidence и основной путь в compare с базовым результатом.",
+      "Сверьте итог compare и основной путь с базовым результатом.",
       "Действуйте только по блоку «Что делать после compare», а не по baseline-шагам."
     ];
   }
@@ -228,7 +349,8 @@ function deterministicDetailNextSteps(
 function buildShortlistFallback(
   caseData: Case,
   result: ResultPayload,
-  offers: NormalizedOffer[]
+  offers: NormalizedOffer[],
+  fallbackReason: FallbackUncertaintyReason
 ): RecommendationShortlist {
   const items = offers.map((offer, index) => {
     const fit = fitForOffer(result, offer);
@@ -238,7 +360,7 @@ function buildShortlistFallback(
       fit,
       title: offer.title,
       summary: offer.description,
-      fitReason: fallbackFitReason(offer, fit),
+      fitReason: fallbackFitReason(fit),
       caution: fallbackCaution(result, offer)
     };
   });
@@ -251,6 +373,7 @@ function buildShortlistFallback(
     source: "fallback",
     recommendedOfferId: deterministicRecommendedOfferId(result, offers),
     items,
+    uncertainty: buildUncertainty(result, fallbackReason),
     disclaimer: shortlistDisclaimer("fallback")
   });
 }
@@ -258,7 +381,8 @@ function buildShortlistFallback(
 function buildDetailFallback(
   caseData: Case,
   result: ResultPayload,
-  offer: NormalizedOffer
+  offer: NormalizedOffer,
+  fallbackReason: FallbackUncertaintyReason
 ): RecommendationDetail {
   const fit = fitForOffer(result, offer);
   const watchouts = [
@@ -275,9 +399,11 @@ function buildDetailFallback(
   const nextSteps = deterministicDetailNextSteps(result, fit);
 
   const trustSignals = [
-    `Вердикт движка: ${result.verdict}.`,
-    `Уверенность движка: ${Math.round(result.trust.confidence * 100)}%.`,
-    `Пересчёт результата: ${result.computedAt}.`
+    `Текущий статус решения: ${result.verdict}.`,
+    result.trust.blockingReason
+      ? `Ограничение доверия: ${result.trust.blockingReason}`
+      : "Критичных ограничений доверия в текущем расчёте не зафиксировано.",
+    `Время пересчёта: ${result.computedAt}.`
   ];
 
   return recommendationDetailSchema.parse({
@@ -296,6 +422,7 @@ function buildDetailFallback(
       : ["Отдельных критичных замечаний по этому варианту сейчас не видно, но требования нужно перепроверить перед действием."],
     nextSteps,
     trustSignals,
+    uncertainty: buildUncertainty(result, fallbackReason),
     disclaimer: detailDisclaimer("fallback")
   });
 }
@@ -392,20 +519,26 @@ function sanitizeShortlist(
   }
 
   if (modelItems.size === 0) {
-    return buildShortlistFallback(caseData, result, offers);
+    return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
   }
 
   const items = offers.map((offer, index) => {
     const fit = fitForOffer(result, offer);
     const modelItem = modelItems.get(offer.offerId);
+    const fallbackItem = {
+      title: offer.title,
+      summary: offer.description,
+      fitReason: fallbackFitReason(fit),
+      caution: fallbackCaution(result, offer)
+    };
     return {
       offerId: offer.offerId,
       rank: index + 1,
       fit,
-      title: modelItem?.title?.trim() || offer.title,
-      summary: modelItem?.summary?.trim() || offer.description,
-      fitReason: modelItem?.fitReason?.trim() || fallbackFitReason(offer, fit),
-      caution: modelItem?.caution?.trim() || fallbackCaution(result, offer)
+      title: safePublicText(modelItem?.title, fallbackItem.title),
+      summary: safePublicText(modelItem?.summary, fallbackItem.summary),
+      fitReason: safePublicText(modelItem?.fitReason, fallbackItem.fitReason),
+      caution: safePublicText(modelItem?.caution, fallbackItem.caution)
     };
   });
 
@@ -417,6 +550,7 @@ function sanitizeShortlist(
     source: "openai",
     recommendedOfferId: deterministicRecommendedOfferId(result, offers),
     items,
+    uncertainty: buildUncertainty(result),
     disclaimer: shortlistDisclaimer("openai")
   });
 }
@@ -428,6 +562,41 @@ function sanitizeDetail(
   offer: NormalizedOffer
 ): RecommendationDetail {
   const fit = fitForOffer(result, offer);
+  const fallback = buildDetailFallback(caseData, result, offer, null);
+  const whyThisFits = output.whyThisFits
+    .map((item, idx) =>
+      removeBaselineActionLeak(
+        safePublicText(item, fallback.whyThisFits[idx] ?? fallback.whyThisFits[0]),
+        result,
+        fit,
+        fallback.whyThisFits[idx] ?? fallback.whyThisFits[0]
+      )
+    )
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
+  const watchouts = output.watchouts
+    .map((item, idx) =>
+      removeBaselineActionLeak(
+        safePublicText(item, fallback.watchouts[idx] ?? fallback.watchouts[0]),
+        result,
+        fit,
+        fallback.watchouts[idx] ?? fallback.watchouts[0]
+      )
+    )
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
+  const trustSignals = output.trustSignals
+    .map((item, idx) =>
+      removeBaselineActionLeak(
+        safePublicText(item, fallback.trustSignals[idx] ?? fallback.trustSignals[0]),
+        result,
+        fit,
+        fallback.trustSignals[idx] ?? fallback.trustSignals[0]
+      )
+    )
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
+
   return recommendationDetailSchema.parse({
     version: "recommendation-ai.v1",
     caseId: caseData.id,
@@ -436,12 +605,23 @@ function sanitizeDetail(
     basedOnComputedAt: result.computedAt,
     source: "openai",
     fit,
-    title: output.title,
-    summary: output.summary,
-    whyThisFits: output.whyThisFits,
-    watchouts: output.watchouts,
+    title: removeBaselineActionLeak(
+      safePublicText(output.title, fallback.title),
+      result,
+      fit,
+      fallback.title
+    ),
+    summary: removeBaselineActionLeak(
+      safePublicText(output.summary, fallback.summary),
+      result,
+      fit,
+      fallback.summary
+    ),
+    whyThisFits: whyThisFits.length > 0 ? whyThisFits : fallback.whyThisFits,
+    watchouts: watchouts.length > 0 ? watchouts : fallback.watchouts,
     nextSteps: deterministicDetailNextSteps(result, fit),
-    trustSignals: output.trustSignals,
+    trustSignals: trustSignals.length > 0 ? trustSignals : fallback.trustSignals,
+    uncertainty: buildUncertainty(result),
     disclaimer: detailDisclaimer("openai")
   });
 }
@@ -455,7 +635,7 @@ export async function buildRecommendationShortlist(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildShortlistFallback(caseData, result, offers);
+    return buildShortlistFallback(caseData, result, offers, "model_unavailable");
   }
 
   try {
@@ -478,13 +658,13 @@ export async function buildRecommendationShortlist(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildShortlistFallback(caseData, result, offers);
+      return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
     }
 
     const parsed = shortlistModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeShortlist(parsed, caseData, result, offers);
   } catch {
-    return buildShortlistFallback(caseData, result, offers);
+    return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
   }
 }
 
@@ -500,7 +680,7 @@ export async function buildRecommendationDetail(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildDetailFallback(caseData, result, offer);
+    return buildDetailFallback(caseData, result, offer, "model_unavailable");
   }
 
   try {
@@ -523,12 +703,12 @@ export async function buildRecommendationDetail(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildDetailFallback(caseData, result, offer);
+      return buildDetailFallback(caseData, result, offer, "model_response_unusable");
     }
 
     const parsed = detailModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeDetail(parsed, caseData, result, offer);
   } catch {
-    return buildDetailFallback(caseData, result, offer);
+    return buildDetailFallback(caseData, result, offer, "model_response_unusable");
   }
 }

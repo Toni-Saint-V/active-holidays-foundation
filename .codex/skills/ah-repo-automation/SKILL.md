@@ -1,6 +1,6 @@
 ---
 name: ah-repo-automation
-description: Active Holidays: repo automation, skills, plugins, MCP и Codex-surface hygiene. Используй для чистки skill catalog, automation checks, plugin/MCP governance и routing docs.
+description: "Active Holidays: repo automation, skills, plugins, MCP и Codex-surface hygiene. Используй для чистки skill catalog, automation checks, plugin/MCP governance и routing docs."
 ---
 
 # AH Repo Automation
@@ -34,4 +34,3 @@ Keep the repo's automation and Codex operating surface small, coherent, and veri
 - No duplicate global/repo-local shadow skills unless intentionally justified.
 - No 70-item visible action list.
 - No speculative plugin or MCP layer.
-

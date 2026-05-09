@@ -105,6 +105,8 @@ describe("recommendation boundary ownership", () => {
       rank: 1,
       fit: "best_match"
     });
+    expect(["clear", "uncertain", "manual_review"]).toContain(shortlist.uncertainty.status);
+    expect(shortlist.uncertainty.note.length).toBeGreaterThan(0);
 
     const alternative = shortlist.items.find((item) => item.offerId === alternativeOfferId);
     expect(alternative).toBeTruthy();
@@ -133,5 +135,67 @@ describe("recommendation boundary ownership", () => {
     expect(detail.nextSteps).not.toContain(result.nextAction.label);
     expect(detail.nextSteps).not.toContain(result.nextAction.detail);
     expect(detail.nextSteps[0]).toContain("Проверить движком");
+    expect(detail.summary).not.toMatch(/score|confidence|\/100/i);
+    expect(["clear", "uncertain", "manual_review"]).toContain(detail.uncertainty.status);
+    expect(detail.uncertainty.note.length).toBeGreaterThan(0);
+  });
+
+  it("sanitizes model confidence claims without percentages to deterministic fallback text", async () => {
+    const { caseData, result, primaryOfferId } = await loadFixture();
+    createResponseMock.mockResolvedValue({
+      output: [],
+      output_text: JSON.stringify({
+        items: [
+          {
+            offerId: primaryOfferId,
+            title: "Высокая вероятность одобрения",
+            summary: "Скорее всего одобрят без риска.",
+            fitReason: "Шансы отличные.",
+            caution: "Гарантия почти точно."
+          }
+        ]
+      })
+    });
+
+    const shortlist = await buildRecommendationShortlist(caseData, result);
+    expect(shortlist).not.toBeNull();
+    if (!shortlist) return;
+
+    const primary = shortlist.items.find((item) => item.offerId === primaryOfferId);
+    expect(primary).toBeTruthy();
+    expect(primary?.title).not.toMatch(/вероятност|шанс|скорее всего|гарант/i);
+    expect(primary?.summary).toBe(result.primaryPath?.description);
+    expect(primary?.fitReason).not.toMatch(/вероятност|шанс|скорее всего|гарант/i);
+    expect(primary?.caution).not.toMatch(/вероятност|шанс|скорее всего|гарант/i);
+  });
+
+  it("marks model_unavailable when fallback is caused by missing OpenAI client/key", async () => {
+    const { caseData, result } = await loadFixture();
+    delete process.env.OPENAI_API_KEY;
+    resetRecommendationClientForTests();
+
+    const shortlist = await buildRecommendationShortlist(caseData, result);
+    expect(shortlist).not.toBeNull();
+    if (!shortlist) return;
+
+    expect(shortlist.source).toBe("fallback");
+    expect(shortlist.uncertainty.reasons).toContain("model_unavailable");
+    expect(shortlist.uncertainty.reasons).not.toContain("model_response_unusable");
+  });
+
+  it("marks model_response_unusable when fallback is caused by refusal/invalid model output", async () => {
+    const { caseData, result } = await loadFixture();
+    createResponseMock.mockResolvedValue({
+      output: [{ type: "message", content: [{ type: "refusal" }] }],
+      output_text: ""
+    });
+
+    const shortlist = await buildRecommendationShortlist(caseData, result);
+    expect(shortlist).not.toBeNull();
+    if (!shortlist) return;
+
+    expect(shortlist.source).toBe("fallback");
+    expect(shortlist.uncertainty.reasons).toContain("model_response_unusable");
+    expect(shortlist.uncertainty.reasons).not.toContain("model_unavailable");
   });
 });

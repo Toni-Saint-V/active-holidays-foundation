@@ -190,19 +190,21 @@ describe("public readiness contract", () => {
   });
 
   it("derives needs_human_review when review is required and no higher blocker applies", () => {
-    expect(
-      derivePublicReadiness(
-        createInput({
-          verdict: "HUMAN_REVIEW",
-          trust: {
-            evidenceStatus: "missing",
-            humanReviewReason: "Evidence gate requires review.",
-            blockingReason: null
-          },
-          firedRuleOutputs: ["human_review_trigger"]
-        })
-      ).state
-    ).toBe("needs_human_review");
+    const projection = derivePublicReadiness(
+      createInput({
+        verdict: "HUMAN_REVIEW",
+        trust: {
+          evidenceStatus: "missing",
+          humanReviewReason: "Evidence gate requires review.",
+          blockingReason: null
+        },
+        firedRuleOutputs: ["human_review_trigger"]
+      })
+    );
+
+    expect(projection.state).toBe("needs_human_review");
+    expect(projection.reasons).toContain("human_review_required");
+    expect(projection.reasons).toContain("evidence_missing");
   });
 
   it("derives insufficient_data before every other state when required intake data is missing", () => {
@@ -232,5 +234,21 @@ describe("public readiness contract", () => {
       firedRuleOutputs: ["human_review_trigger"]
     });
     expect(derivePublicReadinessFromResult(result).state).toBe("needs_human_review");
+  });
+
+  it("adds explicit stale evidence reason even for otherwise ready case", () => {
+    const projection = derivePublicReadiness(
+      createInput({
+        verdict: "GO",
+        trust: {
+          evidenceStatus: "stale",
+          humanReviewReason: null,
+          blockingReason: null
+        }
+      })
+    );
+
+    expect(projection.state).toBe("ready");
+    expect(projection.reasons).toContain("evidence_stale");
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: ah-ui-implementation
-description: Active Holidays: UI реализация после approval. Используй для кодовой доработки экранов, компонентов, responsive states, accessibility и design-system consistency.
+description: "Active Holidays: UI реализация после approval. Используй для кодовой доработки экранов, компонентов, responsive states, accessibility и design-system consistency."
 ---
 
 # AH UI Implementation
@@ -34,4 +34,3 @@ Implement approved UI changes without breaking product trust or system consisten
 - Do not invent UI APIs or route contracts.
 - Do not change unrelated visual systems.
 - Do not ship visible UI without proof.
-

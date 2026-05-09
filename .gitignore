@@ -1,5 +1,6 @@
 node_modules
 dist
+.next
 .DS_Store
 coverage
 .env
@@ -36,3 +37,4 @@ reports.zip
 tmp/
 research_*/
 research_*.zip
+.vercel

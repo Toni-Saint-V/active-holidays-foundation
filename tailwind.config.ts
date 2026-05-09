@@ -1,44 +1,25 @@
-import type { Config } from "tailwindcss";
+import type { Config } from 'tailwindcss'
 
 export default {
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        base: "var(--color-base)",
-        surface: "var(--color-surface)",
-        surface2: "var(--color-surface-2)",
-        surface3: "var(--color-surface-3)",
-        surface4: "var(--color-surface-4)",
-        border: "var(--color-border)",
-        borderStrong: "var(--color-border-strong)",
-        textPrimary: "var(--color-text-primary)",
-        textSecondary: "var(--color-text-secondary)",
-        textMuted: "var(--color-text-muted)",
-        accent: "var(--color-accent)",
-        accentHover: "var(--color-accent-hover)",
-        danger: "var(--color-danger)",
-        success: "var(--color-success)",
-        warning: "var(--color-warning)",
-        info: "var(--color-info)",
-        ai: "var(--color-ai)",
-        route: "var(--color-route)",
-        manual: "var(--color-manual)"
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
+        surface: { DEFAULT: 'var(--surface)', 2: 'var(--surface-2)' },
+        primary: {
+          DEFAULT: 'var(--primary)',
+          soft: 'var(--primary-soft)',
+          deep: 'var(--primary-deep)',
+          foreground: 'var(--primary-foreground)',
+        },
+        ok: 'var(--ok)',
+        warn: 'var(--warn)',
+        destructive: 'var(--destructive)',
       },
-      borderRadius: {
-        sm: "8px",
-        md: "12px",
-        lg: "16px",
-        xl: "20px",
-        "2xl": "28px"
-      },
-      boxShadow: {
-        soft: "0 20px 50px -30px rgba(0,0,0,0.7)"
-      },
-      transitionTimingFunction: {
-        premium: "cubic-bezier(0.16, 1, 0.3, 1)"
-      }
-    }
+      borderRadius: { '4xl': '32px' },
+    },
   },
-  plugins: []
-} satisfies Config;
+} satisfies Config
