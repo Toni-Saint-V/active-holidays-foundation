@@ -3,7 +3,7 @@
 import { ChevronLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { AHInsight } from '@/components/AHInsight'
@@ -72,6 +72,7 @@ function daysFromDeparture(value: string | null): number {
 
 export function ResultPageClient() {
   const params = useSearchParams()
+  const router = useRouter()
   const [heroImageBroken, setHeroImageBroken] = useState(false)
   const [resultAi, setResultAi] = useState<ResultAiOutput | null>(null)
   const [resultAiLoading, setResultAiLoading] = useState(false)
@@ -104,15 +105,6 @@ export function ResultPageClient() {
     return misses
   }, [departureDate, params, returnDate])
 
-  const insuranceUrl = useMemo(() => {
-    const qp = new URLSearchParams()
-    qp.set('country', country)
-    if (departureDate && returnDate) {
-      qp.set('dates', `${departureDate}_${returnDate}`)
-    }
-    return `https://example.com/insurance?${qp.toString()}`
-  }, [country, departureDate, returnDate])
-
   const humanReviewUrl = useMemo(() => {
     const qp = new URLSearchParams()
     qp.set('country', country)
@@ -126,6 +118,37 @@ export function ResultPageClient() {
     resultAi?.tripwire ?? (daysToTrip <= 14 ? 'Если нет финального пакета сегодня — ведите к эксперту.' : 'Если слот или выписка не подтверждены — не двигайте кейс дальше.')
   const visibleContrarian =
     resultAi?.contrarian ?? 'Не добавляйте документы “для веса”: сначала уберите противоречие в датах и деньгах.'
+  const isEscalationVerdict = verdict === 'NOT_NOW' || verdict === 'HUMAN_REVIEW'
+  const primaryActionLabel =
+    verdict === 'GO'
+      ? 'Перейти к плану подготовки'
+      : verdict === 'GO_WITH_CONDITIONS'
+        ? 'Открыть план закрытия условий'
+        : verdict === 'NOT_NOW'
+          ? 'Передать эксперту срочно'
+          : 'Запросить ручную проверку'
+  const primaryActionHint =
+    verdict === 'GO'
+      ? 'Следующий шаг: пройти план на 72 часа и собрать финальный пакет.'
+      : verdict === 'GO_WITH_CONDITIONS'
+        ? 'Сначала закройте отмеченные условия и риски из плана ниже.'
+        : verdict === 'NOT_NOW'
+          ? 'Приоритет: сначала снять блокер по срокам и документам.'
+          : 'Нужна ручная оценка сроков и рисков перед следующим шагом.'
+  const primaryActionFooter =
+    verdict === 'GO'
+      ? 'Следующий шаг: выполните план на 72 часа и сверитесь со списком документов.'
+      : verdict === 'GO_WITH_CONDITIONS'
+        ? 'Следующий шаг: закройте условия по кейсу, затем повторно оцените подачу.'
+        : 'Следующий шаг: эскалация к эксперту с текущими фактами кейса.'
+
+  function handlePrimaryAction() {
+    if (isEscalationVerdict) {
+      router.push(humanReviewUrl)
+      return
+    }
+    document.getElementById('result-action-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -205,6 +228,28 @@ export function ResultPageClient() {
           <BufferGauge days={daysToTrip} />
         </div>
 
+        <section
+          className={cn(
+            'mt-5 rounded-2xl border p-4',
+            isEscalationVerdict
+              ? 'border-orange-300/35 bg-orange-500/[0.08]'
+              : 'border-white/10 bg-white/[0.03]'
+          )}
+        >
+          <div className="ah-eyebrow">Следующий шаг</div>
+          <p className={cn('mt-1 text-[18px] font-semibold leading-tight', isEscalationVerdict ? 'text-orange-300' : 'text-foreground')}>
+            {primaryActionLabel}
+          </p>
+          <p className="mt-2 text-[13px] leading-snug text-foreground/78">{primaryActionHint}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-foreground/80">
+            <span className="rounded-full border border-white/12 px-2.5 py-1">До поездки: {daysToTrip} дн.</span>
+            <span className="rounded-full border border-white/12 px-2.5 py-1">Окно: {countryEntry.optimalWindow}</span>
+            <span className="rounded-full border border-white/12 px-2.5 py-1">
+              Документы: {countryEntry.documents.length} · риск: {riskyDocuments.length}
+            </span>
+          </div>
+        </section>
+
         <div className="mt-8 grid grid-cols-1 border-y border-white/10 md:grid-cols-3">
           <section className="border-b border-white/10 py-4 md:border-b-0 md:border-r md:border-white/10 md:pr-5">
             <div className="ah-eyebrow">Окно подачи</div>
@@ -261,10 +306,10 @@ export function ResultPageClient() {
           <AHInsight>{VERDICT_INSIGHT[verdict]}</AHInsight>
         </div>
 
-        <section className="mt-6 border-y border-primary/20 py-4">
+        <section id="result-action-plan" className="mt-6 border-y border-primary/20 py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="ah-eyebrow">AI-фокус</div>
+              <div className="ah-eyebrow">План на 72 часа</div>
               <p className="mt-1 max-w-[620px] text-[16px] font-semibold leading-snug text-primary">
                 {compactText(resultAi?.title, 'Фокус на 72 часа', 72)}
               </p>
@@ -292,18 +337,16 @@ export function ResultPageClient() {
               128
             )}
           </p>
+          <p className="mt-2 max-w-[760px] text-[11px] leading-snug text-muted-foreground">
+            AI-подсказки помогают собрать пакет, но не гарантируют решение консульства.
+          </p>
         </section>
 
         <div className="mt-8 space-y-3">
-          <AmberCTA onClick={() => window.open(insuranceUrl, '_blank', 'noopener,noreferrer')}>
-            Оформить страховку
-          </AmberCTA>
-          <Link
-            href={humanReviewUrl}
-            className="inline-flex min-h-[44px] items-center text-[14px] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Передать эксперту →
-          </Link>
+          <AmberCTA onClick={handlePrimaryAction}>{primaryActionLabel}</AmberCTA>
+          <p className="text-[12px] text-muted-foreground">
+            {primaryActionFooter}
+          </p>
         </div>
       </article>
     </main>

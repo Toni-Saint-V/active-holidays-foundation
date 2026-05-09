@@ -100,6 +100,16 @@ export function HumanReviewPageClient() {
 
         <p className="mt-4 text-[15px] text-foreground/85">Кейс нестандартный — нужен взгляд эксперта.</p>
 
+        <section className="mt-5 rounded-2xl border border-orange-300/30 bg-orange-500/[0.06] p-4">
+          <div className="ah-eyebrow">Эскалация</div>
+          <p className="mt-1 text-[16px] font-semibold text-orange-300">После отправки формы эксперт связывается и уточняет следующий шаг</p>
+          <ol className="mt-3 space-y-2 text-[13px] leading-snug text-foreground/85">
+            <li>1. Проверяем сроки поездки, окно подачи и критичные документы.</li>
+            <li>2. Формируем короткий рабочий план без лишних шагов.</li>
+            <li>3. Отправляем рекомендации и вопросы для уточнения в Telegram или email.</li>
+          </ol>
+        </section>
+
         <section className="mt-6 rounded-2xl ah-chat-bubble p-4">
           <div className="flex items-start gap-3">
             <div
@@ -122,6 +132,9 @@ export function HumanReviewPageClient() {
         </section>
 
         <section className="mt-6 space-y-4">
+          <p className="text-[12px] text-muted-foreground">
+            Обязательные поля: имя и контакт. Контекст помогает эксперту быстрее закрыть риски.
+          </p>
           <LabeledField label="ИМЯ">
             <input
               value={fullName}
@@ -154,7 +167,7 @@ export function HumanReviewPageClient() {
             disabled={!canSend || aiLoading}
             className="inline-flex min-h-[44px] items-center rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-[12px] text-primary transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {aiLoading ? 'AI собирает бриф…' : 'Собрать AI-бриф для эксперта'}
+            {aiLoading ? 'AI собирает бриф…' : aiPack ? 'Обновить AI-бриф' : 'Подготовить AI-бриф'}
           </button>
         </div>
 
@@ -200,10 +213,6 @@ export function HumanReviewPageClient() {
         <p className="mt-4 text-[13px] text-muted-foreground">
           Бесплатно · <span className="text-foreground/85">Эксперт-человек, не AI</span>
         </p>
-
-        <div className="mt-4">
-          <MockPreviewBadge />
-        </div>
       </article>
     </main>
   )
