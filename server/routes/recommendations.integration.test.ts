@@ -107,10 +107,10 @@ describe("recommendation HTTP surface", () => {
     expect(response.status).toBe(200);
 
     const parsed = recommendationShortlistSchema.parse(response.json);
-    expect(parsed.source).toBe("fallback");
+    expect(parsed.source).toBe("deterministic_recovery");
     expect(parsed.items.length).toBeGreaterThan(0);
     expect(parsed.recommendedOfferId).toBeTruthy();
-    expect(parsed.uncertainty.reasons).toContain("model_unavailable");
+    expect(parsed.uncertainty.reasons).toContain("generation_unavailable");
   });
 
   it("returns a structured detail view for a shortlisted offer", async () => {
@@ -130,9 +130,9 @@ describe("recommendation HTTP surface", () => {
 
     const parsed = recommendationDetailSchema.parse(response.json);
     expect(parsed.offerId).toBe(offerId);
-    expect(parsed.source).toBe("fallback");
+    expect(parsed.source).toBe("deterministic_recovery");
     expect(parsed.whyThisFits.length).toBeGreaterThan(0);
-    expect(parsed.uncertainty.reasons).toContain("model_unavailable");
+    expect(parsed.uncertainty.reasons).toContain("generation_unavailable");
     expect(parsed.trustSignals.join(" ")).not.toMatch(/confidence|score|\/100|\d{1,3}%/i);
   });
 
@@ -230,7 +230,7 @@ describe("recommendation HTTP surface", () => {
     );
     expect(shortlistResponse.status).toBe(200);
     const shortlist = recommendationShortlistSchema.parse(shortlistResponse.json);
-    expect(shortlist.source).toBe("openai");
+    expect(shortlist.source).toBe("ai_structured");
     expect(shortlist.recommendedOfferId).toBe(primaryOfferId);
     expect(shortlist.items[0]?.offerId).toBe(primaryOfferId);
     expect(shortlist.items[0]?.fit).toBe("best_match");
@@ -242,7 +242,7 @@ describe("recommendation HTTP surface", () => {
     );
     expect(detailResponse.status).toBe(200);
     const detail = recommendationDetailSchema.parse(detailResponse.json);
-    expect(detail.source).toBe("openai");
+    expect(detail.source).toBe("ai_structured");
     expect(detail.fit).not.toBe("best_match");
     expect(detail.nextSteps).not.toContain(result.nextAction.label);
     expect(detail.nextSteps).not.toContain(result.nextAction.detail);

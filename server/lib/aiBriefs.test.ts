@@ -22,7 +22,7 @@ describe("aiBriefs", () => {
     resetAiBriefClientForTests();
   });
 
-  it("builds what-if brief in fallback mode", async () => {
+  it("builds what-if brief in deterministic recovery mode", async () => {
     const response = await buildRecommendationWhatIfBrief({
       caseId: "s1-rf-italy",
       candidateCaseId: "s1-rf-italy-fork-1",
@@ -61,13 +61,14 @@ describe("aiBriefs", () => {
       } as any
     });
 
-    expect(response.source).toBe("fallback");
+    expect(response.source).toBe("deterministic_recovery");
     expect(response.caseId).toBe("s1-rf-italy");
     expect(response.candidateCaseId).toBe("s1-rf-italy-fork-1");
+    expect(response.readinessDeltaSummary).not.toMatch(/%|п\.п\.|confidence/i);
     expect(response.priorityActions.length).toBeGreaterThan(0);
   });
 
-  it("builds manager brief in fallback mode", async () => {
+  it("builds manager brief in deterministic recovery mode", async () => {
     const response = await buildHumanReviewManagerBrief({
       caseData: {
         id: "s3-us-spb-business",
@@ -104,7 +105,7 @@ describe("aiBriefs", () => {
       operatorContext: "Клиент просит срочно закрыть кейс"
     });
 
-    expect(response.source).toBe("fallback");
+    expect(response.source).toBe("deterministic_recovery");
     expect(response.caseId).toBe("s3-us-spb-business");
     expect(response.requestId).toBe("hr_123");
     expect(response.firstChecks.length).toBeGreaterThan(0);

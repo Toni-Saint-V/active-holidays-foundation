@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-export const recommendationSourceSchema = z.enum(["openai", "fallback"]);
+export const recommendationSourceSchema = z.enum([
+  "ai_structured",
+  "deterministic_recovery"
+]);
 export type RecommendationSource = z.infer<typeof recommendationSourceSchema>;
 
 export const recommendationFitSchema = z.enum([
@@ -16,8 +19,8 @@ export const recommendationUncertaintyReasonSchema = z.enum([
   "evidence_conflicting",
   "evidence_manual_only",
   "assumptions_present",
-  "model_unavailable",
-  "model_response_unusable"
+  "generation_unavailable",
+  "generation_unusable"
 ]);
 export type RecommendationUncertaintyReason = z.infer<
   typeof recommendationUncertaintyReasonSchema

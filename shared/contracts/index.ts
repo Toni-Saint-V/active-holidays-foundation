@@ -28,3 +28,4 @@ export * from "./recommendations";
 export * from "./aiBriefs";
 export * from "./m1Scope";
 export * from "./publicReadiness";
+export * from "./aiResultWriter";
