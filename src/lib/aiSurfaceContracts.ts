@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const countryCodeSchema = z.enum(['IT', 'ES', 'FR', 'GR'])
 export const verdictKindSchema = z.enum(['GO', 'GO_WITH_CONDITIONS', 'NOT_NOW', 'HUMAN_REVIEW'])
-export const aiSourceSchema = z.enum(['openai', 'fallback'])
+export const aiSourceSchema = z.enum(['ai_structured', 'deterministic_recovery'])
 export const aiQualitySchema = z.object({
   score: z.number().int().min(0).max(100),
   threshold: z.literal(90),
@@ -29,7 +29,6 @@ export const landingAiOutputSchema = z.object({
   title: z.string().min(1),
   bullets: z.array(z.string().min(1)).min(3).max(3),
   note: z.string().min(1),
-  quality: aiQualitySchema,
 })
 
 export const intakeAiInputSchema = z.object({
@@ -44,7 +43,6 @@ export const intakeAiOutputSchema = z.object({
   rewrite: z.string().min(1),
   proofPoints: z.array(z.string().min(1)).min(2).max(3),
   riskAngle: z.string().min(1),
-  quality: aiQualitySchema,
 })
 
 export const resultAiInputSchema = z.object({
@@ -71,7 +69,6 @@ export const resultAiOutputSchema = z.object({
     .max(3),
   contrarian: z.string().min(1),
   tripwire: z.string().min(1),
-  quality: aiQualitySchema,
 })
 
 export const humanReviewAiInputSchema = z.object({
@@ -91,7 +88,6 @@ export const humanReviewAiOutputSchema = z.object({
   blockers: z.array(z.string().min(1)).min(2).max(3),
   expertQuestions: z.array(z.string().min(1)).min(3).max(3),
   packetSummary: z.string().min(1),
-  quality: aiQualitySchema,
 })
 
 export type LandingAiInput = z.infer<typeof landingAiInputSchema>

@@ -98,7 +98,7 @@ describe("recommendation boundary ownership", () => {
     expect(shortlist).not.toBeNull();
     if (!shortlist) return;
 
-    expect(shortlist.source).toBe("openai");
+    expect(shortlist.source).toBe("ai_structured");
     expect(shortlist.recommendedOfferId).toBe(primaryOfferId);
     expect(shortlist.items[0]).toMatchObject({
       offerId: primaryOfferId,
@@ -130,7 +130,7 @@ describe("recommendation boundary ownership", () => {
 
     const detail = await buildRecommendationDetail(caseData, result, alternativeOfferId);
 
-    expect(detail.source).toBe("openai");
+    expect(detail.source).toBe("ai_structured");
     expect(detail.fit).not.toBe("best_match");
     expect(detail.nextSteps).not.toContain(result.nextAction.label);
     expect(detail.nextSteps).not.toContain(result.nextAction.detail);
@@ -169,7 +169,7 @@ describe("recommendation boundary ownership", () => {
     expect(primary?.caution).not.toMatch(/вероятност|шанс|скорее всего|гарант/i);
   });
 
-  it("marks model_unavailable when fallback is caused by missing OpenAI client/key", async () => {
+  it("marks generation_unavailable when deterministic recovery is caused by missing OpenAI client/key", async () => {
     const { caseData, result } = await loadFixture();
     delete process.env.OPENAI_API_KEY;
     resetRecommendationClientForTests();
@@ -178,12 +178,12 @@ describe("recommendation boundary ownership", () => {
     expect(shortlist).not.toBeNull();
     if (!shortlist) return;
 
-    expect(shortlist.source).toBe("fallback");
-    expect(shortlist.uncertainty.reasons).toContain("model_unavailable");
-    expect(shortlist.uncertainty.reasons).not.toContain("model_response_unusable");
+    expect(shortlist.source).toBe("deterministic_recovery");
+    expect(shortlist.uncertainty.reasons).toContain("generation_unavailable");
+    expect(shortlist.uncertainty.reasons).not.toContain("generation_unusable");
   });
 
-  it("marks model_response_unusable when fallback is caused by refusal/invalid model output", async () => {
+  it("marks generation_unusable when deterministic recovery is caused by refusal/invalid model output", async () => {
     const { caseData, result } = await loadFixture();
     createResponseMock.mockResolvedValue({
       output: [{ type: "message", content: [{ type: "refusal" }] }],
@@ -194,8 +194,8 @@ describe("recommendation boundary ownership", () => {
     expect(shortlist).not.toBeNull();
     if (!shortlist) return;
 
-    expect(shortlist.source).toBe("fallback");
-    expect(shortlist.uncertainty.reasons).toContain("model_response_unusable");
-    expect(shortlist.uncertainty.reasons).not.toContain("model_unavailable");
+    expect(shortlist.source).toBe("deterministic_recovery");
+    expect(shortlist.uncertainty.reasons).toContain("generation_unusable");
+    expect(shortlist.uncertainty.reasons).not.toContain("generation_unavailable");
   });
 });

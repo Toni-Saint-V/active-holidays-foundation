@@ -16,7 +16,7 @@ import {
 const whatIfModelSchema = z.object({
   headline: z.string().min(1),
   verdictDeltaSummary: z.string().min(1),
-  confidenceDeltaSummary: z.string().min(1),
+  readinessDeltaSummary: z.string().min(1),
   priorityActions: z.array(z.string().min(1)).min(1).max(3),
   riskCallout: z.string().min(1),
   operatorNote: z.string().min(1)
@@ -63,14 +63,12 @@ function responseHasRefusal(response: {
   );
 }
 
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatDelta(value: number): string {
-  const points = Math.round(value * 100);
-  if (points === 0) return "без изменения";
-  return `${points > 0 ? "+" : ""}${points} п.п.`;
+function readinessDeltaLabel(value: number): string {
+  if (value >= 0.08) return "Определённость по маршруту заметно выросла.";
+  if (value > 0.01) return "Определённость по маршруту выросла.";
+  if (value <= -0.08) return "Определённость по маршруту заметно снизилась.";
+  if (value < -0.01) return "Определённость по маршруту снизилась.";
+  return "Определённость по маршруту без заметного изменения.";
 }
 
 function evidenceStatusLabel(status: string): string {
@@ -119,6 +117,27 @@ function normalizeUiCopy(value: string): string {
     .trim();
 }
 
+function redactContact(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "контакт подтверждён";
+  const email = trimmed.match(/^([^@]+)@(.+)$/);
+  if (email) {
+    return `${email[1]?.slice(0, 1) ?? "*"}***@${email[2]}`;
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 4) return `***${digits.slice(-2)}`;
+  return "контакт подтверждён";
+}
+
+function sanitizeOperatorText(value: string | undefined): string | null {
+  if (!value) return null;
+  const normalized = normalizeUiCopy(value)
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/\+?\d[\d\s().-]{5,}\d/g, "[phone]")
+    .trim();
+  return normalized.length > 0 ? clampCopy(normalized, 320) : null;
+}
+
 function clampCopy(value: string, max: number): string {
   if (value.length <= max) return value;
   const cut = value.slice(0, Math.max(0, max - 1)).trim();
@@ -137,6 +156,23 @@ function ensureCopyWindow(
     return clampCopy(padded, bounds.max);
   }
   return normalized;
+}
+
+function sanitizePublicAiBriefText(value: string): string {
+  return normalizeUiCopy(value)
+    .replace(/\d{1,3}\s?%/giu, "")
+    .replace(/\b\d{1,3}\/100\b/giu, "")
+    .replace(/\bп\.п\.\b/giu, "")
+    .replace(
+      /\b(confidence|high confidence|low confidence|approval chance|likely approval|approved for sure|guaranteed|no risk)\b/giu,
+      ""
+    )
+    .replace(
+      /\b(вероятност[а-я]*|шанс(?:ы)?|скорее всего|почти точно|точно одобрят|одобрят|без риска|гарантия|гарантировано)\b/giu,
+      ""
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function fallbackWhatIfBrief(input: {
@@ -180,13 +216,13 @@ function fallbackWhatIfBrief(input: {
     caseId: input.caseId,
     candidateCaseId: input.candidateCaseId,
     offerId: input.offerId,
-    source: "fallback",
+    source: "deterministic_recovery",
     generatedAt: new Date().toISOString(),
     headline: input.offerLabel
       ? `Если сместить маршрут в сторону «${input.offerLabel}»: что реально изменится`
       : "Если сместить маршрут по альтернативному сценарию: фактический эффект",
     verdictDeltaSummary: `${verdictLabel[baseline.verdict]} → ${verdictLabel[candidate.verdict]}`,
-    confidenceDeltaSummary: `${formatPercent(baseline.confidence)} → ${formatPercent(candidate.confidence)} (${formatDelta(comparison.delta.confidenceDelta)})`,
+    readinessDeltaSummary: readinessDeltaLabel(comparison.delta.confidenceDelta),
     priorityActions,
     riskCallout,
     operatorNote: `Сдвиг основан на ${signalShiftCount} сигналах и ${preferenceShiftCount} предпочтениях. Подтверждение — только через детерминированный compare.`,
@@ -312,7 +348,7 @@ function fallbackManagerBrief(input: {
     version: "human-review-manager-brief.v1",
     caseId: input.caseData.id,
     requestId: input.request.id,
-    source: "fallback",
+    source: "deterministic_recovery",
     generatedAt: new Date().toISOString(),
     managerSummary: ensureCopyWindow(
       [
@@ -356,7 +392,7 @@ function whatIfInput(input: {
         "Пиши только по фактам JSON и только по-русски.",
         "Не придумывай новые документы, цены, правила, дедлайны и обещания.",
         "Не меняй ownership: compare уже посчитан детерминированным движком.",
-        "Дай 1 headline, сводку дельты вердикта/уверенности, 1-3 практических шага и риск-callout."
+        "Дай 1 headline, сводку изменения определенности без числовых процентов, 1-3 практических шага и риск-callout."
       ],
       context: {
         caseId: input.caseId,
@@ -396,11 +432,11 @@ function managerInput(input: {
           id: input.request.id,
           status: input.request.status,
           channel: input.request.channel,
-          message: input.request.message,
-          contact: input.request.contact
+          message: sanitizeOperatorText(input.request.message),
+          contact: redactContact(input.request.contact)
         },
         packet: input.packet,
-        operatorContext: input.operatorContext ?? null
+        operatorContext: sanitizeOperatorText(input.operatorContext)
       }
     },
     null,
@@ -417,24 +453,28 @@ function sanitizeWhatIfBrief(
     comparison: ScenarioLabComparison;
   },
   output: z.infer<typeof whatIfModelSchema>,
-  source: "openai" | "fallback"
+  source: "ai_structured" | "deterministic_recovery"
 ): RecommendationWhatIfBrief {
   const fallback = fallbackWhatIfBrief(input);
   return recommendationWhatIfBriefSchema.parse({
     ...fallback,
     source,
-    headline: normalizeUiCopy(output.headline) || fallback.headline,
-    verdictDeltaSummary: normalizeUiCopy(output.verdictDeltaSummary) || fallback.verdictDeltaSummary,
-    confidenceDeltaSummary:
-      normalizeUiCopy(output.confidenceDeltaSummary) || fallback.confidenceDeltaSummary,
+    headline: sanitizePublicAiBriefText(output.headline) || fallback.headline,
+    verdictDeltaSummary:
+      sanitizePublicAiBriefText(output.verdictDeltaSummary) || fallback.verdictDeltaSummary,
+    readinessDeltaSummary:
+      sanitizePublicAiBriefText(output.readinessDeltaSummary) || fallback.readinessDeltaSummary,
     priorityActions:
       output.priorityActions.map((item) => item.trim()).filter(Boolean).slice(0, 3).length > 0
-        ? output.priorityActions.map((item) => normalizeUiCopy(item)).filter(Boolean).slice(0, 3)
+        ? output.priorityActions
+            .map((item) => sanitizePublicAiBriefText(item))
+            .filter(Boolean)
+            .slice(0, 3)
         : fallback.priorityActions,
-    riskCallout: normalizeUiCopy(output.riskCallout) || fallback.riskCallout,
-    operatorNote: normalizeUiCopy(output.operatorNote) || fallback.operatorNote,
+    riskCallout: sanitizePublicAiBriefText(output.riskCallout) || fallback.riskCallout,
+    operatorNote: sanitizePublicAiBriefText(output.operatorNote) || fallback.operatorNote,
     disclaimer:
-      source === "openai"
+      source === "ai_structured"
         ? "AI-слой объясняет уже посчитанный compare и не подменяет решение движка."
         : fallback.disclaimer
   });
@@ -448,7 +488,7 @@ function sanitizeManagerBrief(
     operatorContext?: string;
   },
   output: z.infer<typeof managerBriefModelSchema>,
-  source: "openai" | "fallback"
+  source: "ai_structured" | "deterministic_recovery"
 ): HumanReviewManagerBrief {
   const cleanedFirstChecks = output.firstChecks
     .map((item) =>
@@ -501,7 +541,7 @@ function sanitizeManagerBrief(
       fallback: fallback.escalationNote
     }),
     disclaimer:
-      source === "openai"
+      source === "ai_structured"
         ? "AI-слой собрал черновой manager packet, но решение по кейсу остаётся за оператором."
         : fallback.disclaimer
   });
@@ -541,7 +581,7 @@ export async function buildRecommendationWhatIfBrief(input: {
     }
 
     const parsed = whatIfModelSchema.parse(JSON.parse(response.output_text));
-    return sanitizeWhatIfBrief(input, parsed, "openai");
+    return sanitizeWhatIfBrief(input, parsed, "ai_structured");
   } catch {
     return fallbackWhatIfBrief(input);
   }
@@ -580,7 +620,7 @@ export async function buildHumanReviewManagerBrief(input: {
     }
 
     const parsed = managerBriefModelSchema.parse(JSON.parse(response.output_text));
-    return sanitizeManagerBrief(input, parsed, "openai");
+    return sanitizeManagerBrief(input, parsed, "ai_structured");
   } catch {
     return fallbackManagerBrief(input);
   }

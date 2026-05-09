@@ -46,13 +46,12 @@ type NormalizedOffer = {
   description: string;
   facts: string[];
   blockers: string[];
-  score: number;
   eligible: boolean;
 };
 
 type FallbackUncertaintyReason =
-  | "model_unavailable"
-  | "model_response_unusable"
+  | "generation_unavailable"
+  | "generation_unusable"
   | null;
 
 let openaiClient: OpenAI | null | undefined;
@@ -109,7 +108,6 @@ function normalizeOffer(offer: Offer): NormalizedOffer {
         `Требования: ${offer.requirements.map((item) => item.label).join(", ")}`
       ],
       blockers: offer.blockers.map((item) => item.text),
-      score: offer.score,
       eligible: offer.eligible
     };
   }
@@ -125,7 +123,6 @@ function normalizeOffer(offer: Offer): NormalizedOffer {
         `Консульства: ${offer.consulateOptions.join(", ") || "нужно уточнение"}`
       ],
       blockers: offer.blockers.map((item) => item.text),
-      score: offer.score,
       eligible: offer.eligible
     };
   }
@@ -144,7 +141,6 @@ function normalizeOffer(offer: Offer): NormalizedOffer {
       `Включено: ${includes.join(", ") || "базовое покрытие"}`
     ],
     blockers: offer.blockers.map((item) => item.text),
-    score: offer.score,
     eligible: offer.eligible
   };
 }
@@ -162,13 +158,23 @@ function confidenceWord(value: string): string {
 function leaksInternalLanguage(value: string): boolean {
   const normalized = confidenceWord(value);
   if (
+    normalized.includes("openai") ||
+    normalized.includes("fallback") ||
+    normalized.includes("model_unavailable") ||
+    normalized.includes("model_response_unusable") ||
+    normalized.includes("go_with_conditions") ||
+    normalized.includes("human_review") ||
+    normalized.includes("not_ready_fixable") ||
     normalized.includes("score") ||
     normalized.includes("confidence") ||
     normalized.includes("ruleResults".toLowerCase()) ||
     normalized.includes("audittrail") ||
+    normalized.includes("chain-of-thought") ||
+    normalized.includes("reasoning") ||
     normalized.includes("внутрен") ||
     normalized.includes("диагност") ||
-    normalized.includes("скрыт")
+    normalized.includes("скрыт") ||
+    normalized.includes("ai-модель недоступна")
   ) {
     return true;
   }
@@ -178,30 +184,28 @@ function leaksInternalLanguage(value: string): boolean {
 function referencesUnsupportedConfidence(value: string): boolean {
   const normalized = confidenceWord(value);
   const claimLexemes = [
-    "высокая вероятность",
-    "низкая вероятность",
     "вероятность",
     "шанс",
     "шансы",
     "скорее всего",
     "почти точно",
-    "гарант",
+    "точно одобрят",
+    "одобрят",
+    "без риска",
+    "гарантировано",
     "гарантия",
+    "гарант",
+    "approved for sure",
     "guaranteed",
     "likely approval",
     "approval chance",
+    "no risk",
     "high confidence",
     "low confidence"
   ];
   if (claimLexemes.some((lexeme) => normalized.includes(lexeme))) return true;
-
-  if (!/\b\d{1,3}%\b/.test(normalized)) return false;
-  return (
-    normalized.includes("уверен") ||
-    normalized.includes("уверенность") ||
-    normalized.includes("вероят") ||
-    normalized.includes("шанс")
-  );
+  if (/\d{1,3}\s?%/.test(normalized)) return true;
+  return /\b\d{1,3}\/100\b/.test(normalized);
 }
 
 function safePublicText(candidate: string | undefined, fallback: string): string {
@@ -281,18 +285,20 @@ function documentsWatchout(result: ResultPayload): string | null {
   return `Не готов полный пакет документов: ${missing.join(", ")}.`;
 }
 
-function shortlistDisclaimer(source: "openai" | "fallback"): string {
-  if (source === "openai") {
+function shortlistDisclaimer(
+  source: "ai_structured" | "deterministic_recovery"
+): string {
+  if (source === "ai_structured") {
     return "AI-слой объясняет текущий результат движка и не подменяет формальные требования.";
   }
-  return "Карточки собраны без модели по текущему результату движка: используйте их как краткий разбор, а не как отдельный источник истины.";
+  return "Карточки собраны по проверенным правилам кейса: используйте их как краткий разбор, а не как отдельный источник истины.";
 }
 
-function detailDisclaimer(source: "openai" | "fallback"): string {
-  if (source === "openai") {
+function detailDisclaimer(source: "ai_structured" | "deterministic_recovery"): string {
+  if (source === "ai_structured") {
     return "Разбор основан только на текущем кейсе и расчёте движка Active Holidays.";
   }
-  return "Разбор собран сервером без модели и опирается только на текущий расчёт движка.";
+  return "Разбор собран по проверенным правилам кейса и опирается только на текущий расчёт движка.";
 }
 
 function deterministicRecommendedOfferId(
@@ -370,11 +376,11 @@ function buildShortlistFallback(
     caseId: caseData.id,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "fallback",
+    source: "deterministic_recovery",
     recommendedOfferId: deterministicRecommendedOfferId(result, offers),
     items,
     uncertainty: buildUncertainty(result, fallbackReason),
-    disclaimer: shortlistDisclaimer("fallback")
+    disclaimer: shortlistDisclaimer("deterministic_recovery")
   });
 }
 
@@ -412,7 +418,7 @@ function buildDetailFallback(
     offerId: offer.offerId,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "fallback",
+    source: "deterministic_recovery",
     fit,
     title: offer.title,
     summary: offer.description,
@@ -423,7 +429,7 @@ function buildDetailFallback(
     nextSteps,
     trustSignals,
     uncertainty: buildUncertainty(result, fallbackReason),
-    disclaimer: detailDisclaimer("fallback")
+    disclaimer: detailDisclaimer("deterministic_recovery")
   });
 }
 
@@ -436,7 +442,6 @@ function modelContext(caseData: Case, result: ResultPayload, offers: NormalizedO
     },
     result: {
       verdict: result.verdict,
-      confidence: Number(result.trust.confidence.toFixed(2)),
       computedAt: result.computedAt,
       nextAction: {
         label: result.nextAction.label,
@@ -519,7 +524,7 @@ function sanitizeShortlist(
   }
 
   if (modelItems.size === 0) {
-    return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
+    return buildShortlistFallback(caseData, result, offers, "generation_unusable");
   }
 
   const items = offers.map((offer, index) => {
@@ -547,11 +552,11 @@ function sanitizeShortlist(
     caseId: caseData.id,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "openai",
+    source: "ai_structured",
     recommendedOfferId: deterministicRecommendedOfferId(result, offers),
     items,
     uncertainty: buildUncertainty(result),
-    disclaimer: shortlistDisclaimer("openai")
+    disclaimer: shortlistDisclaimer("ai_structured")
   });
 }
 
@@ -603,7 +608,7 @@ function sanitizeDetail(
     offerId: offer.offerId,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "openai",
+    source: "ai_structured",
     fit,
     title: removeBaselineActionLeak(
       safePublicText(output.title, fallback.title),
@@ -622,7 +627,7 @@ function sanitizeDetail(
     nextSteps: deterministicDetailNextSteps(result, fit),
     trustSignals: trustSignals.length > 0 ? trustSignals : fallback.trustSignals,
     uncertainty: buildUncertainty(result),
-    disclaimer: detailDisclaimer("openai")
+    disclaimer: detailDisclaimer("ai_structured")
   });
 }
 
@@ -635,7 +640,7 @@ export async function buildRecommendationShortlist(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildShortlistFallback(caseData, result, offers, "model_unavailable");
+    return buildShortlistFallback(caseData, result, offers, "generation_unavailable");
   }
 
   try {
@@ -658,13 +663,13 @@ export async function buildRecommendationShortlist(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
+      return buildShortlistFallback(caseData, result, offers, "generation_unusable");
     }
 
     const parsed = shortlistModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeShortlist(parsed, caseData, result, offers);
   } catch {
-    return buildShortlistFallback(caseData, result, offers, "model_response_unusable");
+    return buildShortlistFallback(caseData, result, offers, "generation_unusable");
   }
 }
 
@@ -680,7 +685,7 @@ export async function buildRecommendationDetail(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildDetailFallback(caseData, result, offer, "model_unavailable");
+    return buildDetailFallback(caseData, result, offer, "generation_unavailable");
   }
 
   try {
@@ -703,12 +708,12 @@ export async function buildRecommendationDetail(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildDetailFallback(caseData, result, offer, "model_response_unusable");
+      return buildDetailFallback(caseData, result, offer, "generation_unusable");
     }
 
     const parsed = detailModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeDetail(parsed, caseData, result, offer);
   } catch {
-    return buildDetailFallback(caseData, result, offer, "model_response_unusable");
+    return buildDetailFallback(caseData, result, offer, "generation_unusable");
   }
 }

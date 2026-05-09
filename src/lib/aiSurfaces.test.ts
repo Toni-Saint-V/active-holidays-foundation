@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildHumanReviewAi, buildIntakeAi, buildLandingAi, buildResultAi } from '@/lib/aiSurfaces'
 
-describe('screen AI quality gate', () => {
-  it('keeps fallback screen AI at expert quality threshold', async () => {
+describe('screen AI public payload', () => {
+  it('returns schema-safe outputs without internal quality diagnostics', async () => {
     vi.stubEnv('OPENAI_API_KEY', '')
 
     const outputs = await Promise.all([
@@ -31,14 +31,14 @@ describe('screen AI quality gate', () => {
     ])
 
     for (const output of outputs) {
-      expect(output.quality.score).toBeGreaterThanOrEqual(90)
-      expect(output.quality.threshold).toBe(90)
-      expect(output.quality.criteria).toHaveLength(6)
-      expect(output.quality.criteria.every((criterion) => criterion.score >= 90)).toBe(true)
+      expect(['ai_structured', 'deterministic_recovery']).toContain(output.source)
+      expect('quality' in output).toBe(false)
+      const serialized = JSON.stringify(output)
+      expect(serialized).not.toMatch(/quality|score|confidence|fallback_upgraded|expert_ready/i)
     }
   })
 
-  it('keeps public AI copy compact and hides internal scoring language', async () => {
+  it('keeps visible copy compact and free from internal tokens', async () => {
     vi.stubEnv('OPENAI_API_KEY', '')
 
     const landing = await buildLandingAi({ country: 'IT' })
@@ -62,7 +62,7 @@ describe('screen AI quality gate', () => {
       result.tripwire,
     ].join(' ')
 
-    expect(visibleCopy).not.toMatch(/90\/100|порог|fallback|Критерий качества/i)
+    expect(visibleCopy).not.toMatch(/90\/100|порог|fallback|quality|Критерий качества/i)
     expect(landing.bullets.every((item) => item.length <= 54)).toBe(true)
     expect(result.timeline.every((item) => item.action.length <= 72)).toBe(true)
   })

@@ -44,7 +44,7 @@ export const recommendationWhatIfBriefSchema = z.object({
   generatedAt: z.string().datetime(),
   headline: z.string().min(1),
   verdictDeltaSummary: z.string().min(1),
-  confidenceDeltaSummary: z.string().min(1),
+  readinessDeltaSummary: z.string().min(1),
   priorityActions: z.array(z.string().min(1)).min(1).max(3),
   riskCallout: z.string().min(1),
   operatorNote: z.string().min(1),

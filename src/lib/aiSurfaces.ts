@@ -2,10 +2,12 @@ import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { FORBIDDEN } from '@/lib/forbiddenCopy'
 import {
+  aiQualitySchema,
   humanReviewAiOutputSchema,
   intakeAiOutputSchema,
   landingAiOutputSchema,
   resultAiOutputSchema,
+  type AiQuality,
   type HumanReviewAiInput,
   type HumanReviewAiOutput,
   type IntakeAiInput,
@@ -16,15 +18,15 @@ import {
   type ResultAiOutput,
 } from '@/lib/aiSurfaceContracts'
 
-const landingAiDraftSchema = landingAiOutputSchema.omit({ quality: true })
-const intakeAiDraftSchema = intakeAiOutputSchema.omit({ quality: true })
-const resultAiDraftSchema = resultAiOutputSchema.omit({ quality: true })
-const humanReviewAiDraftSchema = humanReviewAiOutputSchema.omit({ quality: true })
+const landingAiDraftSchema = landingAiOutputSchema
+const intakeAiDraftSchema = intakeAiOutputSchema
+const resultAiDraftSchema = resultAiOutputSchema
+const humanReviewAiDraftSchema = humanReviewAiOutputSchema
 
-type LandingAiDraft = Omit<LandingAiOutput, 'quality'>
-type IntakeAiDraft = Omit<IntakeAiOutput, 'quality'>
-type ResultAiDraft = Omit<ResultAiOutput, 'quality'>
-type HumanReviewAiDraft = Omit<HumanReviewAiOutput, 'quality'>
+type LandingAiDraft = LandingAiOutput
+type IntakeAiDraft = IntakeAiOutput
+type ResultAiDraft = ResultAiOutput
+type HumanReviewAiDraft = HumanReviewAiOutput
 
 const COUNTRY_LABEL: Record<'IT' | 'ES' | 'FR' | 'GR', string> = {
   IT: 'Италия',
@@ -32,12 +34,6 @@ const COUNTRY_LABEL: Record<'IT' | 'ES' | 'FR' | 'GR', string> = {
   FR: 'Франция',
   GR: 'Греция',
 }
-
-type AiQuality =
-  | LandingAiOutput['quality']
-  | IntakeAiOutput['quality']
-  | ResultAiOutput['quality']
-  | HumanReviewAiOutput['quality']
 
 type QualityStatus = AiQuality['status']
 
@@ -79,6 +75,36 @@ function safeLine(value: string, fallback: string): string {
 function safeLines(values: string[], fallback: string[]): string[] {
   const cleaned = values.map((item, i) => safeLine(item, fallback[i] ?? fallback[0]))
   return cleaned.length > 0 ? cleaned : fallback
+}
+
+function redactName(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return 'Клиент'
+  return `${trimmed[0] ?? 'К'}***`
+}
+
+function redactContact(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return 'контакт подтвержден'
+  const emailMatch = trimmed.match(/^([^@]+)@(.+)$/)
+  if (emailMatch) {
+    return `${emailMatch[1]?.slice(0, 1) ?? '*'}***@${emailMatch[2]}`
+  }
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits.length >= 4) {
+    return `***${digits.slice(-2)}`
+  }
+  return 'контакт подтвержден'
+}
+
+function sanitizeModelContext(value: string | undefined): string | null {
+  if (!value) return null
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+    .replace(/\+?\d[\d\s().-]{5,}\d/g, '[phone]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 600)
 }
 
 function textBlob(parts: string[]): string {
@@ -206,16 +232,16 @@ function evaluateQuality(args: {
   ]
 
   const score = Math.round(criteria.reduce((sum, item) => sum + item.score, 0) / criteria.length)
-  return {
+  return aiQualitySchema.parse({
     score,
     threshold: AI_QUALITY_THRESHOLD,
     status: score >= AI_QUALITY_THRESHOLD ? args.status : 'fallback_upgraded',
     label: score >= AI_QUALITY_THRESHOLD ? 'Готово для публичного интерфейса' : 'Заменено на экспертный текст',
     criteria,
-  }
+  })
 }
 
-function withQuality<TDraft extends { source: 'openai' | 'fallback' }>(args: {
+function withQuality<TDraft extends { source: 'ai_structured' | 'deterministic_recovery' }>(args: {
   draft: TDraft
   parts: string[]
   contextTerms?: string[]
@@ -233,6 +259,11 @@ function withQuality<TDraft extends { source: 'openai' | 'fallback' }>(args: {
 
 function qualityPassed(output: { quality: AiQuality }): boolean {
   return output.quality.score >= AI_QUALITY_THRESHOLD
+}
+
+function stripQuality<TDraft>(value: TDraft & { quality: AiQuality }): TDraft {
+  const { quality: _quality, ...rest } = value
+  return rest as TDraft
 }
 
 async function structuredResponse<T>(args: {
@@ -266,7 +297,7 @@ async function structuredResponse<T>(args: {
 function fallbackLanding(input: LandingAiInput): LandingAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'ваша страна'
   const draft = {
-    source: 'fallback',
+    source: 'deterministic_recovery',
     title: 'Фокус: не страна, а узкое место',
     bullets: [
       `${country}: проверьте окно подачи`,
@@ -274,14 +305,14 @@ function fallbackLanding(input: LandingAiInput): LandingAiOutput {
       'Уточните слот; риск в датах — эксперту',
     ],
     note: 'Следующий шаг сегодня: проверьте окно подачи.',
-  } satisfies Omit<LandingAiOutput, 'quality'>
+  } satisfies LandingAiOutput
 
-  return withQuality({
+  return stripQuality(withQuality({
     draft,
     parts: [draft.title, ...draft.bullets, draft.note],
     contextTerms: input.country ? [COUNTRY_LABEL[input.country]] : [],
     status: 'fallback_upgraded',
-  })
+  }))
 }
 
 export async function buildLandingAi(input: LandingAiInput): Promise<LandingAiOutput> {
@@ -313,11 +344,11 @@ export async function buildLandingAi(input: LandingAiInput): Promise<LandingAiOu
   if (!parsed.success) return fallback
 
   const draft = {
-    source: 'openai',
+    source: 'ai_structured',
     title: safeLine(parsed.data.title, fallback.title),
     bullets: safeLines(parsed.data.bullets, fallback.bullets),
     note: safeLine(parsed.data.note, fallback.note),
-  } satisfies Omit<LandingAiOutput, 'quality'>
+  } satisfies LandingAiOutput
 
   const candidate = withQuality({
     draft,
@@ -326,13 +357,13 @@ export async function buildLandingAi(input: LandingAiInput): Promise<LandingAiOu
     status: 'expert_ready',
   })
 
-  return qualityPassed(candidate) ? candidate : fallback
+  return qualityPassed(candidate) ? stripQuality(candidate) : fallback
 }
 
 function fallbackIntake(input: IntakeAiInput): IntakeAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'стране назначения'
   const draft = {
-    source: 'fallback',
+    source: 'deterministic_recovery',
     title: 'AI Формулировка без потерь',
     rewrite:
       `Прошу повторно рассмотреть кейс для поездки в ${country}: маршрут, даты, бронь проживания и финансовые подтверждения собраны в одну непротиворечивую версию. Готов предоставить недостающий документ сегодня, чтобы снять риск задержки.`,
@@ -342,14 +373,14 @@ function fallbackIntake(input: IntakeAiInput): IntakeAiOutput {
       'Проверьте совпадение ФИО, дат и номера паспорта во всех бронях и выписках.',
     ].slice(0, 3),
     riskAngle: 'Главный риск: документы выглядят фрагментированно или противоречат датам поездки, поэтому эксперт сначала проверяет целостность пакета.',
-  } satisfies Omit<IntakeAiOutput, 'quality'>
+  } satisfies IntakeAiOutput
 
-  return withQuality({
+  return stripQuality(withQuality({
     draft,
     parts: [draft.title, draft.rewrite, ...draft.proofPoints, draft.riskAngle],
     contextTerms: input.country ? [COUNTRY_LABEL[input.country]] : [],
     status: 'fallback_upgraded',
-  })
+  }))
 }
 
 export async function buildIntakeAi(input: IntakeAiInput): Promise<IntakeAiOutput> {
@@ -383,12 +414,12 @@ export async function buildIntakeAi(input: IntakeAiInput): Promise<IntakeAiOutpu
   if (!parsed.success) return fallback
 
   const draft = {
-    source: 'openai',
+    source: 'ai_structured',
     title: safeLine(parsed.data.title, fallback.title),
     rewrite: safeLine(parsed.data.rewrite, fallback.rewrite),
     proofPoints: safeLines(parsed.data.proofPoints, fallback.proofPoints),
     riskAngle: safeLine(parsed.data.riskAngle, fallback.riskAngle),
-  } satisfies Omit<IntakeAiOutput, 'quality'>
+  } satisfies IntakeAiOutput
 
   const candidate = withQuality({
     draft,
@@ -397,13 +428,13 @@ export async function buildIntakeAi(input: IntakeAiInput): Promise<IntakeAiOutpu
     status: 'expert_ready',
   })
 
-  return qualityPassed(candidate) ? candidate : fallback
+  return qualityPassed(candidate) ? stripQuality(candidate) : fallback
 }
 
 function fallbackResult(input: ResultAiInput): ResultAiOutput {
   const country = COUNTRY_LABEL[input.country]
   const draft = {
-    source: 'fallback',
+    source: 'deterministic_recovery',
     title: 'AI-фокус: снять один риск, не раздувать пакет',
     timeline: [
       {
@@ -424,9 +455,9 @@ function fallbackResult(input: ResultAiInput): ResultAiOutput {
       input.daysToTrip <= 14
         ? 'Если сегодня нет финального пакета, ведите кейс к эксперту.'
         : `Триггер: ${input.topRisk}`,
-  } satisfies Omit<ResultAiOutput, 'quality'>
+  } satisfies ResultAiOutput
 
-  return withQuality({
+  return stripQuality(withQuality({
     draft,
     parts: [
       draft.title,
@@ -436,7 +467,7 @@ function fallbackResult(input: ResultAiInput): ResultAiOutput {
     ],
     contextTerms: [country, input.verdict, String(input.daysToTrip)],
     status: 'fallback_upgraded',
-  })
+  }))
 }
 
 export async function buildResultAi(input: ResultAiInput): Promise<ResultAiOutput> {
@@ -470,7 +501,7 @@ export async function buildResultAi(input: ResultAiInput): Promise<ResultAiOutpu
   if (!parsed.success) return fallback
 
   const draft = {
-    source: 'openai',
+    source: 'ai_structured',
     title: safeLine(parsed.data.title, fallback.title),
     timeline: parsed.data.timeline.map((item, idx) => ({
       horizon: safeLine(item.horizon, fallback.timeline[idx]?.horizon ?? fallback.timeline[0].horizon),
@@ -478,7 +509,7 @@ export async function buildResultAi(input: ResultAiInput): Promise<ResultAiOutpu
     })),
     contrarian: safeLine(parsed.data.contrarian, fallback.contrarian),
     tripwire: safeLine(parsed.data.tripwire, fallback.tripwire),
-  } satisfies Omit<ResultAiOutput, 'quality'>
+  } satisfies ResultAiOutput
 
   const candidate = withQuality({
     draft,
@@ -492,13 +523,15 @@ export async function buildResultAi(input: ResultAiInput): Promise<ResultAiOutpu
     status: 'expert_ready',
   })
 
-  return qualityPassed(candidate) ? candidate : fallback
+  return qualityPassed(candidate) ? stripQuality(candidate) : fallback
 }
 
 function fallbackHumanReview(input: HumanReviewAiInput): HumanReviewAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'направлению поездки'
+  const safeName = redactName(input.fullName)
+  const safeContact = redactContact(input.contact)
   const draft = {
-    source: 'fallback',
+    source: 'deterministic_recovery',
     title: 'AI Бриф для эксперта',
     urgency: input.verdict === 'HUMAN_REVIEW' ? 'Срочность: высокая' : 'Срочность: стандартная',
     blockers: [
@@ -511,10 +544,10 @@ function fallbackHumanReview(input: HumanReviewAiInput): HumanReviewAiOutput {
       'Какой план действий на ближайшие 72 часа самый безопасный с учётом дедлайна?',
       'Какая формулировка запроса минимизирует риск задержки без обещаний по исходу?',
     ],
-    packetSummary: `Клиент ${input.fullName} просит экспертную проверку. Контакт: ${input.contact}. Приоритет: снять риск по срокам, документам и следующему действию за 72 часа.`,
-  } satisfies Omit<HumanReviewAiOutput, 'quality'>
+    packetSummary: `Клиент ${safeName} просит экспертную проверку. Контакт: ${safeContact}. Приоритет: снять риск по срокам, документам и следующему действию за 72 часа.`,
+  } satisfies HumanReviewAiOutput
 
-  return withQuality({
+  return stripQuality(withQuality({
     draft,
     parts: [
       draft.title,
@@ -523,9 +556,9 @@ function fallbackHumanReview(input: HumanReviewAiInput): HumanReviewAiOutput {
       ...draft.expertQuestions,
       draft.packetSummary,
     ],
-    contextTerms: input.country ? [COUNTRY_LABEL[input.country], input.fullName] : [input.fullName],
+    contextTerms: input.country ? [COUNTRY_LABEL[input.country]] : undefined,
     status: 'fallback_upgraded',
-  })
+  }))
 }
 
 export async function buildHumanReviewAi(input: HumanReviewAiInput): Promise<HumanReviewAiOutput> {
@@ -542,9 +575,8 @@ export async function buildHumanReviewAi(input: HumanReviewAiInput): Promise<Hum
           verdict: input.verdict ?? null,
           departureDate: input.departureDate ?? null,
           returnDate: input.returnDate ?? null,
-          fullName: input.fullName,
-          contact: input.contact,
-          context: input.context ?? '',
+          contact: redactContact(input.contact),
+          context: sanitizeModelContext(input.context),
           outputStyle: 'operator brief, concise and specific',
         },
       },
@@ -559,13 +591,13 @@ export async function buildHumanReviewAi(input: HumanReviewAiInput): Promise<Hum
   if (!parsed.success) return fallback
 
   const draft = {
-    source: 'openai',
+    source: 'ai_structured',
     title: safeLine(parsed.data.title, fallback.title),
     urgency: safeLine(parsed.data.urgency, fallback.urgency),
     blockers: safeLines(parsed.data.blockers, fallback.blockers),
     expertQuestions: safeLines(parsed.data.expertQuestions, fallback.expertQuestions),
     packetSummary: safeLine(parsed.data.packetSummary, fallback.packetSummary),
-  } satisfies Omit<HumanReviewAiOutput, 'quality'>
+  } satisfies HumanReviewAiOutput
 
   const candidate = withQuality({
     draft,
@@ -576,9 +608,9 @@ export async function buildHumanReviewAi(input: HumanReviewAiInput): Promise<Hum
       ...draft.expertQuestions,
       draft.packetSummary,
     ],
-    contextTerms: input.country ? [COUNTRY_LABEL[input.country], input.fullName] : [input.fullName],
+    contextTerms: input.country ? [COUNTRY_LABEL[input.country]] : undefined,
     status: 'expert_ready',
   })
 
-  return qualityPassed(candidate) ? candidate : fallback
+  return qualityPassed(candidate) ? stripQuality(candidate) : fallback
 }
