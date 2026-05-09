@@ -1,6 +1,6 @@
 ---
 name: ah-result-flow
-description: Active Holidays: result loop. Используй для result, trust, documents, compare, human-review и сценарной лаборатории без detached side screens.
+description: "Active Holidays: result loop. Используй для result, trust, documents, compare, human-review и сценарной лаборатории без detached side screens."
 ---
 
 # AH Result Flow
@@ -33,4 +33,3 @@ Improve the core result loop while preserving deterministic ownership and trust.
 - No side screen "for completeness".
 - No fake AI certainty.
 - Compare-only alternatives must stay compare-only.
-
