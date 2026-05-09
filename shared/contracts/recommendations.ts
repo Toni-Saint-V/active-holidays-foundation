@@ -10,6 +10,26 @@ export const recommendationFitSchema = z.enum([
 ]);
 export type RecommendationFit = z.infer<typeof recommendationFitSchema>;
 
+export const recommendationUncertaintyReasonSchema = z.enum([
+  "evidence_stale",
+  "evidence_missing",
+  "evidence_conflicting",
+  "evidence_manual_only",
+  "assumptions_present",
+  "model_unavailable",
+  "model_response_unusable"
+]);
+export type RecommendationUncertaintyReason = z.infer<
+  typeof recommendationUncertaintyReasonSchema
+>;
+
+export const recommendationUncertaintySchema = z.object({
+  status: z.enum(["clear", "uncertain", "manual_review"]),
+  reasons: z.array(recommendationUncertaintyReasonSchema),
+  note: z.string().min(1)
+});
+export type RecommendationUncertainty = z.infer<typeof recommendationUncertaintySchema>;
+
 export const recommendationShortlistItemSchema = z.object({
   offerId: z.string().min(1),
   rank: z.number().int().min(1).max(3),
@@ -29,6 +49,7 @@ export const recommendationShortlistSchema = z.object({
   source: recommendationSourceSchema,
   recommendedOfferId: z.string().min(1).nullable(),
   items: z.array(recommendationShortlistItemSchema).min(1).max(3),
+  uncertainty: recommendationUncertaintySchema,
   disclaimer: z.string().min(1)
 });
 export type RecommendationShortlist = z.infer<typeof recommendationShortlistSchema>;
@@ -52,6 +73,7 @@ export const recommendationDetailSchema = z.object({
   watchouts: z.array(z.string().min(1)).min(1).max(3),
   nextSteps: z.array(z.string().min(1)).min(1).max(3),
   trustSignals: z.array(z.string().min(1)).min(1).max(3),
+  uncertainty: recommendationUncertaintySchema,
   disclaimer: z.string().min(1)
 });
 export type RecommendationDetail = z.infer<typeof recommendationDetailSchema>;
