@@ -144,6 +144,9 @@ export function IntakePageClient() {
             {step === 3 && 'Какая цель поездки?'}
             {step === 4 && 'Были ли предыдущие отказы?'}
           </h2>
+          <p className="mt-3 max-w-[620px] text-[14px] leading-snug text-foreground/78">
+            За 4 шага получите вердикт, главный риск и план действий на ближайшие 72 часа.
+          </p>
         </div>
 
         <div className="mt-8 flex-1">
@@ -314,6 +317,9 @@ export function IntakePageClient() {
             {step < 4 ? 'Далее' : 'Показать вердикт'} <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+        <p className="mt-3 text-[12px] text-muted-foreground">
+          Результат строится на введённых данных и подсвечивает риски без гарантий решения консульства.
+        </p>
       </section>
     </main>
   )
