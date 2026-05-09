@@ -7,6 +7,13 @@ export class HttpError extends Error {
   }
 }
 
+function compactIssues(error: ZodError) {
+  return error.issues.slice(0, 5).map((issue) => ({
+    path: issue.path.join("."),
+    code: issue.code
+  }));
+}
+
 export function notFound(_req: Request, res: Response): void {
   res.status(404).json({ error: "not_found", message: "Ресурс не найден." });
 }
@@ -21,7 +28,7 @@ export function errorHandler(
     res.status(400).json({
       error: "validation_failed",
       message: "Запрос не прошёл проверку схемы.",
-      issues: error.issues
+      issues: compactIssues(error)
     });
     return;
   }
@@ -32,7 +39,10 @@ export function errorHandler(
     });
     return;
   }
-  const message = error instanceof Error ? error.message : "Неожиданная ошибка на сервере.";
+  const message = error instanceof Error ? error.message : "unknown";
   console.error(`[active-holidays] server_error: ${message}`);
-  res.status(500).json({ error: "server_error", message });
+  res.status(500).json({
+    error: "server_error",
+    message: "Неожиданная ошибка на сервере."
+  });
 }

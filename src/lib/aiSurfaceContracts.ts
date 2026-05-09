@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const countryCodeSchema = z.enum(['IT', 'ES', 'FR', 'GR'])
 export const verdictKindSchema = z.enum(['GO', 'GO_WITH_CONDITIONS', 'NOT_NOW', 'HUMAN_REVIEW'])
-export const aiSourceSchema = z.enum(['ai_structured', 'deterministic_recovery'])
+export const aiSourceSchema = z.enum(['ai_structured', 'rule_based'])
 export const aiQualitySchema = z.object({
   score: z.number().int().min(0).max(100),
   threshold: z.literal(90),

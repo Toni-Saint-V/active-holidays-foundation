@@ -216,7 +216,7 @@ function fallbackWhatIfBrief(input: {
     caseId: input.caseId,
     candidateCaseId: input.candidateCaseId,
     offerId: input.offerId,
-    source: "deterministic_recovery",
+    source: "rule_based",
     generatedAt: new Date().toISOString(),
     headline: input.offerLabel
       ? `Если сместить маршрут в сторону «${input.offerLabel}»: что реально изменится`
@@ -348,7 +348,7 @@ function fallbackManagerBrief(input: {
     version: "human-review-manager-brief.v1",
     caseId: input.caseData.id,
     requestId: input.request.id,
-    source: "deterministic_recovery",
+    source: "rule_based",
     generatedAt: new Date().toISOString(),
     managerSummary: ensureCopyWindow(
       [
@@ -453,7 +453,7 @@ function sanitizeWhatIfBrief(
     comparison: ScenarioLabComparison;
   },
   output: z.infer<typeof whatIfModelSchema>,
-  source: "ai_structured" | "deterministic_recovery"
+  source: "ai_structured" | "rule_based"
 ): RecommendationWhatIfBrief {
   const fallback = fallbackWhatIfBrief(input);
   return recommendationWhatIfBriefSchema.parse({
@@ -488,7 +488,7 @@ function sanitizeManagerBrief(
     operatorContext?: string;
   },
   output: z.infer<typeof managerBriefModelSchema>,
-  source: "ai_structured" | "deterministic_recovery"
+  source: "ai_structured" | "rule_based"
 ): HumanReviewManagerBrief {
   const cleanedFirstChecks = output.firstChecks
     .map((item) =>

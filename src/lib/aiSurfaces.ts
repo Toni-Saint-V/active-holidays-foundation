@@ -241,7 +241,7 @@ function evaluateQuality(args: {
   })
 }
 
-function withQuality<TDraft extends { source: 'ai_structured' | 'deterministic_recovery' }>(args: {
+function withQuality<TDraft extends { source: 'ai_structured' | 'rule_based' }>(args: {
   draft: TDraft
   parts: string[]
   contextTerms?: string[]
@@ -297,7 +297,7 @@ async function structuredResponse<T>(args: {
 function fallbackLanding(input: LandingAiInput): LandingAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'ваша страна'
   const draft = {
-    source: 'deterministic_recovery',
+    source: 'rule_based',
     title: 'Фокус: не страна, а узкое место',
     bullets: [
       `${country}: проверьте окно подачи`,
@@ -363,7 +363,7 @@ export async function buildLandingAi(input: LandingAiInput): Promise<LandingAiOu
 function fallbackIntake(input: IntakeAiInput): IntakeAiOutput {
   const country = input.country ? COUNTRY_LABEL[input.country] : 'стране назначения'
   const draft = {
-    source: 'deterministic_recovery',
+    source: 'rule_based',
     title: 'AI Формулировка без потерь',
     rewrite:
       `Прошу повторно рассмотреть кейс для поездки в ${country}: маршрут, даты, бронь проживания и финансовые подтверждения собраны в одну непротиворечивую версию. Готов предоставить недостающий документ сегодня, чтобы снять риск задержки.`,
@@ -434,7 +434,7 @@ export async function buildIntakeAi(input: IntakeAiInput): Promise<IntakeAiOutpu
 function fallbackResult(input: ResultAiInput): ResultAiOutput {
   const country = COUNTRY_LABEL[input.country]
   const draft = {
-    source: 'deterministic_recovery',
+    source: 'rule_based',
     title: 'AI-фокус: снять один риск, не раздувать пакет',
     timeline: [
       {
@@ -531,7 +531,7 @@ function fallbackHumanReview(input: HumanReviewAiInput): HumanReviewAiOutput {
   const safeName = redactName(input.fullName)
   const safeContact = redactContact(input.contact)
   const draft = {
-    source: 'deterministic_recovery',
+    source: 'rule_based',
     title: 'AI Бриф для эксперта',
     urgency: input.verdict === 'HUMAN_REVIEW' ? 'Срочность: высокая' : 'Срочность: стандартная',
     blockers: [

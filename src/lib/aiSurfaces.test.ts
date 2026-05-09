@@ -31,10 +31,10 @@ describe('screen AI public payload', () => {
     ])
 
     for (const output of outputs) {
-      expect(['ai_structured', 'deterministic_recovery']).toContain(output.source)
+      expect(['ai_structured', 'rule_based']).toContain(output.source)
       expect('quality' in output).toBe(false)
       const serialized = JSON.stringify(output)
-      expect(serialized).not.toMatch(/quality|score|confidence|fallback_upgraded|expert_ready/i)
+      expect(serialized).not.toMatch(/quality|score|confidence|fallback_upgraded|expert_ready|deterministic_recovery/i)
     }
   })
 
@@ -62,7 +62,7 @@ describe('screen AI public payload', () => {
       result.tripwire,
     ].join(' ')
 
-    expect(visibleCopy).not.toMatch(/90\/100|порог|fallback|quality|Критерий качества/i)
+    expect(visibleCopy).not.toMatch(/90\/100|порог|fallback|quality|Критерий качества|deterministic_recovery/i)
     expect(landing.bullets.every((item) => item.length <= 54)).toBe(true)
     expect(result.timeline.every((item) => item.action.length <= 72)).toBe(true)
   })

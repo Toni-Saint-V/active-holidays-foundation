@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import { healthResponseSchema, type HealthResponse } from "@shared/contracts";
 import { loadCatalogs } from "./lib/catalogs";
 import { initializeCaseStore } from "./lib/caseStore";
@@ -14,6 +13,7 @@ import {
 import { initializeHumanReviewLearningStore } from "./lib/humanReviewLearningStore";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
+import { configuredCors } from "./middleware/cors";
 import { casesRouter } from "./routes/cases";
 import { sourcesRouter } from "./routes/sources";
 import { rulesRouter } from "./routes/rules";
@@ -37,8 +37,8 @@ export async function createApp(): Promise<express.Express> {
     persistEvents: savePersistedHumanReviewLearningEvents
   });
 
-  app.use(cors());
-  app.use(express.json());
+  app.use(configuredCors());
+  app.use(express.json({ limit: "256kb" }));
   app.use(requestLogger);
 
   const healthResponse: HealthResponse = {

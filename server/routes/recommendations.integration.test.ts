@@ -107,10 +107,13 @@ describe("recommendation HTTP surface", () => {
     expect(response.status).toBe(200);
 
     const parsed = recommendationShortlistSchema.parse(response.json);
-    expect(parsed.source).toBe("deterministic_recovery");
+    expect(parsed.source).toBe("rule_based");
     expect(parsed.items.length).toBeGreaterThan(0);
     expect(parsed.recommendedOfferId).toBeTruthy();
-    expect(parsed.uncertainty.reasons).toContain("generation_unavailable");
+    expect(parsed.uncertainty.reasons).toContain("assistant_limited");
+    expect(JSON.stringify(parsed)).not.toMatch(
+      /confidence|score|quality|\/100|\d{1,3}%|fallback|openai|provider|deterministic_recovery|generation_unavailable|generation_unusable/i
+    );
   });
 
   it("returns a structured detail view for a shortlisted offer", async () => {
@@ -130,10 +133,12 @@ describe("recommendation HTTP surface", () => {
 
     const parsed = recommendationDetailSchema.parse(response.json);
     expect(parsed.offerId).toBe(offerId);
-    expect(parsed.source).toBe("deterministic_recovery");
+    expect(parsed.source).toBe("rule_based");
     expect(parsed.whyThisFits.length).toBeGreaterThan(0);
-    expect(parsed.uncertainty.reasons).toContain("generation_unavailable");
-    expect(parsed.trustSignals.join(" ")).not.toMatch(/confidence|score|\/100|\d{1,3}%/i);
+    expect(parsed.uncertainty.reasons).toContain("assistant_limited");
+    expect(JSON.stringify(parsed)).not.toMatch(
+      /confidence|score|quality|\/100|\d{1,3}%|fallback|openai|provider|deterministic_recovery|generation_unavailable|generation_unusable/i
+    );
   });
 
   it("does not expose baseline nextAction steps in alternative detail", async () => {
@@ -255,6 +260,6 @@ describe("recommendation HTTP surface", () => {
     ].join(" ");
     expect(mergedDetailCopy).not.toContain(result.nextAction.label);
     expect(mergedDetailCopy).not.toContain(result.nextAction.detail);
-    expect(mergedDetailCopy).not.toMatch(/confidence|score|\/100|\d{1,3}%/i);
+    expect(mergedDetailCopy).not.toMatch(/confidence|score|quality|\/100|\d{1,3}%/i);
   });
 });

@@ -50,8 +50,7 @@ type NormalizedOffer = {
 };
 
 type FallbackUncertaintyReason =
-  | "generation_unavailable"
-  | "generation_unusable"
+  | "assistant_limited"
   | null;
 
 let openaiClient: OpenAI | null | undefined;
@@ -286,7 +285,7 @@ function documentsWatchout(result: ResultPayload): string | null {
 }
 
 function shortlistDisclaimer(
-  source: "ai_structured" | "deterministic_recovery"
+  source: "ai_structured" | "rule_based"
 ): string {
   if (source === "ai_structured") {
     return "AI-слой объясняет текущий результат движка и не подменяет формальные требования.";
@@ -294,7 +293,7 @@ function shortlistDisclaimer(
   return "Карточки собраны по проверенным правилам кейса: используйте их как краткий разбор, а не как отдельный источник истины.";
 }
 
-function detailDisclaimer(source: "ai_structured" | "deterministic_recovery"): string {
+function detailDisclaimer(source: "ai_structured" | "rule_based"): string {
   if (source === "ai_structured") {
     return "Разбор основан только на текущем кейсе и расчёте движка Active Holidays.";
   }
@@ -376,11 +375,11 @@ function buildShortlistFallback(
     caseId: caseData.id,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "deterministic_recovery",
+    source: "rule_based",
     recommendedOfferId: deterministicRecommendedOfferId(result, offers),
     items,
     uncertainty: buildUncertainty(result, fallbackReason),
-    disclaimer: shortlistDisclaimer("deterministic_recovery")
+    disclaimer: shortlistDisclaimer("rule_based")
   });
 }
 
@@ -418,7 +417,7 @@ function buildDetailFallback(
     offerId: offer.offerId,
     generatedAt: new Date().toISOString(),
     basedOnComputedAt: result.computedAt,
-    source: "deterministic_recovery",
+    source: "rule_based",
     fit,
     title: offer.title,
     summary: offer.description,
@@ -429,7 +428,7 @@ function buildDetailFallback(
     nextSteps,
     trustSignals,
     uncertainty: buildUncertainty(result, fallbackReason),
-    disclaimer: detailDisclaimer("deterministic_recovery")
+    disclaimer: detailDisclaimer("rule_based")
   });
 }
 
@@ -524,7 +523,7 @@ function sanitizeShortlist(
   }
 
   if (modelItems.size === 0) {
-    return buildShortlistFallback(caseData, result, offers, "generation_unusable");
+    return buildShortlistFallback(caseData, result, offers, "assistant_limited");
   }
 
   const items = offers.map((offer, index) => {
@@ -640,7 +639,7 @@ export async function buildRecommendationShortlist(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildShortlistFallback(caseData, result, offers, "generation_unavailable");
+    return buildShortlistFallback(caseData, result, offers, "assistant_limited");
   }
 
   try {
@@ -663,13 +662,13 @@ export async function buildRecommendationShortlist(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildShortlistFallback(caseData, result, offers, "generation_unusable");
+      return buildShortlistFallback(caseData, result, offers, "assistant_limited");
     }
 
     const parsed = shortlistModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeShortlist(parsed, caseData, result, offers);
   } catch {
-    return buildShortlistFallback(caseData, result, offers, "generation_unusable");
+    return buildShortlistFallback(caseData, result, offers, "assistant_limited");
   }
 }
 
@@ -685,7 +684,7 @@ export async function buildRecommendationDetail(
 
   const client = getOpenAIClient();
   if (!client) {
-    return buildDetailFallback(caseData, result, offer, "generation_unavailable");
+    return buildDetailFallback(caseData, result, offer, "assistant_limited");
   }
 
   try {
@@ -708,12 +707,12 @@ export async function buildRecommendationDetail(
     });
 
     if (responseHasRefusal(response) || !response.output_text) {
-      return buildDetailFallback(caseData, result, offer, "generation_unusable");
+      return buildDetailFallback(caseData, result, offer, "assistant_limited");
     }
 
     const parsed = detailModelSchema.parse(JSON.parse(response.output_text));
     return sanitizeDetail(parsed, caseData, result, offer);
   } catch {
-    return buildDetailFallback(caseData, result, offer, "generation_unusable");
+    return buildDetailFallback(caseData, result, offer, "assistant_limited");
   }
 }

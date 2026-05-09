@@ -740,7 +740,8 @@ describe("human review HTTP surface", () => {
         "GET",
         "/api/cases/s2-tr-spb/drift",
         undefined,
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(driftAfterResolution.status).toBe(200);
       expect(driftAfterResolution.json.drifted).toBe(false);
@@ -762,7 +763,8 @@ describe("human review HTTP surface", () => {
         "GET",
         "/api/cases/s2-tr-spb/drift",
         undefined,
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(driftWithNewerRequest.status).toBe(200);
       expect(driftWithNewerRequest.json.drifted).toBe(false);
