@@ -19,18 +19,30 @@
     --destructive: oklch(0.65 0.22 25);
   }
 
+  html,
+  body {
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    touch-action: manipulation;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-inter), -apple-system, sans-serif;
-    scrollbar-width: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  body::-webkit-scrollbar {
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
     display: none;
+    width: 0;
+    height: 0;
   }
 
   :focus {
@@ -44,6 +56,8 @@
 
   * {
     -webkit-tap-highlight-color: transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
   ::selection {
