@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import '@/app/globals.css'
+import { AutoMotion } from '@/components/AutoMotion'
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -15,12 +16,15 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
     title: 'Active Holiday',
+    statusBarStyle: 'black-translucent',
   },
   icons: {
     icon: '/ah-icon.svg',
     apple: '/ah-icon.svg',
+  },
+  formatDetection: {
+    telephone: false,
   },
   other: {
     'mobile-web-app-capable': 'yes',
@@ -41,7 +45,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body className={`${inter.variable} min-h-screen ah-grid-bg`}>{children}</body>
+      <body className={`${inter.variable} min-h-screen ah-grid-bg`}>
+        <AutoMotion />
+        {children}
+      </body>
     </html>
   )
 }
