@@ -1,0 +1,102 @@
+name: UI Polish Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-polish-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-polish:
+    name: UI polish fail-closed gate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare baseline from PR base SHA
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          rm -rf .ci-base
+          git worktree add --detach .ci-base "$BASE_SHA"
+          (
+            cd .ci-base
+            npm ci
+            UI_BASE_URL=http://127.0.0.1:3201 "$WORKSPACE/node_modules/.bin/tsx" "$WORKSPACE/scripts/ui/screen-lab.ts" --baseline
+          )
+          mkdir -p reports/ui/baseline
+          cp -f .ci-base/reports/ui/baseline/*.png reports/ui/baseline/
+          cp -f .ci-base/reports/ui/baseline/ui-screen-report.json reports/ui/baseline/
+          cp -f .ci-base/reports/ui/baseline/ui-screen-report.md reports/ui/baseline/
+          node -e "const fs=require('fs'); const meta={generatedAt:new Date().toISOString(), branch:process.env.BASE_REF || 'unknown', commit:process.env.BASE_SHA || 'unknown', workingTreeDirty:false, command:'ci baseline from base sha'}; fs.writeFileSync('reports/ui/baseline/baseline-meta.json', JSON.stringify(meta, null, 2)+'\n');"
+
+      - name: Prepare baseline for manual run
+        if: github.event_name != 'pull_request'
+        run: npm run ui:baseline:refresh
+
+      - name: UI screen lab
+        env:
+          UI_BASE_URL: http://127.0.0.1:3100
+        run: npm run ui:screen-lab
+
+      - name: UI visual diff
+        env:
+          UI_BASE_URL: http://127.0.0.1:3100
+        run: npm run ui:visual-diff
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload UI reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-polish-artifacts-${{ github.run_id }}
+          path: |
+            reports/ui/**/*.png
+            reports/ui/**/*.md
+            reports/ui/**/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Cleanup baseline worktree
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          git worktree remove .ci-base --force || true
+          rm -rf .ci-base

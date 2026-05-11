@@ -74,7 +74,7 @@
     "ui:baseline:refresh": "tsx scripts/ui/baseline-refresh.ts",
     "ui:premium-polish-patch": "tsx scripts/ui/premium-polish-patch.ts",
     "ui:visual-diff": "tsx scripts/ui/visual-diff.ts",
-    "ui:polish-check": "npm run ui:screen-lab && npm run ui:visual-diff && npm run typecheck",
+    "ui:polish-check": "npm run ui:screen-lab && npm run ui:visual-diff && npm run typecheck && npm run build",
     "start": "next start",
     "verify:forbidden-copy": "node scripts/ci/forbidden-copy-check.mjs"
   },
