@@ -30,6 +30,10 @@ type FullscreenRoot = HTMLElement & {
   msRequestFullscreen?: () => Promise<void> | void
 }
 
+type StandaloneNavigator = Navigator & {
+  standalone?: boolean
+}
+
 const countries: CountryView[] = [
   {
     code: 'IT',
@@ -73,26 +77,19 @@ const countryByCode = countries.reduce<Record<CountryCode, CountryView>>(
   {} as Record<CountryCode, CountryView>
 )
 
-const factTagTones = [
-  'border-sky-300/[0.22] bg-sky-300/[0.075] text-sky-50/[0.82]',
-  'border-violet-300/[0.22] bg-violet-300/[0.075] text-violet-50/[0.8]',
-  'border-cyan-300/[0.18] bg-cyan-300/[0.06] text-cyan-50/[0.74]',
-  'border-fuchsia-300/[0.18] bg-fuchsia-300/[0.06] text-fuchsia-50/[0.74]',
-]
-
 export default function LandingPage() {
   const router = useRouter()
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode | null>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>('IT')
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false)
   const [brandHintActive, setBrandHintActive] = useState(true)
   const [brandPulseCycle, setBrandPulseCycle] = useState(0)
 
-  const selectedCountryView = selectedCountry ? countryByCode[selectedCountry] : null
-  const heroImage = selectedCountry ? COUNTRIES[selectedCountry].heroImage : planeImg.src
-  const activeFacts = selectedCountryView?.facts ?? ['окно подачи', 'главный риск', 'документы']
-  const liveLine = selectedCountryView
-    ? `${selectedCountryView.name} · ${selectedCountryView.duration}`
-    : 'Выберите страну · срок появится здесь'
+  const selectedCountryView = countryByCode[selectedCountry]
+  const heroImage = COUNTRIES[selectedCountry].heroImage || planeImg.src
+  const activeFacts = selectedCountryView.facts
+  const riskFact = activeFacts.find((fact) => fact.startsWith('риск')) ?? activeFacts[2]
+  const documentsFact = activeFacts.find((fact) => fact.includes('документ')) ?? activeFacts[1]
+  const liveLine = `${selectedCountryView.name} · ${selectedCountryView.duration}`
 
   function getFullscreenElement() {
     const fullscreenDocument = document as FullscreenDocument
@@ -102,6 +99,30 @@ export default function LandingPage() {
       fullscreenDocument.msFullscreenElement ??
       null
     )
+  }
+
+  function isStandaloneMode() {
+    const standaloneNavigator = navigator as StandaloneNavigator
+    return (
+      standaloneNavigator.standalone === true ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: standalone)').matches
+    )
+  }
+
+  function setImmersiveIntent(enabled: boolean) {
+    if (enabled) {
+      document.documentElement.dataset.ahImmersive = 'true'
+      document.documentElement.style.setProperty('--ah-immersive-height', `${window.innerHeight}px`)
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 1, left: 0, behavior: 'smooth' })
+      })
+      return
+    }
+
+    delete document.documentElement.dataset.ahImmersive
+    document.documentElement.style.removeProperty('--ah-immersive-height')
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }
 
   function triggerBrandHint() {
@@ -114,7 +135,12 @@ export default function LandingPage() {
 
   useEffect(() => {
     function syncFullscreenState() {
-      setIsFullscreen(Boolean(getFullscreenElement()))
+      const fullscreenElement = Boolean(getFullscreenElement())
+      const immersiveIntent = document.documentElement.dataset.ahImmersive === 'true'
+      setIsImmersiveMode(fullscreenElement || isStandaloneMode() || immersiveIntent)
+      if (immersiveIntent) {
+        document.documentElement.style.setProperty('--ah-immersive-height', `${window.innerHeight}px`)
+      }
     }
 
     syncFullscreenState()
@@ -122,6 +148,8 @@ export default function LandingPage() {
     document.addEventListener('fullscreenchange', syncFullscreenState)
     document.addEventListener('webkitfullscreenchange', syncFullscreenState)
     document.addEventListener('msfullscreenchange', syncFullscreenState)
+    window.addEventListener('resize', syncFullscreenState)
+    window.addEventListener('orientationchange', syncFullscreenState)
 
     const hintInterval = window.setInterval(() => {
       if (!getFullscreenElement()) {
@@ -134,16 +162,23 @@ export default function LandingPage() {
       document.removeEventListener('fullscreenchange', syncFullscreenState)
       document.removeEventListener('webkitfullscreenchange', syncFullscreenState)
       document.removeEventListener('msfullscreenchange', syncFullscreenState)
+      window.removeEventListener('resize', syncFullscreenState)
+      window.removeEventListener('orientationchange', syncFullscreenState)
+      setImmersiveIntent(false)
     }
   }, [])
 
   function toggleCountry(country: CountryCode) {
-    setSelectedCountry((current) => (current === country ? null : country))
+    setSelectedCountry(country)
   }
 
   async function toggleFullscreen() {
     try {
-      if (!getFullscreenElement()) {
+      const fullscreenElement = getFullscreenElement()
+      const immersiveIntent = document.documentElement.dataset.ahImmersive === 'true'
+
+      if (!fullscreenElement && !immersiveIntent) {
+        setImmersiveIntent(true)
         const fullscreenRoot = document.documentElement as FullscreenRoot
         const requestFullscreen =
           fullscreenRoot.requestFullscreen ??
@@ -151,12 +186,13 @@ export default function LandingPage() {
           fullscreenRoot.msRequestFullscreen
 
         if (!requestFullscreen) {
+          setIsImmersiveMode(true)
           triggerBrandHint()
           return
         }
 
         await requestFullscreen.call(fullscreenRoot)
-        setIsFullscreen(true)
+        setIsImmersiveMode(true)
         return
       }
 
@@ -166,27 +202,24 @@ export default function LandingPage() {
         fullscreenDocument.webkitExitFullscreen ??
         fullscreenDocument.msExitFullscreen
 
-      await exitFullscreen?.call(document)
-      setIsFullscreen(false)
+      if (fullscreenElement) {
+        await exitFullscreen?.call(document)
+      }
+      setImmersiveIntent(false)
+      setIsImmersiveMode(isStandaloneMode())
     } catch {
       // Browsers may block fullscreen outside a trusted user gesture.
-      setIsFullscreen(Boolean(getFullscreenElement()))
+      setIsImmersiveMode(Boolean(getFullscreenElement()) || isStandaloneMode())
       triggerBrandHint()
     }
   }
 
   function startVisaCheck() {
-    if (!selectedCountry) return
-    router.push(`/intake?country=${selectedCountry}`)
-  }
-
-  function openInsuranceFlow() {
-    if (!selectedCountry) return
     router.push(`/intake?country=${selectedCountry}`)
   }
 
   return (
-    <main className="h-[100svh] w-full overflow-hidden bg-[#020712] text-white">
+    <main className="h-[100dvh] min-h-[100svh] w-full overflow-hidden bg-[#020712] text-white" data-immersive={isImmersiveMode}>
       <section className="relative isolate h-full overflow-hidden">
         <div
           key={heroImage}
@@ -196,19 +229,19 @@ export default function LandingPage() {
         />
         <div className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:42px_42px] opacity-[0.22]" />
 
-        <div className="relative z-10 flex h-full min-h-0 w-full min-w-0 flex-col px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-[clamp(22px,4.5svh,38px)]">
+        <div className="relative z-10 flex h-full min-h-0 w-full min-w-0 flex-col px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-[clamp(22px,4.5svh,38px)] md:max-w-[620px] md:px-8">
           <div className="flex min-h-[32px] items-center gap-2.5">
             <button
               type="button"
               onClick={toggleFullscreen}
               onAnimationEnd={() => setBrandHintActive(false)}
-              aria-label={isFullscreen ? 'Выйти из полноэкранного режима' : 'Открыть во весь экран'}
-              aria-pressed={isFullscreen}
+              aria-label={isImmersiveMode ? 'Выйти из полноэкранного режима' : 'Открыть во весь экран'}
+              aria-pressed={isImmersiveMode}
               data-pulse-cycle={brandPulseCycle}
               className={cn(
                 'ah-brand-logo grid h-[31px] w-[31px] shrink-0 place-items-center rounded-full border-0 bg-[rgba(255,140,31,0.055)] p-0 text-[22px] font-bold leading-none tracking-[-0.04em] text-[#ff8c1f] active:scale-95',
-                brandHintActive && !isFullscreen && 'ah-brand-logo--hint',
-                isFullscreen && 'ah-brand-logo--fullscreen'
+                brandHintActive && !isImmersiveMode && 'ah-brand-logo--hint',
+                isImmersiveMode && 'ah-brand-logo--fullscreen'
               )}
             >
               A
@@ -227,7 +260,7 @@ export default function LandingPage() {
           <p className="mt-[clamp(14px,2.35svh,20px)] text-[clamp(14px,2svh,17px)] font-light leading-[1.28] text-white/68">
             Страна задаёт первый риск.
             <br />
-            Дальше проверим даты и портфель.
+            Дальше — даты, документы и план.
           </p>
 
           <div className="mt-[clamp(20px,3.55svh,30px)] text-[11px] font-medium uppercase leading-none tracking-[0.16em] text-white/42">
@@ -303,46 +336,24 @@ export default function LandingPage() {
           <div
             key={selectedCountry ?? 'empty'}
             data-testid="fact-tags"
-            className="mt-[clamp(18px,2.6svh,22px)] flex min-h-[clamp(72px,9.8svh,82px)] flex-wrap content-start gap-2"
+            className="mt-[clamp(18px,2.6svh,22px)] flex min-h-[42px] flex-wrap content-start gap-2"
           >
-            {activeFacts.map((fact, index) => (
-              <span
-                key={fact}
-                className={cn(
-                  'ah-fact-tag inline-flex min-h-[34px] max-w-full items-center rounded-full border px-3 py-2 text-[12px] font-normal leading-[1.2] tracking-[0.003em]',
-                  factTagTones[index % factTagTones.length]
-                )}
-                style={{ '--tag-delay': `${index * 95}ms` } as React.CSSProperties}
-              >
-                {fact}
-              </span>
-            ))}
+            <span className="inline-flex min-h-[34px] max-w-full items-center rounded-full border border-primary/22 bg-primary/[0.075] px-3 py-2 text-[12px] font-normal leading-[1.2] tracking-[0.003em] text-primary/90">
+              {riskFact}
+            </span>
+            <span className="inline-flex min-h-[34px] max-w-full items-center rounded-full border border-white/12 bg-white/[0.035] px-3 py-2 text-[12px] font-normal leading-[1.2] tracking-[0.003em] text-white/62">
+              {documentsFact}
+            </span>
           </div>
 
-          <div className="mt-auto w-full pt-[clamp(8px,1.4svh,12px)]">
-            <button
-              type="button"
-              onClick={openInsuranceFlow}
-              disabled={!selectedCountry}
-              data-testid="insurance-cta"
-              className="mb-4 flex h-[clamp(52px,7.2svh,64px)] w-full items-center justify-center rounded-full border border-white/[0.075] bg-white/[0.025] text-[13px] font-normal tracking-[0.005em] text-white/44 transition-colors active:bg-white/[0.04] disabled:text-white/24"
-            >
-              Купить страховку
-            </button>
-
+          <div className="relative z-20 mt-auto w-full pt-[clamp(8px,1.4svh,12px)]">
             <button
               type="button"
               onClick={startVisaCheck}
-              disabled={!selectedCountry}
               data-testid="primary-cta"
-              className={cn(
-                'relative flex h-[clamp(52px,7.2svh,64px)] w-full items-center justify-center rounded-full text-[19px] font-semibold tracking-normal transition-[transform,opacity,box-shadow] active:translate-y-[1px]',
-                selectedCountry
-                  ? 'bg-[linear-gradient(180deg,#ffbb73,#ff8c1f)] text-[#101318] shadow-[0_16px_40px_rgba(255,139,31,0.24),inset_0_1px_0_rgba(255,255,255,0.26)]'
-                  : 'bg-[linear-gradient(180deg,rgba(255,187,115,0.48),rgba(255,140,31,0.36))] text-[rgba(16,19,24,0.58)] shadow-[0_12px_32px_rgba(255,139,31,0.09),inset_0_1px_0_rgba(255,255,255,0.14)]'
-              )}
+              className="relative flex h-[clamp(56px,7.5svh,66px)] w-full items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffbb73,#ff8c1f)] text-[19px] font-semibold tracking-normal text-[#101318] shadow-[0_18px_44px_rgba(255,139,31,0.26),inset_0_1px_0_rgba(255,255,255,0.26)] transition-[transform,box-shadow] active:translate-y-[1px]"
             >
-              {selectedCountryView ? `Проверить ${selectedCountryView.ctaName}` : 'Выберите страну'}
+              Проверить {selectedCountryView.ctaName}
             </button>
 
             <p className="mt-[clamp(10px,1.7svh,14px)] flex items-center justify-center gap-1.5 text-center text-[11px] leading-[1.3] text-white/26">
@@ -466,14 +477,6 @@ export default function LandingPage() {
           animation: live-line-in 620ms ease both;
         }
 
-        .ah-fact-tag {
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-          opacity: 0;
-          transform: translateY(8px) scale(0.96);
-          animation: tag-pop 520ms cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
-          animation-delay: var(--tag-delay);
-        }
-
         @keyframes brand-hint {
           0% {
             transform: scale(1);
@@ -548,24 +551,6 @@ export default function LandingPage() {
           }
         }
 
-        @keyframes tag-pop {
-          0% {
-            opacity: 0;
-            transform: translateY(8px) scale(0.96);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        @media (max-height: 760px) {
-          .ah-fact-tag {
-            min-height: 30px;
-            padding-top: 6px;
-            padding-bottom: 6px;
-          }
-        }
       `}</style>
     </main>
   )

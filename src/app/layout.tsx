@@ -12,6 +12,21 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Active Holiday',
   description: 'Проверка готовности к подаче на шенген',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Active Holiday',
+  },
+  icons: {
+    icon: '/ah-icon.svg',
+    apple: '/ah-icon.svg',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+  },
 }
 
 export const viewport: Viewport = {
@@ -20,6 +35,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  themeColor: '#020712',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,20 @@
+{
+  "name": "Active Holiday",
+  "short_name": "Active Holiday",
+  "description": "Проверка готовности к подаче на шенген",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#020712",
+  "theme_color": "#020712",
+  "icons": [
+    {
+      "src": "/ah-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

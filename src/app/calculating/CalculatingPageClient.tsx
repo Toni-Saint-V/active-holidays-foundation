@@ -25,12 +25,12 @@ export function CalculatingPageClient() {
         <div className="relative z-10">
           <AHEyebrow>Расчёт маршрута</AHEyebrow>
           <h1 className="ah-display mt-5 max-w-2xl text-[42px] md:text-[56px]">
-            Собираем вердикт
+            Собираем AI-карту
             <br />
             по вашему кейсу
           </h1>
           <p className="mt-5 max-w-xl text-[15px] leading-snug text-foreground/80">
-            Проверяем страну, даты, буфер до поездки и риск ручной проверки. Следующий экран откроется автоматически.
+            Сверяем страну, даты, документы и главный риск. Следующий экран откроется автоматически.
           </p>
 
           <RouteMap forceStop={2} className="mt-8 max-w-2xl" />

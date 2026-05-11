@@ -37,6 +37,26 @@
     text-rendering: optimizeLegibility;
   }
 
+  html[data-ah-immersive='true'],
+  html[data-ah-immersive='true'] body {
+    background: #020712;
+    min-height: calc(var(--ah-immersive-height, 100dvh) + 1px);
+  }
+
+  html[data-ah-immersive='true'] body {
+    overflow-y: auto;
+  }
+
+  @media (display-mode: fullscreen), (display-mode: standalone) {
+    html,
+    body {
+      height: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      background: #020712;
+    }
+  }
+
   html::-webkit-scrollbar,
   body::-webkit-scrollbar,
   *::-webkit-scrollbar {
