@@ -1,8 +1,8 @@
 'use client'
 
-import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, MapPin, Sparkles } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, MapPin, Maximize2, Minimize2, Sparkles } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { StepRail } from '@/components/StepRail'
 import { fetchIntakeAi } from '@/lib/aiSurfaceClient'
@@ -11,6 +11,18 @@ import { COUNTRIES } from '@/lib/countryData'
 import type { CountryCode } from '@/lib/constants'
 
 type Purpose = 'Туризм' | 'По работе' | 'К родственникам' | 'Спорт/событие'
+
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void
+  webkitFullscreenElement?: Element | null
+  msExitFullscreen?: () => Promise<void> | void
+  msFullscreenElement?: Element | null
+}
+
+type FullscreenRoot = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void
+  msRequestFullscreen?: () => Promise<void> | void
+}
 
 const PURPOSE_OPTIONS: Purpose[] = ['Туризм', 'По работе', 'К родственникам', 'Спорт/событие']
 const COUNTRY_ORDER: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
@@ -101,6 +113,8 @@ export function IntakePageClient() {
   const [refusalContext, setRefusalContext] = useState('')
   const [intakeAi, setIntakeAi] = useState<IntakeAiOutput | null>(null)
   const [intakeAiLoading, setIntakeAiLoading] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [logoPulseActive, setLogoPulseActive] = useState(false)
 
   const daysToTrip = useMemo(() => daysToTripFromDate(departureDate), [departureDate])
   const dateRangeValid = useMemo(
@@ -126,6 +140,49 @@ export function IntakePageClient() {
     }
     return false
   }, [country, dateRangeValid, hadRefusal, purpose, refusalContext, step])
+
+  useEffect(() => {
+    function getFullscreenElement() {
+      const fullscreenDocument = document as FullscreenDocument
+      return (
+        document.fullscreenElement ??
+        fullscreenDocument.webkitFullscreenElement ??
+        fullscreenDocument.msFullscreenElement ??
+        null
+      )
+    }
+
+    function syncFullscreenState() {
+      setIsFullscreen(Boolean(getFullscreenElement()))
+    }
+
+    syncFullscreenState()
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+    document.addEventListener('webkitfullscreenchange', syncFullscreenState)
+    document.addEventListener('msfullscreenchange', syncFullscreenState)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreenState)
+      document.removeEventListener('msfullscreenchange', syncFullscreenState)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isFullscreen) {
+      setLogoPulseActive(false)
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      setLogoPulseActive(true)
+      window.setTimeout(() => setLogoPulseActive(false), 1400)
+    }, 30_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isFullscreen])
 
   function applyDatePreset(startInDays: number, durationDays: number) {
     const departure = addDaysIso(startInDays)
@@ -176,8 +233,51 @@ export function IntakePageClient() {
     }
   }
 
+  async function toggleImmersiveMode() {
+    const fullscreenDocument = document as FullscreenDocument
+    const fullscreenRoot = document.documentElement as FullscreenRoot
+    const fullscreenElement =
+      document.fullscreenElement ??
+      fullscreenDocument.webkitFullscreenElement ??
+      fullscreenDocument.msFullscreenElement ??
+      null
+
+    if (!fullscreenElement) {
+      const requestFullscreen =
+        fullscreenRoot.requestFullscreen ??
+        fullscreenRoot.webkitRequestFullscreen ??
+        fullscreenRoot.msRequestFullscreen
+
+      if (requestFullscreen) {
+        try {
+          await requestFullscreen.call(fullscreenRoot)
+          return
+        } catch {
+          // Fall through to scroll fallback.
+        }
+      }
+    } else {
+      const exitFullscreen =
+        document.exitFullscreen ??
+        fullscreenDocument.webkitExitFullscreen ??
+        fullscreenDocument.msExitFullscreen
+
+      if (exitFullscreen) {
+        try {
+          await exitFullscreen.call(document)
+          return
+        } catch {
+          // Fall through to scroll fallback.
+        }
+      }
+    }
+
+    // iOS Safari may not support fullscreen for regular pages.
+    window.scrollTo({ top: 1, behavior: 'smooth' })
+  }
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020712] text-white">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#020712] text-white">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[43svh] bg-cover bg-center opacity-[0.52]"
         style={{ backgroundImage: `url(${activeHero})` }}
@@ -186,13 +286,41 @@ export function IntakePageClient() {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#020712]/45 via-[#020712]/82 to-[#020712]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:44px_44px] opacity-[0.2]" />
 
-      <section className="relative z-10 flex h-[100svh] flex-col px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-6 md:mx-auto md:max-w-[460px] md:px-0">
+      <section className="relative z-10 flex min-h-screen flex-col px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-6 md:mx-auto md:max-w-[460px] md:px-0">
         <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.2em] text-white/65">
-            ACTIVE HOLIDAY · ДЛЯ ГРАЖДАН РФ
-          </p>
-          <div className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/80">
-            Шаг {step}/4
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="relative grid h-[31px] w-[31px] shrink-0 place-items-center">
+              <span
+                aria-hidden
+                className={`absolute inset-[-5px] rounded-full bg-primary/35 blur-[10px] transition-all duration-700 ${
+                  logoPulseActive ? 'scale-125 opacity-90' : 'scale-100 opacity-0'
+                }`}
+              />
+              <span
+                className={`relative grid h-[31px] w-[31px] place-items-center rounded-full border border-primary/35 bg-primary/10 text-[20px] font-bold leading-none tracking-[-0.03em] text-primary transition-all duration-700 ${
+                  logoPulseActive ? 'scale-110 shadow-[0_0_18px_rgba(247,163,77,0.45)]' : 'scale-100'
+                }`}
+              >
+                A
+              </span>
+            </div>
+            <p className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.2em] text-white/65">
+              ACTIVE HOLIDAY · ДЛЯ ГРАЖДАН РФ
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void toggleImmersiveMode()}
+              className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/85"
+              aria-label={isFullscreen ? 'Выйти из полноэкранного режима' : 'Войти в полноэкранный режим'}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {isFullscreen ? 'Экран' : 'Фокус'}
+            </button>
+            <div className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-white/80">
+              Шаг {step}/4
+            </div>
           </div>
         </div>
 
