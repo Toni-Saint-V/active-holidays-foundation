@@ -310,6 +310,7 @@ export function IntakePageClient() {
           </button>
           <button
             type="button"
+            data-testid="intake-primary-cta"
             onClick={goNext}
             disabled={!canProceed}
             className="ah-amber-cta flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40"
