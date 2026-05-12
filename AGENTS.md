@@ -7,6 +7,7 @@ Repo-level operating contract for Codex and reviewers. Keep this file short. Kee
 - `docs/ui/premium-scorecard.md`
 - `docs/workflows/codex-delivery-flow.md`
 - `docs/workflows/merge-readiness-checklist.md`
+- `docs/workflows/parallel-codex-streams.md`
 - `docs/templates/codex-task-template.md`
 - `docs/templates/pr-report-template.md`
 
@@ -100,6 +101,7 @@ Required evidence when gate applies:
 - Start from clean status unless intentionally continuing the same task branch.
 - New task branch path: `checkout main` and `pull --ff-only`, then create branch.
 - Continue existing task branch path: stay on branch, verify scope/status, do not `checkout main` in the middle of the task.
+- For multi-stream execution ownership and routing, follow `docs/workflows/parallel-codex-streams.md`.
 - Push task branch only when checks are acceptable. Never force-push.
 - Open PR when `gh` is available and authenticated.
 - Do not auto-merge risky runtime changes.
