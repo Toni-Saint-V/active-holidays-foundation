@@ -76,7 +76,9 @@
     "ui:visual-diff": "tsx scripts/ui/visual-diff.ts",
     "ui:polish-check": "npm run ui:screen-lab && npm run ui:visual-diff && npm run typecheck && npm run build",
     "start": "next start",
-    "verify:forbidden-copy": "node scripts/ci/forbidden-copy-check.mjs"
+    "verify:forbidden-copy": "node scripts/ci/forbidden-copy-check.mjs",
+    "release:gate": "tsx scripts/ci/release-gate-summary.ts",
+    "release:gate:json": "tsx scripts/ci/release-gate-summary.ts --json"
   },
   "dependencies": {
     "@langchain/core": "^1.1.42",

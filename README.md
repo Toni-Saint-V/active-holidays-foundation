@@ -49,7 +49,24 @@ No legacy Vite UI, React Router screen tree, `src/screens`, `src/ui`, or generat
 - `pnpm run typecheck` — TypeScript check
 - `pnpm run test` — Vitest suite
 - `pnpm run verify` — forbidden-copy check, typecheck, build
+- `pnpm run release:gate` — centralized blocking/advisory release verdict summary
+- `pnpm run release:gate:json` — machine-readable release verdict JSON only
 - `pnpm run server` — Express API for domain/runtime work
+
+## Release Gate Matrix
+
+`release:gate` runs the existing checks under one centralized policy and exits non-zero only when blocking checks fail.
+
+- Blocking:
+  - `npm run verify`
+  - `npm run verify:boundaries`
+  - `npm run verify:engine`
+  - `npm run automations:verify`
+  - `npm run automations:verify:negative`
+  - `npm run automations:check:truth`
+- Advisory:
+  - `npm run automations:check:context`
+  - `npm run autonomous:verify` (side-effecting; skipped by default unless `--include-side-effects` is passed)
 
 ## Environment
 
