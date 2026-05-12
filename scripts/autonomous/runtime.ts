@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { cpus, freemem, loadavg, totalmem, uptime } from "node:os";
 import path from "node:path";
 import { MODE_DEFINITIONS, type ModeId, type MultiAgentRole } from "../codex/skill-mode-registry.ts";
+import { writeAutonomousArtifacts } from "./artifact-write.ts";
 
 export type RuntimeCommandErrorClass =
   | "not_found"
@@ -1148,13 +1149,16 @@ export function writeNextTaskArtifacts(
   result: NextTaskResult,
   currentRepoRoot = repoRoot
 ): void {
-  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
-  mkdirSync(currentOutputDir, { recursive: true });
-  writeFileSync(
-    path.join(currentOutputDir, "next-best-task-latest.json"),
-    `${JSON.stringify(result, null, 2)}\n`
-  );
-  writeFileSync(path.join(currentOutputDir, "founder-report-latest.md"), `${result.founderReport}\n`);
+  writeAutonomousArtifacts(currentRepoRoot, [
+    {
+      fileName: "next-best-task-latest.json",
+      content: `${JSON.stringify(result, null, 2)}\n`
+    },
+    {
+      fileName: "founder-report-latest.md",
+      content: `${result.founderReport}\n`
+    }
+  ]);
 }
 
 export function buildAutonomousBranchName(candidateId: string): string {
@@ -1679,13 +1683,16 @@ export function writeExecutionArtifacts(
   packet: ExecutionPacket,
   currentRepoRoot = repoRoot
 ): void {
-  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
-  mkdirSync(currentOutputDir, { recursive: true });
-  writeFileSync(
-    path.join(currentOutputDir, "executor-packet-latest.json"),
-    `${JSON.stringify(packet, null, 2)}\n`
-  );
-  writeFileSync(path.join(currentOutputDir, "executor-brief-latest.md"), `${packet.executionBrief}\n`);
+  writeAutonomousArtifacts(currentRepoRoot, [
+    {
+      fileName: "executor-packet-latest.json",
+      content: `${JSON.stringify(packet, null, 2)}\n`
+    },
+    {
+      fileName: "executor-brief-latest.md",
+      content: `${packet.executionBrief}\n`
+    }
+  ]);
 }
 
 export function runVerificationStack(
@@ -2045,13 +2052,16 @@ function buildHealthReport(snapshot: AutonomousHealthSnapshot): string {
 }
 
 export function writeHealthArtifacts(snapshot: AutonomousHealthSnapshot, currentRepoRoot = repoRoot): void {
-  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
-  mkdirSync(currentOutputDir, { recursive: true });
-  writeFileSync(
-    path.join(currentOutputDir, "health-latest.json"),
-    `${JSON.stringify(snapshot, null, 2)}\n`
-  );
-  writeFileSync(path.join(currentOutputDir, "health-latest.md"), `${buildHealthReport(snapshot)}\n`);
+  writeAutonomousArtifacts(currentRepoRoot, [
+    {
+      fileName: "health-latest.json",
+      content: `${JSON.stringify(snapshot, null, 2)}\n`
+    },
+    {
+      fileName: "health-latest.md",
+      content: `${buildHealthReport(snapshot)}\n`
+    }
+  ]);
 }
 
 function buildCycleReport(result: AutonomousCycleResult): string {
@@ -2110,13 +2120,16 @@ export function writeCycleArtifacts(
   result: AutonomousCycleResult,
   currentRepoRoot = repoRoot
 ): void {
-  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
-  mkdirSync(currentOutputDir, { recursive: true });
-  writeFileSync(
-    path.join(currentOutputDir, "cycle-latest.json"),
-    `${JSON.stringify(result, null, 2)}\n`
-  );
-  writeFileSync(path.join(currentOutputDir, "cycle-report-latest.md"), `${buildCycleReport(result)}\n`);
+  writeAutonomousArtifacts(currentRepoRoot, [
+    {
+      fileName: "cycle-latest.json",
+      content: `${JSON.stringify(result, null, 2)}\n`
+    },
+    {
+      fileName: "cycle-report-latest.md",
+      content: `${buildCycleReport(result)}\n`
+    }
+  ]);
 }
 
 export function runAutonomousCycle(options?: {
@@ -2230,13 +2243,16 @@ function buildLevelBReport(result: LevelBCycleResult): string {
 }
 
 function writeLevelBArtifacts(result: LevelBCycleResult, currentRepoRoot = repoRoot): void {
-  const currentOutputDir = path.join(currentRepoRoot, "reports", "autonomous");
-  mkdirSync(currentOutputDir, { recursive: true });
-  writeFileSync(
-    path.join(currentOutputDir, "level-b-latest.json"),
-    `${JSON.stringify(result, null, 2)}\n`
-  );
-  writeFileSync(path.join(currentOutputDir, "level-b-latest.md"), `${buildLevelBReport(result)}\n`);
+  writeAutonomousArtifacts(currentRepoRoot, [
+    {
+      fileName: "level-b-latest.json",
+      content: `${JSON.stringify(result, null, 2)}\n`
+    },
+    {
+      fileName: "level-b-latest.md",
+      content: `${buildLevelBReport(result)}\n`
+    }
+  ]);
 }
 
 export function runLevelBCycle(options?: {
