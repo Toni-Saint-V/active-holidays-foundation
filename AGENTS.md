@@ -1,93 +1,148 @@
 # AGENTS.md
 
-## Core Rules
+## Purpose
+
+Repo-level operating contract for Codex and reviewers. Keep this file short. Keep detailed process in:
+
+- `docs/ui/premium-scorecard.md`
+- `docs/workflows/codex-delivery-flow.md`
+- `docs/workflows/merge-readiness-checklist.md`
+- `docs/templates/codex-task-template.md`
+- `docs/templates/pr-report-template.md`
+
+## Repo-First Rules
 
 - Domain logic first, UI second.
-- Never claim completeness without verification.
-- Never leak secrets or server-only data to browser code.
-- UI must depend on stable domain contracts, not raw storage shapes.
+- Inspect repo truth before edits: `package.json`, relevant code/contracts, `AGENTS.md`, `docs/`, and `README.md` when relevant.
+- Work in task branches only. Never execute tasks directly in `main`.
+- One task, one branch, one clean PR.
+- Keep scope tight: no unrelated files, no cosmetic refactor outside task.
 - All visible UI copy must be in Russian.
-- Prefer the strongest real implementation over broad fake completeness.
-- Repo-local custom Codex skills live in `.codex/skills` and should stay versioned with the repository when they affect this project's workflow.
 
-## Project Ownership Rules
+## Source-of-Truth Hierarchy
 
-- Keep the whole Active Holidays project in view, not just the current file or isolated task.
-- Do not behave like a narrow ticket executor when project continuity matters.
-- Proactively define or surface the next strongest concrete task when it helps move the project forward.
-- Keep delivery aligned with the current project phase, real constraints, and source-of-truth artifacts.
-- When useful, prepare handoff-ready next-step blocks for Lovable, Cursor, Codex, or GitHub instead of making the user restate the work.
+1. Production code and domain contracts (`src/`, `server/`, `shared/`).
+2. Operational scripts and configs (`package.json`, tool configs).
+3. `AGENTS.md`.
+4. `docs/`.
+5. `README.md`.
+6. Prior plans/chat notes.
 
-## Notion Discipline Rules
+When sources conflict, follow the higher source and update lower docs.
 
-- When Notion is part of the workflow and access exists, treat it as a living source of truth, not passive reference material.
-- Reconcile repo reality with Notion before making major planning, scope, or status claims.
-- Keep task framing, progress, and execution state aligned between the implementation and Notion.
-- After meaningful progress, scope change, or decision change, update the relevant Notion artifact or prepare the exact update block immediately.
-- Do not let Notion drift away from the actual project state.
+## Active Holidays Law
 
-## Protocol Rules
+- ResultPayload is canonical.
+- PublicReadiness is projection.
+- Engine decides.
+- AI explains.
+- UI shows provenance.
+- Human review is premium path, not failure.
+- Insurance attach is gated monetization, not forced purchase.
 
-- Ordinary discussion and clarification may use normal natural language.
-- Default final answer format for every task must stay short and human-readable:
+## Safety Blockers (Hard Stop)
+
+Block any change that introduces:
+
+- URL-driven result truth.
+- Fake readiness, confidence, or document verification.
+- Visa guarantee claims.
+- AI owning deterministic fields.
+- Insurance CTA for unknown/ineligible cases.
+- Fake "human review sent" state.
+- Raw prompts, internal tokens, or unnecessary PII in browser/analytics.
+- UI that invents backend/product truth.
+
+## Codex Execution Rules
+
+- Always inspect `package.json` scripts before claiming checks passed.
+- If a script is missing, mark it `ABSENT`; never report it as passed.
+- Never hide failing checks.
+- Docs-only tasks must not touch runtime/UI/backend code or dependencies.
+- Do not change public API unless task scope requires it.
+- For UI code tasks, PNG approval is required before UI implementation.
+
+## Premium UI Gate
+
+Premium UI Gate from `docs/ui/premium-scorecard.md` is mandatory for any user-visible UI/UX diff, including:
+
+- Layout or navigation changes.
+- CTA placement, hierarchy, or copy changes.
+- User-facing copy affecting trust, readiness, verification, eligibility, insurance, AI, or next action.
+- Responsive behavior changes.
+- Visual hierarchy changes.
+- Loading, error, empty, or success state changes.
+- Accessibility-affecting UI changes.
+- Motion or animation changes.
+- Monetization UI changes.
+- AI explanation UI changes.
+
+Exceptions only:
+
+- Typo-only copy fix without meaning/trust change.
+- Docs-only change.
+- Test-only change.
+- Non-visible refactor.
+
+If there is doubt, Premium UI Gate is required.
+
+Required evidence when gate applies:
+
+- Score `>=85/100`
+- No category below `3/5`
+- Screenshot pack
+- UX risk block
+- Accessibility check
+- Truth-safety confirmation
+
+## Branch, PR, and Merge Rules
+
+- Start from clean status unless intentionally continuing the same task branch.
+- New task branch path: `checkout main` and `pull --ff-only`, then create branch.
+- Continue existing task branch path: stay on branch, verify scope/status, do not `checkout main` in the middle of the task.
+- Push task branch only when checks are acceptable. Never force-push.
+- Open PR when `gh` is available and authenticated.
+- Do not auto-merge risky runtime changes.
+- Docs-only tasks may auto-merge only with explicit user/policy approval and clean gates.
+- After merge: update local `main` (`pull --ff-only`) before next task.
+
+## Required Codex Final Report
+
+Every task report must include:
+
+1. Summary.
+2. Files changed.
+3. Commands run.
+4. Exact results.
+5. Scripts absent (`ABSENT` list).
+6. Tests/build/lint result.
+7. Risks and follow-ups.
+8. Docs/scripts/tests updates needed.
+9. Rollback path.
+10. Confirmation runtime code/dependencies were not changed when task is docs-only.
+11. Confirmation unrelated files were not changed.
+
+## Communication Rule
+
+- Keep final user-facing answer short and operational:
   1. what was done
-  2. how it affects the product
-  3. what the user will see or feel
-  4. what to do next
-- Keep detailed prompts, research, screenshots, specs, and long evidence blocks separate after that short core answer.
-- Do not write long recap paragraphs unless the user explicitly asks for detail.
-- Structured formatting is mandatory only for execution-related outputs:
-  - specs
-  - implementation plans
-  - task handoff blocks
-  - status/progress blocks when they affect execution
-  - checklists, risks, and acceptance criteria
-- Do not force structured JSON for casual conversation unless the user explicitly asks for it.
-- For any UI task, first show a PNG preview and wait for explicit user approval before changing UI code.
-- Live browser screenshots are implementation proof only; they do not replace pre-implementation PNG approval.
-- If a task mixes UI and non-UI work, non-UI execution may proceed, but the UI slice stays blocked until approval.
+  2. product impact
+  3. what user will see/feel
+  4. next step
 
-## Automation Rules
+## Task Block Format
 
-- Repo-local Codex automations live in `.codex/automations/`.
-- Keep repo-local skills only when they differ from the shared global version; byte-identical copies should be removed instead of shadowing them.
-- Automation definitions must stay runnable from `/Users/user/Projects/active-holidays-foundation`.
-- Run `npm run automations:verify` after editing automation prompts, schedules, or supporting docs.
-- Use `npm run automations:sync -- --dry-run` before copying repo-local automations into `$CODEX_HOME`.
-- Runtime outputs belong in `reports/automations/` and must not turn into committed noise.
+For every command/prompt/task block, use exactly this compact header before the transfer block:
 
-## Artifact Ownership Rules
+1) Что это:
+2) Для чего:
+3) Модель:
+4) Сложность:
+5) Готовность:
 
-- Keep deterministic source-of-truth state tracked only when a repo contract explicitly lists it.
-- Keep browser captures in `output/playwright/`; use them as local proof or external review evidence, not as default committed source.
-- Keep generated PDFs and copy packs in `output/pdf/` unless a curated document is intentionally moved into docs or Notion.
-- Keep design approval packs in `reports/design/`; commit them only as a deliberate artifact pack after explicit approval.
-- Keep scratch generation work in `tmp/` and root `.playwright-cli/` local-only.
+Then provide one transfer block only.
 
-## Plugin / MCP Surface Rules
-
-- Prefer existing runtime plugins and shared skills before adding any repo-local plugin scaffold.
-- Do not invent plugin manifests, marketplace entries, or MCP config shapes.
-- Repo-local plugin work must stay anchored to real files: `plugins/*/.codex-plugin/plugin.json`, optional `.agents/plugins/marketplace.json`, and optional `.cursor/mcp.json`.
-- If a repo-local plugin is added, it must solve a repeated repo-local workflow that skills, docs, or automations could not already cover cleanly.
-
-## Skill Routing Rules
-
-- Resolve exactly one primary operating mode before loading bundles or templates.
-- Use `.codex/skills/modes.md`, `npm run skills:detect-mode`, or `npm run skills:start` to classify the task.
-- Bundle choice and template choice must follow that same primary mode.
-- Treat extra mode candidates as context only, not as permission to combine multiple primary modes.
-- `skill-system-governance` is the primary mode for repo-local Codex surface work such as `.codex/skills/*`, `.codex/automations/*`, routing docs, `README.md`, `AGENTS.md`, and validator guidance.
-- `skill-system-governance` is not a new abstraction layer; it is the maintenance mode for the existing router and operating docs.
-- Move to `plugin-surface` only when plugin or MCP files are the dominant changed surface.
-
-## Phase 1 Boundary
-
-- Allowed: scaffold, routing, theme, tooling, client shell, server health route.
-- Deferred: decision engine, data model, real API routes, AI interactions.
-
-## Verification Rules
-
-- Run `npm run build` after scaffold changes.
-- Run `npm run test` after test or app-shell changes.
-- Run `npm run typecheck` before closing a phase.
+Keep explanations minimal.
+The user is the messenger between ChatGPT and Codex.
+Do not make the user manage process details manually.
+Do not provide command/task blocks below 8/10 quality; improve them first.
