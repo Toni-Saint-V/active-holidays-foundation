@@ -106,3 +106,20 @@ Every task report must include:
   2. product impact
   3. what user will see/feel
   4. next step
+
+## Task Block Format
+
+For every command/prompt/task block, use exactly this compact header before the transfer block:
+
+1) Что это:
+2) Для чего:
+3) Модель:
+4) Сложность:
+5) Готовность:
+
+Then provide one transfer block only.
+
+Keep explanations minimal.
+The user is the messenger between ChatGPT and Codex.
+Do not make the user manage process details manually.
+Do not provide command/task blocks below 8/10 quality; improve them first.

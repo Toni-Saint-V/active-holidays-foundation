@@ -1,5 +1,24 @@
 # Codex Task Template
 
+## Mandatory Task Block Header
+
+Use this header exactly before the transfer block:
+
+1) Что это:
+2) Для чего:
+3) Модель:
+4) Сложность:
+5) Готовность:
+
+Then provide one transfer block only.
+
+Keep explanations minimal.
+The user is the messenger between ChatGPT and Codex.
+Do not make the user manage process details manually.
+Do not provide command/task blocks below 8/10 quality; improve them first.
+
+---
+
 ## 1) What This Is
 
 One-line task description.
