@@ -43,15 +43,25 @@ const EXPERT_SYSTEM_RULES =
 
 let cachedClient: OpenAI | null | undefined
 
+type RuntimeEnv = Record<string, string | undefined>
+
+function readRuntimeEnv(name: string): string | undefined {
+  const env = (globalThis as { process?: { env?: RuntimeEnv } }).process?.env
+  const value = env?.[name]
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
 function getClient(): OpenAI | null {
   if (cachedClient !== undefined) return cachedClient
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = readRuntimeEnv('OPENAI_API_KEY')
   cachedClient = apiKey ? new OpenAI({ apiKey }) : null
   return cachedClient
 }
 
 function aiModel(): string {
-  return process.env.OPENAI_SCREEN_AI_MODEL ?? process.env.OPENAI_RECOMMENDATION_MODEL ?? 'gpt-4o-mini'
+  return readRuntimeEnv('OPENAI_SCREEN_AI_MODEL') ?? readRuntimeEnv('OPENAI_RECOMMENDATION_MODEL') ?? 'gpt-4o-mini'
 }
 
 function escapeRegExp(value: string): string {
