@@ -64,7 +64,29 @@ Block any change that introduces:
 
 ## Premium UI Gate
 
-Important UI PRs must pass `docs/ui/premium-scorecard.md`:
+Premium UI Gate from `docs/ui/premium-scorecard.md` is mandatory for any user-visible UI/UX diff, including:
+
+- Layout or navigation changes.
+- CTA placement, hierarchy, or copy changes.
+- User-facing copy affecting trust, readiness, verification, eligibility, insurance, AI, or next action.
+- Responsive behavior changes.
+- Visual hierarchy changes.
+- Loading, error, empty, or success state changes.
+- Accessibility-affecting UI changes.
+- Motion or animation changes.
+- Monetization UI changes.
+- AI explanation UI changes.
+
+Exceptions only:
+
+- Typo-only copy fix without meaning/trust change.
+- Docs-only change.
+- Test-only change.
+- Non-visible refactor.
+
+If there is doubt, Premium UI Gate is required.
+
+Required evidence when gate applies:
 
 - Score `>=85/100`
 - No category below `3/5`
@@ -76,7 +98,8 @@ Important UI PRs must pass `docs/ui/premium-scorecard.md`:
 ## Branch, PR, and Merge Rules
 
 - Start from clean status unless intentionally continuing the same task branch.
-- Before new work: `checkout main` and `pull --ff-only`.
+- New task branch path: `checkout main` and `pull --ff-only`, then create branch.
+- Continue existing task branch path: stay on branch, verify scope/status, do not `checkout main` in the middle of the task.
 - Push task branch only when checks are acceptable. Never force-push.
 - Open PR when `gh` is available and authenticated.
 - Do not auto-merge risky runtime changes.

@@ -4,7 +4,29 @@ Premium UI is evidence-based, not taste-based. A UI change is accepted only when
 
 ## Mandatory PR Evidence
 
-Every important UI PR must include:
+Premium UI Gate is mandatory for any user-visible UI/UX diff, including:
+
+- Layout/navigation changes
+- CTA placement/hierarchy/copy changes
+- User-facing copy affecting trust/readiness/verification/eligibility/insurance/AI/next action
+- Responsive behavior changes
+- Visual hierarchy changes
+- Loading/error/empty/success state changes
+- Accessibility-affecting UI changes
+- Motion/animation changes
+- Monetization UI changes
+- AI explanation UI changes
+
+Exceptions only:
+
+- Typo-only copy fix without meaning/trust change
+- Docs-only
+- Test-only
+- Non-visible refactor
+
+If there is doubt, gate is mandatory.
+
+When gate applies, the PR must include:
 
 - Premium Scorecard
 - Screenshot pack

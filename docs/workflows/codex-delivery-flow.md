@@ -12,15 +12,25 @@ One task, one branch, one clean PR.
 
 - Run from the folder that contains `.git` and `package.json`.
 - Never work directly on `main`.
-- `git status` must be clean, unless intentionally continuing an existing task branch.
+- `git status` must be clean unless intentionally continuing the same task branch.
 
-## Step 1 - Create or Update Task Branch
+## Step 1 - Choose Branch Path
 
+### Path A: New Task Branch
+
+- Require clean status.
 - `git checkout main`
 - `git pull --ff-only`
 - Create task branch from `main`.
 
-Branch naming examples:
+### Path B: Continue Existing Task Branch
+
+- Stay on the task branch.
+- Verify branch name, task scope, and current status before edits.
+- Do not checkout `main` in this path.
+- If branch is stale versus `main`, report rebase/merge strategy explicitly before implementation; do not guess.
+
+Branch naming examples (Path A):
 
 - `docs/premium-ui-gate`
 - `docs/repo-operating-layer`
@@ -39,7 +49,46 @@ Codex must inspect:
 - `docs/`
 - `README.md` when relevant
 
-## Step 3 - Implementation
+## Step 3 - UI PNG Approval Gate (Before UI Implementation)
+
+If task includes any user-visible UI/UX diff, gate is mandatory. Trigger examples:
+
+- Layout/navigation
+- CTA placement/hierarchy/copy
+- User-facing copy affecting trust/readiness/verification/eligibility/insurance/AI/next action
+- Responsive behavior
+- Visual hierarchy
+- Loading/error/empty/success states
+- Accessibility-affecting UI
+- Motion/animation
+- Monetization UI
+- AI explanation UI
+
+Exceptions only:
+
+- Typo-only copy fix without meaning/trust change
+- Docs-only
+- Test-only
+- Non-visible refactor
+
+If there is doubt, gate is mandatory.
+
+Before implementation, collect and present:
+
+- Mobile PNG
+- Desktop PNG
+- Before/after PNG for existing screens
+- Empty/loading/error/success states where relevant
+- Reduced-motion note
+- Screen annotations marking:
+  - deterministic truth fields
+  - AI explanation fields
+  - user input fields
+  - primary CTA
+
+Broad UI code changes are blocked until explicit approval.
+
+## Step 4 - Implementation
 
 - Follow existing repo patterns.
 - Do not touch unrelated files.
@@ -48,7 +97,7 @@ Codex must inspect:
 - Do not run cosmetic refactor outside task scope.
 - Docs-only tasks must stay docs-only.
 
-## Step 4 - Self-Review
+## Step 5 - Self-Review
 
 Codex must run:
 
@@ -58,7 +107,7 @@ Codex must run:
 - Relevant available scripts from `package.json`
 - Mark absent scripts as `ABSENT`
 
-## Step 5 - Push and PR
+## Step 6 - Push and PR
 
 If checks are acceptable:
 
@@ -77,7 +126,7 @@ PR body must include:
 - Risks/follow-ups
 - Rollback path
 
-## Step 6 - Merge Gate
+## Step 7 - Merge Gate
 
 Do not merge if:
 
@@ -88,7 +137,7 @@ Do not merge if:
 - UI PR lacks Premium UI Gate evidence.
 - Any script is claimed passed but is actually absent.
 
-## Step 7 - After Merge
+## Step 8 - After Merge
 
 - `git checkout main`
 - `git pull --ff-only`
