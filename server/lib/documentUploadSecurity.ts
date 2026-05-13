@@ -103,6 +103,7 @@ const EXECUTABLE_SEGMENT_MIN_LENGTH = Math.min(
 const CONFUSABLE_ASCII_CODEPOINT_MAP = new Map<number, string>([
   [0x03b5, "e"], // Greek epsilon
   [0x03c7, "x"], // Greek chi
+  [0xa7d3, "x"], // Latin epigraphic letter reversed f (confusable with x)
   [0xab32, "e"], // Latin small letter blackletter e
   [0xab53, "x"], // Latin small letter chi
   [0x04bd, "e"], // Cyrillic abkhasian che (confusable with e)

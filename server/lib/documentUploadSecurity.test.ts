@@ -133,6 +133,20 @@ describe("document upload security and trust boundary", () => {
     }
   });
 
+  it("еꟓе.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "\u0435\uA7D3\u0435.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
   it("renamed exe.pdf rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
