@@ -456,7 +456,7 @@ export function casesRouter(): Router {
     res.json(result.documents);
   });
 
-  router.get("/:id/human-review", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/human-review", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     const request = getCaseStore().latestHumanReviewFor(caseData.id);
     res.json(humanReviewResponseSchema.parse({ request }));
@@ -508,6 +508,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/human-review",
+    requireInternalApiToken,
     validateParams(caseIdParams),
     validateBody(humanReviewCreateRequestSchema),
     (req, res) => {

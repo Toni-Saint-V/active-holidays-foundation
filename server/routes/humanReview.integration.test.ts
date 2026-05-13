@@ -193,11 +193,17 @@ describe("human review HTTP surface", () => {
   });
 
   it("returns active operator queue and detail read models from existing review state", async () => {
-    const created = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
-      channel: "email",
-      contact: "ops@example.com",
-      message: "Нужна операторская проверка evidence по кейсу."
-    });
+    const created = await requestJson(
+      "POST",
+      "/api/cases/s2-tr-spb/human-review",
+      {
+        channel: "email",
+        contact: "ops@example.com",
+        message: "Нужна операторская проверка evidence по кейсу."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(created.status).toBe(200);
 
     const queue = await requestJson(
@@ -257,7 +263,8 @@ describe("human review HTTP surface", () => {
           contact: "ops-action@example.com",
           message: "Нужно проверить конфликтующие evidence-источники оператором."
         },
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(created.status).toBe(200);
 
@@ -458,11 +465,17 @@ describe("human review HTTP surface", () => {
   });
 
   it("keeps terminal reviews out of the active queue while preserving operator detail", async () => {
-    const created = await requestJson("POST", "/api/cases/s4-rf-residency-dnv/human-review", {
-      channel: "telegram",
-      contact: "@ops",
-      message: "Закрываем ручную проверку через текущий transition-only lifecycle."
-    });
+    const created = await requestJson(
+      "POST",
+      "/api/cases/s4-rf-residency-dnv/human-review",
+      {
+        channel: "telegram",
+        contact: "@ops",
+        message: "Закрываем ручную проверку через текущий transition-only lifecycle."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(created.status).toBe(200);
 
     const terminal = await requestJson(
@@ -509,26 +522,44 @@ describe("human review HTTP surface", () => {
   });
 
   it("creates one active request and reuses it on repeated submit", async () => {
-    const first = await requestJson("POST", "/api/cases/s3-us-spb-business/human-review", {
-      channel: "email",
-      contact: "user@example.com",
-      message: "Был отказ, хочу проверить кейс вручную."
-    });
+    const first = await requestJson(
+      "POST",
+      "/api/cases/s3-us-spb-business/human-review",
+      {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Был отказ, хочу проверить кейс вручную."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(first.status).toBe(200);
     expect(first.json.reused).toBe(false);
     expect(first.json.request.status).toBe("submitted");
 
-    const second = await requestJson("POST", "/api/cases/s3-us-spb-business/human-review", {
-      channel: "telegram",
-      contact: "@other_contact",
-      message: "Повторная отправка не должна пересоздать запрос."
-    });
+    const second = await requestJson(
+      "POST",
+      "/api/cases/s3-us-spb-business/human-review",
+      {
+        channel: "telegram",
+        contact: "@other_contact",
+        message: "Повторная отправка не должна пересоздать запрос."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(second.status).toBe(200);
     expect(second.json.reused).toBe(true);
     expect(second.json.request.id).toBe(first.json.request.id);
     expect(second.json.request.contact).toBe("user@example.com");
 
-    const fetched = await requestJson("GET", "/api/cases/s3-us-spb-business/human-review");
+    const fetched = await requestJson(
+      "GET",
+      "/api/cases/s3-us-spb-business/human-review",
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(fetched.status).toBe(200);
     expect(fetched.json.request.id).toBe(first.json.request.id);
     expect(fetched.json.request.durability).toBe("persisted");
@@ -542,36 +573,60 @@ describe("human review HTTP surface", () => {
     );
     expect(recomputed.status).toBe(200);
 
-    const afterRecompute = await requestJson("GET", "/api/cases/s3-us-spb-business/human-review");
+    const afterRecompute = await requestJson(
+      "GET",
+      "/api/cases/s3-us-spb-business/human-review",
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(afterRecompute.status).toBe(200);
     expect(afterRecompute.json.request.id).toBe(first.json.request.id);
     expect(afterRecompute.json.request.durability).toBe("persisted");
 
     app = await createApp();
 
-    const restarted = await requestJson("GET", "/api/cases/s3-us-spb-business/human-review");
+    const restarted = await requestJson(
+      "GET",
+      "/api/cases/s3-us-spb-business/human-review",
+      undefined,
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(restarted.status).toBe(200);
     expect(restarted.json.request.id).toBe(first.json.request.id);
     expect(restarted.json.request.durability).toBe("persisted");
   });
 
   it("rejects client-supplied changedBy at the public boundary", async () => {
-    const response = await requestJson("POST", "/api/cases/s1-rf-italy/human-review", {
-      channel: "email",
-      contact: "user@example.com",
-      message: "Проверьте спорный кейс.",
-      changedBy: "ops"
-    });
+    const response = await requestJson(
+      "POST",
+      "/api/cases/s1-rf-italy/human-review",
+      {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Проверьте спорный кейс.",
+        changedBy: "ops"
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
 
     expect(response.status).toBe(400);
   });
 
   it("allows the server-owned transition surface to move the request lifecycle", async () => {
-    const created = await requestJson("POST", "/api/cases/s1-rf-italy/human-review", {
-      channel: "email",
-      contact: "ops@example.com",
-      message: "Нужен ручной прогон кейса по внутреннему каналу."
-    });
+    const created = await requestJson(
+      "POST",
+      "/api/cases/s1-rf-italy/human-review",
+      {
+        channel: "email",
+        contact: "ops@example.com",
+        message: "Нужен ручной прогон кейса по внутреннему каналу."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
 
     expect(created.status).toBe(200);
 
@@ -612,12 +667,18 @@ describe("human review HTTP surface", () => {
   });
 
   it("returns a recomputed canonical result when operator resolves a scenario handoff", async () => {
-    const created = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
-      channel: "email",
-      contact: "resolution@example.com",
-      message: "Нужно проверить human-review-only сценарий и вернуть честный итог.",
-      scenarioId: "human-review"
-    });
+    const created = await requestJson(
+      "POST",
+      "/api/cases/s2-tr-spb/human-review",
+      {
+        channel: "email",
+        contact: "resolution@example.com",
+        message: "Нужно проверить human-review-only сценарий и вернуть честный итог.",
+        scenarioId: "human-review"
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
 
     expect(created.status).toBe(200);
     expect(created.json.request.handoff.scenarioId).toBe("human-review");
@@ -642,11 +703,17 @@ describe("human review HTTP surface", () => {
   });
 
   it("rejects transition requests without the internal token", async () => {
-    const created = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
-      channel: "email",
-      contact: "user@example.com",
-      message: "Нужна повторная проверка спорного кейса."
-    });
+    const created = await requestJson(
+      "POST",
+      "/api/cases/s2-tr-spb/human-review",
+      {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Нужна повторная проверка спорного кейса."
+      },
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
 
     expect(created.status).toBe(200);
 
@@ -674,7 +741,8 @@ describe("human review HTTP surface", () => {
         "GET",
         "/api/cases/s2-tr-spb/human-review",
         undefined,
-        corruptedApp
+        corruptedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
 
       expect(response.status).toBe(200);
@@ -716,7 +784,8 @@ describe("human review HTTP surface", () => {
           contact: "learning@example.com",
           message: "Нужно разобрать конфликт источников и сохранить learning feedback."
         },
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(created.status).toBe(200);
 
@@ -760,7 +829,8 @@ describe("human review HTTP surface", () => {
           contact: "second-learning@example.com",
           message: "Новый запрос не должен ломать drift terminal snapshot."
         },
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(newerRequest.status).toBe(200);
       expect(newerRequest.json.request.id).not.toBe(created.json.request.id);

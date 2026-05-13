@@ -151,7 +151,7 @@ describe("Express API security hardening", () => {
     expect(caseResponse.response.status).toBe(403);
     expect(resultResponse.response.status).toBe(403);
     expect(documentsResponse.response.status).toBe(403);
-    expect(reviewResponse.response.status).toBe(200);
+    expect(reviewResponse.response.status).toBe(403);
     expect(serialized).not.toMatch(
       /caseId|accessToken|resultPayload|travelProfile|readiness|documentsUploaded/i
     );
@@ -193,6 +193,20 @@ describe("Express API security hardening", () => {
   });
 
   it("fails closed for human-review packet and manager brief routes without token", async () => {
+    const review = await requestJson("GET", "/api/cases/s2-tr-spb/human-review");
+    expect(review.response.status).toBe(403);
+    expect(review.json.error).toBe("internal_api_forbidden");
+
+    const createReview = await requestJson("POST", "/api/cases/s2-tr-spb/human-review", {
+      body: {
+        channel: "email",
+        contact: "security-test@example.com",
+        message: "Нужна ручная проверка."
+      }
+    });
+    expect(createReview.response.status).toBe(403);
+    expect(createReview.json.error).toBe("internal_api_forbidden");
+
     const packet = await requestJson("GET", "/api/cases/s2-tr-spb/human-review/packet");
     expect(packet.response.status).toBe(403);
     expect(packet.json.error).toBe("internal_api_forbidden");
