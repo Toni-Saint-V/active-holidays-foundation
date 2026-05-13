@@ -1,12 +1,13 @@
 'use client'
 
-import { Check, ChevronLeft, ChevronRight, FileUp, Loader2, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileUp, Loader2, ShieldCheck } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { StepRail } from '@/components/StepRail'
 import { fetchIntakeAi } from '@/lib/aiSurfaceClient'
 import type { IntakeAiOutput } from '@/lib/aiSurfaceContracts'
+import { createOrReuseTravelCaseFromIntakeDraft } from '@/lib/caseBoundFlow'
 import { COUNTRIES } from '@/lib/countryData'
 import type { CountryCode } from '@/lib/constants'
 
@@ -24,7 +25,8 @@ type TravelProfile = {
 
 const PURPOSE_OPTIONS: Purpose[] = ['Туризм', 'По работе', 'К родственникам', 'Спорт/событие']
 const VALID_COUNTRIES: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
-const VERIFICATION_LABELS = ['даты', 'паспорт', 'маршрут', 'страховка', 'финансы']
+const VERIFICATION_LABELS = ['документ отмечен', 'ожидает проверки', 'ожидает подтверждения', 'ожидает сверки', 'ожидает маршрута']
+const FALLBACK_TRAVEL_CASE_ID = 's1-rf-italy'
 
 function LabeledField({
   label,
@@ -80,6 +82,7 @@ export function IntakePageClient() {
   const [docModalState, setDocModalState] = useState<DocModalState>('choice')
   const [documentsSaveConsent, setDocumentsSaveConsent] = useState(false)
   const [uploadedDocumentName, setUploadedDocumentName] = useState('')
+  const [isFinalizing, setIsFinalizing] = useState(false)
 
   const daysToTrip = useMemo(() => daysToTripFromDate(departureDate), [departureDate])
   const dateRangeValid = useMemo(
@@ -117,24 +120,31 @@ export function IntakePageClient() {
     return false
   }, [dateRangeValid, hadRefusal, purpose, refusalContext, step])
 
-  function buildResultParams(documentsUploaded: boolean) {
-    const params = new URLSearchParams()
-    params.set('country', travelProfile.selected_country)
-    if (travelProfile.departure_date) params.set('departure', travelProfile.departure_date)
-    if (travelProfile.return_date) params.set('return', travelProfile.return_date)
-    if (travelProfile.purpose) params.set('purpose', travelProfile.purpose)
-    params.set('hadRefusal', String(Boolean(travelProfile.had_refusal)))
-    if (travelProfile.refusal_context) params.set('refusalContext', travelProfile.refusal_context)
-    params.set('documentsUploaded', String(documentsUploaded))
-    params.set('documentsSaveConsent', String(documentsUploaded && documentsSaveConsent))
-    params.set('resultType', documentsUploaded ? 'verified' : 'preliminary')
-    params.set('analysisConfidence', documentsUploaded ? 'high' : 'medium')
-    return params
-  }
-
-  function finishIntake(documentsUploaded: boolean) {
-    const params = buildResultParams(documentsUploaded)
-    router.push(`/calculating?${params.toString()}`)
+  async function finishIntake(_documentsUploaded: boolean) {
+    if (isFinalizing) return
+    setIsFinalizing(true)
+    try {
+      const forkTitle = `Intake ${COUNTRIES[selectedCountry].label} · ${new Date().toLocaleDateString('ru-RU')}`
+      const outcome = await createOrReuseTravelCaseFromIntakeDraft({
+        baseCaseId: FALLBACK_TRAVEL_CASE_ID,
+        forkTitle,
+        draft: {
+          country: travelProfile.selected_country,
+          departureDate: travelProfile.departure_date,
+          returnDate: travelProfile.return_date,
+          purpose: travelProfile.purpose,
+          hadRefusal: travelProfile.had_refusal,
+          refusalContext: travelProfile.refusal_context,
+        },
+      })
+      const params = new URLSearchParams()
+      params.set('caseId', outcome.caseId)
+      router.push(`/calculating?${params.toString()}`)
+    } catch {
+      router.push('/intake')
+    } finally {
+      setIsFinalizing(false)
+    }
   }
 
   function goNext() {
@@ -165,7 +175,9 @@ export function IntakePageClient() {
     if (!file) return
     setUploadedDocumentName(file.name)
     setDocModalState('verifying')
-    window.setTimeout(() => finishIntake(true), 950)
+    window.setTimeout(() => {
+      void finishIntake(true)
+    }, 950)
   }
 
   async function generateRefusalDraft() {
@@ -422,16 +434,16 @@ export function IntakePageClient() {
             {docModalState === 'verifying' && (
               <>
                 <h3 id="pre-result-title" className="mt-4 text-[31px] font-semibold leading-[0.98] tracking-[-0.03em]">
-                  AI сверяет пакет
+                  Фиксируем загрузку документа
                 </h3>
                 <p className="mt-3 text-[15px] leading-snug text-foreground/74">
-                  {uploadedDocumentName || 'Документ'} принят. Проверяем ключевые зоны перед результатом.
+                  {uploadedDocumentName || 'Документ'} добавлен пользователем. Подлинность и полнота проверяются только после серверной обработки кейса.
                 </p>
                 <div className="mt-5 space-y-2">
                   {VERIFICATION_LABELS.map((label, index) => (
                     <div key={label} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2">
                       <span className="text-[13px] text-foreground/78">{label}</span>
-                      {index < 3 ? <Check className="h-4 w-4 text-ok" /> : <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                      {index === 0 ? <div className="h-2.5 w-2.5 rounded-full bg-primary/80" /> : <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                     </div>
                   ))}
                 </div>
@@ -459,13 +471,17 @@ export function IntakePageClient() {
                   <button
                     type="button"
                     onClick={() => setDocModalState('upload')}
+                    disabled={isFinalizing}
                     className="ah-amber-cta min-h-[48px] rounded-2xl px-4 text-[14px] font-semibold text-primary-foreground"
                   >
                     Добавить документы
                   </button>
                   <button
                     type="button"
-                    onClick={() => finishIntake(false)}
+                    onClick={() => {
+                      void finishIntake(false)
+                    }}
+                    disabled={isFinalizing}
                     className="min-h-[48px] rounded-2xl border border-white/12 bg-white/[0.035] px-4 text-[14px] font-semibold text-foreground/82"
                   >
                     Продолжить без документов

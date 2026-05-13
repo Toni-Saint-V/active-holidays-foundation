@@ -4,16 +4,15 @@ import { ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, CircleAlert, Clipb
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AmberCTA } from '@/components/AmberCTA'
+import { apiClient } from '@/lib/apiClient'
 import { COUNTRIES } from '@/lib/countryData'
-import { ENGINE_CLASS, type CountryCode, type VerdictKind } from '@/lib/constants'
+import { ENGINE_CLASS, VERDICT_HEADLINE } from '@/lib/constants'
 import { IMAGE_BLURS } from '@/lib/imageBlurs'
+import { resolveResultTruth, type ResultTruthReady, type ResultTruthResolution } from '@/lib/resultTruth'
 import { cn } from '@/lib/utils'
-import { deriveVerdict } from '@/lib/verdict'
 
-type ResultType = 'preliminary' | 'verified'
-type AnalysisConfidence = 'medium' | 'high'
 type ResultCard = {
   id: string
   label: string
@@ -24,47 +23,17 @@ type ResultCard = {
   icon: React.ReactNode
 }
 
-const VALID_COUNTRIES: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
-const VERDICT_TABS: VerdictKind[] = ['GO', 'GO_WITH_CONDITIONS', 'NOT_NOW', 'HUMAN_REVIEW']
-
-function parseCountry(value: string | null): CountryCode {
-  if (!value) return 'IT'
-  const upper = value.toUpperCase() as CountryCode
-  return VALID_COUNTRIES.includes(upper) ? upper : 'IT'
-}
-
-function parseDays(value: string | null): number {
-  if (!value) return 24
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 24
-  return Math.max(0, Math.round(parsed))
-}
-
-function daysFromDeparture(value: string | null): number {
-  if (!value) return 24
-  const departure = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(departure.getTime())) return 24
-  const diff = departure.getTime() - Date.now()
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-}
-
-function parseResultType(value: string | null, documentsUploaded: boolean): ResultType {
-  if (value === 'verified') return 'verified'
-  if (value === 'preliminary') return 'preliminary'
-  return documentsUploaded ? 'verified' : 'preliminary'
-}
-
 function buildVerifiedCards(): ResultCard[] {
   return [
     {
       id: 'risk',
       label: '1/3 Главный риск',
       title: 'Главный риск',
-      body: 'Нет подтверждённого слота. Без него пакет нельзя считать готовым к подаче.',
-      cta: 'Проверить варианты слота',
+      body: 'Проверьте блокирующие факторы перед следующим шагом.',
+      cta: 'Передать кейс эксперту',
       detail: [
-        'Ближайшее окно: 11–14 июня',
-        'Если слот появится позже 11 июня, маршрут и бронь могут устареть.',
+        'Риск и действие берутся из серверного кейса, не из URL.',
+        'При сомнении маршрут уходит на ручную проверку без фейкового GO.',
       ],
       icon: <CircleAlert className="h-5 w-5" />,
     },
@@ -72,23 +41,23 @@ function buildVerifiedCards(): ResultCard[] {
       id: 'confirmed',
       label: '2/3 Что подтверждено',
       title: 'Что подтверждено',
-      body: 'AI сверил загруженные данные и не нашёл главный блокер в документах.',
-      cta: 'Показать подтверждения',
+      body: 'Проверка основана на детерминированном ResultPayload от сервера.',
+      cta: 'Показать детали',
       detail: [
-        'Проверено: даты поездки, маршрут, страховка',
-        'Финансовые подтверждения и базовые паспортные данные сверены.',
+        'Вердикт определяет движок, AI только объясняет.',
+        'Уровень готовности — это projection поверх canonical payload.',
       ],
       icon: <CheckCircle2 className="h-5 w-5" />,
     },
     {
       id: 'plan',
-      label: '3/3 План на 24 дня',
-      title: 'План на 24 дня',
-      body: 'Сначала закрепить слот. Потом AI пересоберёт финальный порядок подачи.',
-      cta: 'Открыть план',
+      label: '3/3 Следующий шаг',
+      title: 'Следующий шаг',
+      body: 'Для нестандартного кейса лучше закрепить решение с экспертом.',
+      cta: 'Открыть экспертный маршрут',
       detail: [
-        'Сегодня — проверить окна записи',
-        'До 11 июня — закрепить слот. За 3 дня — контрольная проверка.',
+        'Путь и приоритет берутся из `nextAction` сервера.',
+        'Никакие query params не могут подменить это решение.',
       ],
       icon: <CalendarDays className="h-5 w-5" />,
     },
@@ -101,23 +70,23 @@ function buildPreliminaryCards(): ResultCard[] {
       id: 'risk',
       label: '1/3 Главный риск',
       title: 'Главный риск',
-      body: 'Нет подтверждённого слота. Без него пакет нельзя считать готовым к подаче.',
-      cta: 'Проверить варианты слота',
+      body: 'Часть данных не подтверждена, поэтому кейс считается предварительным.',
+      cta: 'Передать кейс эксперту',
       detail: [
-        'Ближайшее окно: 11–14 июня',
-        'Если слот появится позже 11 июня, маршрут и бронь могут устареть.',
+        'Нужны дополнительные факты или ручная проверка.',
+        'Система не рисует «verified», если сервер это не подтвердил.',
       ],
       icon: <CircleAlert className="h-5 w-5" />,
     },
     {
       id: 'missing-evidence',
-      label: '2/3 Что AI не видел',
-      title: 'Что AI не видел',
-      body: 'Документы ещё не загружены, поэтому часть вывода предварительная.',
-      cta: 'Добавить документы',
+      label: '2/3 Что не подтверждено',
+      title: 'Что не подтверждено',
+      body: 'Данные или источники пока недостаточны для подтверждённого статуса.',
+      cta: 'Открыть ручную проверку',
       detail: [
-        'AI сможет сверить паспорт, бронь, страховку',
-        'Также проверит финансы, маршрут и актуальность дат.',
+        'Нет фейковой верификации документов через URL.',
+        'Нужен безопасный переход через серверный workflow.',
       ],
       icon: <FileWarning className="h-5 w-5" />,
     },
@@ -125,73 +94,166 @@ function buildPreliminaryCards(): ResultCard[] {
       id: 'next-step',
       label: '3/3 Следующий шаг',
       title: 'Следующий шаг',
-      body: 'Можно продолжить с предварительным результатом или уточнить карту по документам.',
-      cta: 'Показать план',
+      body: 'Продолжайте только по серверному действию, а не по параметрам ссылки.',
+      cta: 'Показать следующий шаг',
       detail: [
-        'Сегодня — проверить окна записи',
-        'До 11 июня — закрепить слот. После слота — финальная сверка пакета.',
+        'Результат всегда привязан к caseId.',
+        'При ошибке данных экран честно предлагает вернуться в анкету.',
       ],
       icon: <ClipboardCheck className="h-5 w-5" />,
     },
   ]
 }
 
+function readinessLabel(state: ResultTruthReady['readiness']['state']): string {
+  switch (state) {
+    case 'ready':
+      return 'готово'
+    case 'almost_ready':
+      return 'почти готово'
+    case 'not_ready_fixable':
+      return 'нужно исправить'
+    case 'not_ready_blocked':
+      return 'есть блокер'
+    case 'needs_human_review':
+      return 'нужна ручная проверка'
+    case 'insufficient_data':
+      return 'недостаточно данных'
+  }
+}
+
+function confidenceBandLabel(band: ResultTruthReady['confidenceBand']): string {
+  switch (band) {
+    case 'high':
+      return 'высокая'
+    case 'medium':
+      return 'средняя'
+    case 'low':
+      return 'низкая'
+  }
+}
+
+function LoadingState() {
+  return (
+    <main className="w-full p-0">
+      <article className="relative flex min-h-screen flex-col overflow-hidden bg-[#070806] p-5 pt-7 text-foreground md:p-8">
+        <div className="mt-16 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/52">Загрузка кейса</div>
+        <h1 className="mt-3 max-w-[420px] text-[44px] font-semibold leading-[0.95] tracking-[-0.03em] md:text-[64px]">
+          Проверяем серверный
+          <br />
+          ResultPayload
+        </h1>
+        <p className="mt-4 max-w-[460px] text-[15px] leading-snug text-foreground/70">
+          URL-параметры не используются как источник истины. Загружаем решение по caseId.
+        </p>
+      </article>
+    </main>
+  )
+}
+
+function RecoveryState({ resolution }: { resolution: Extract<ResultTruthResolution, { status: 'recovery' }> }) {
+  const router = useRouter()
+
+  return (
+    <main className="w-full p-0">
+      <article className="relative flex min-h-screen flex-col overflow-hidden bg-[#070806] p-5 pt-7 text-foreground md:p-8">
+        <header className="flex min-h-[36px] items-center justify-between gap-4">
+          <Link
+            href="/intake"
+            aria-label="Вернуться к анкете"
+            className="inline-flex min-h-[44px] items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/62 transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" /> ACTIVE HOLIDAY
+          </Link>
+        </header>
+
+        <section className="mt-12 md:mx-auto md:w-full md:max-w-[720px]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/48">
+            Честное восстановление
+          </div>
+          <h1 className="mt-3 max-w-[460px] text-[40px] font-semibold leading-[0.96] tracking-[-0.03em] md:text-[58px]">
+            Результат недоступен
+            <br />
+            без кейса
+          </h1>
+          <p className="mt-4 max-w-[520px] text-[15px] leading-snug text-foreground/72">{resolution.message}</p>
+          <p className="mt-2 text-[12px] text-foreground/52">Код: {resolution.code}</p>
+        </section>
+
+        <section className="mt-auto pt-6 md:mx-auto md:w-full md:max-w-[720px]">
+          <AmberCTA onClick={() => router.push('/intake')}>Вернуться к анкете</AmberCTA>
+        </section>
+      </article>
+    </main>
+  )
+}
+
 export function ResultPageClient() {
   const params = useSearchParams()
   const router = useRouter()
   const carouselRef = useRef<HTMLDivElement | null>(null)
-  const resultUploadRef = useRef<HTMLInputElement | null>(null)
   const [heroImageBroken, setHeroImageBroken] = useState(false)
   const [activeCard, setActiveCard] = useState(0)
   const [expandedCard, setExpandedCard] = useState<string>('risk')
-  const [resultUploadVerifying, setResultUploadVerifying] = useState(false)
+  const [resolution, setResolution] = useState<ResultTruthResolution | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const country = parseCountry(params.get('country'))
-  const departureDate = params.get('departure')
-  const returnDate = params.get('return')
-  const explicitDays = parseDays(params.get('days'))
-  const daysToTrip = departureDate ? daysFromDeparture(departureDate) : explicitDays
-  const countryEntry = COUNTRIES[country]
-  const hasBlur = Boolean(IMAGE_BLURS[country])
-  const documentsUploaded = params.get('documentsUploaded') === 'true'
-  const resultType = parseResultType(params.get('resultType'), documentsUploaded)
-  const analysisConfidence: AnalysisConfidence = resultType === 'verified' ? 'high' : 'medium'
+  const paramsSnapshot = params.toString()
 
-  const missingFields = useMemo(() => {
-    return !departureDate || !returnDate || !params.get('purpose')
-  }, [departureDate, params, returnDate])
-  const forcedVerdict = params.get('verdict') as VerdictKind | null
-  const derivedVerdict = deriveVerdict(daysToTrip, missingFields)
-  const verdict = VERDICT_TABS.includes(forcedVerdict as VerdictKind)
-    ? (forcedVerdict as VerdictKind)
-    : derivedVerdict
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setResolution(null)
 
-  const cards = useMemo(
-    () => (resultType === 'verified' ? buildVerifiedCards() : buildPreliminaryCards()),
-    [resultType]
-  )
+    void resolveResultTruth({
+      searchParams: new URLSearchParams(paramsSnapshot),
+      getCase: apiClient.getCase,
+      getResult: apiClient.getResult,
+    }).then((nextResolution) => {
+      if (cancelled) return
+      setResolution(nextResolution)
+      setLoading(false)
+      setActiveCard(0)
+      setExpandedCard('risk')
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [paramsSnapshot])
+
+  if (loading || !resolution) {
+    return <LoadingState />
+  }
+
+  if (resolution.status === 'recovery') {
+    return <RecoveryState resolution={resolution} />
+  }
+
+  const truth = resolution
+  const countryEntry = COUNTRIES[truth.country]
+  const hasBlur = Boolean(IMAGE_BLURS[truth.country])
+  const cards = truth.resultType === 'verified' ? buildVerifiedCards() : buildPreliminaryCards()
+  const isVerified = truth.resultType === 'verified'
+  const readinessPercent = Math.max(0, Math.min(100, Math.round(truth.result.documents.score * 100)))
 
   const humanReviewUrl = useMemo(() => {
     const qp = new URLSearchParams()
-    qp.set('country', country)
-    qp.set('verdict', verdict)
-    qp.set('resultType', resultType)
-    qp.set('analysisConfidence', analysisConfidence)
-    if (departureDate) qp.set('departure', departureDate)
-    if (returnDate) qp.set('return', returnDate)
+    qp.set('caseId', truth.caseId)
+    qp.set('country', truth.country)
+    qp.set('verdict', truth.result.verdict)
     return `/human-review?${qp.toString()}`
-  }, [analysisConfidence, country, departureDate, resultType, returnDate, verdict])
+  }, [truth.caseId, truth.country, truth.result.verdict])
 
-  const isVerified = resultType === 'verified'
-  const frameTitle = isVerified ? 'Карта готовности уточнена' : 'Предварительная карта готовности'
+  const frameTitle = isVerified ? 'Серверный результат подтверждён' : 'Предварительный серверный результат'
   const trustLine = isVerified
-    ? 'AI сверил ответы с документами.'
-    : 'Профиль собран по вашим ответам. Документы ещё не проверены.'
-  const caseSubtitle = isVerified
-    ? 'Пакет почти готов, но без слота его нельзя вести дальше.'
-    : 'Пакет выглядит почти готовым по вашим ответам, но документы ещё не проверены.'
-  const confidenceLabel = isVerified ? 'точность: высокая' : 'точность: средняя'
-  const readinessCaption = isVerified ? 'готовность пакета' : 'по ответам пользователя'
+    ? 'Документы подтверждены детерминированной проверкой кейса.'
+    : 'Результат предварительный: часть данных не подтверждена.'
+  const caseSubtitle = truth.readiness.state === 'needs_human_review'
+    ? 'Автомат не может безопасно закрыть этот кейс без эксперта.'
+    : `Вердикт движка: ${VERDICT_HEADLINE[truth.result.verdict]}. Следуйте серверному next action.`
+  const confidenceLabel = `уверенность движка: ${truth.confidencePercent}% (${confidenceBandLabel(truth.confidenceBand)})`
+  const readinessCaption = `статус: ${readinessLabel(truth.readiness.state)}`
 
   function scrollToCard(index: number) {
     setActiveCard(index)
@@ -216,32 +278,17 @@ export function ResultPageClient() {
   }
 
   function handleCardAction(card: ResultCard, index: number) {
-    if (card.id === 'missing-evidence') {
-      resultUploadRef.current?.click()
-      return
-    }
     if (activeCard !== index) {
       scrollToCard(index)
       return
     }
-    if (card.id === 'risk' || card.id === 'plan' || card.id === 'next-step') {
+
+    if (card.id === 'risk' || card.id === 'plan' || card.id === 'next-step' || card.id === 'missing-evidence') {
       router.push(humanReviewUrl)
       return
     }
-    setExpandedCard((current) => (current === card.id ? '' : card.id))
-  }
 
-  function handleResultDocumentPicked(file: File | undefined) {
-    if (!file) return
-    setResultUploadVerifying(true)
-    window.setTimeout(() => {
-      const qp = new URLSearchParams(params.toString())
-      qp.set('documentsUploaded', 'true')
-      qp.set('documentsSaveConsent', 'false')
-      qp.set('resultType', 'verified')
-      qp.set('analysisConfidence', 'high')
-      router.replace(`/result?${qp.toString()}`)
-    }, 900)
+    setExpandedCard((current) => (current === card.id ? '' : card.id))
   }
 
   return (
@@ -258,7 +305,7 @@ export function ResultPageClient() {
             fill
             sizes="100vw"
             placeholder={hasBlur ? 'blur' : 'empty'}
-            blurDataURL={hasBlur ? IMAGE_BLURS[country] : undefined}
+            blurDataURL={hasBlur ? IMAGE_BLURS[truth.country] : undefined}
             onError={() => setHeroImageBroken(true)}
             className="pointer-events-none absolute inset-0 -z-10 object-cover opacity-[0.18] saturate-[0.85]"
           />
@@ -274,23 +321,14 @@ export function ResultPageClient() {
             <ChevronLeft className="h-4 w-4" /> ACTIVE HOLIDAY
           </Link>
           <div className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-[12px] font-semibold text-foreground/72">
-            {countryEntry.label} · {daysToTrip} дня
+            {countryEntry.label} · {truth.daysToTrip} дня
           </div>
         </header>
 
         <section className="mt-10 md:mx-auto md:w-full md:max-w-[720px]">
-          <input
-            ref={resultUploadRef}
-            type="file"
-            className="sr-only"
-            accept=".pdf,.png,.jpg,.jpeg,.heic,.webp"
-            onChange={(event) => handleResultDocumentPicked(event.target.files?.[0])}
-          />
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/48">
-            {frameTitle}
-          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/48">{frameTitle}</div>
           <h1 className="mt-3 max-w-[360px] text-[48px] font-semibold leading-[0.94] tracking-[-0.035em] md:max-w-[620px] md:text-[66px]">
-            <span className="text-primary">Слот</span> мешает <span className="text-foreground">подаче</span>
+            <span className="text-primary">{VERDICT_HEADLINE[truth.result.verdict]}</span>
           </h1>
           <p className="mt-4 max-w-[360px] text-[15px] leading-snug text-foreground/68 md:max-w-[560px] md:text-[17px]">
             {caseSubtitle}
@@ -299,14 +337,12 @@ export function ResultPageClient() {
           <div className="mt-5 flex items-center justify-between gap-4 border-y border-white/10 py-3">
             <div>
               <div className={cn('text-[13px] font-semibold', isVerified ? 'text-ok' : 'text-primary')}>
-                {resultUploadVerifying ? 'AI сверяет пакет.' : trustLine}
+                {trustLine}
               </div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {resultUploadVerifying ? 'переходим к уточнённой карте' : confidenceLabel}
-              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{confidenceLabel}</div>
             </div>
             <div className="text-right">
-              <div className="text-[34px] font-semibold leading-none tracking-[-0.05em]">86%</div>
+              <div className="text-[34px] font-semibold leading-none tracking-[-0.05em]">{readinessPercent}%</div>
               <div className="mt-1 text-[10px] leading-tight text-muted-foreground">{readinessCaption}</div>
             </div>
           </div>
@@ -356,7 +392,7 @@ export function ResultPageClient() {
                           </div>
                           {card.id === 'risk' && (
                             <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                              блокер
+                              контроль
                             </span>
                           )}
                         </div>
@@ -415,10 +451,10 @@ export function ResultPageClient() {
 
         <section className="mt-auto pt-6 md:mx-auto md:w-full md:max-w-[720px]">
           <AmberCTA onClick={() => router.push(humanReviewUrl)}>
-            {isVerified ? 'Открыть экспертный план' : 'Показать план'}
+            {truth.result.nextAction.label}
           </AmberCTA>
           <p className="mt-3 text-center text-[11px] leading-snug text-foreground/48">
-            AI показывает риски и порядок действий, но не обещает решение консульства.
+            Источник: серверный ResultPayload · {truth.provenance.evidenceStatus} · {truth.provenance.freshnessStatus}
           </p>
         </section>
       </article>

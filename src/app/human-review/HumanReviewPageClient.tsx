@@ -3,15 +3,17 @@
 import { ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { AmberCTA } from '@/components/AmberCTA'
 import { MockPreviewBadge } from '@/components/MockPreviewBadge'
 import { RouteMap } from '@/components/RouteMap'
 import { fetchHumanReviewAi } from '@/lib/aiSurfaceClient'
 import type { HumanReviewAiOutput } from '@/lib/aiSurfaceContracts'
+import { apiClient } from '@/lib/apiClient'
 import { COUNTRIES } from '@/lib/countryData'
 import { VERDICT_HEADLINE, type CountryCode, type VerdictKind } from '@/lib/constants'
+import type { Case, SignalRecord } from '@shared/contracts'
 
 const VALID_COUNTRIES: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
 const VALID_VERDICTS: VerdictKind[] = ['GO', 'GO_WITH_CONDITIONS', 'NOT_NOW', 'HUMAN_REVIEW']
@@ -27,6 +29,27 @@ function parseVerdict(value: string | null): VerdictKind {
     : 'GO_WITH_CONDITIONS'
 }
 
+function signalValue(caseData: Case, signalId: SignalRecord['id']): unknown {
+  const found = caseData.signals.find((signal) => signal.id === signalId)
+  return found?.value
+}
+
+function countryFromCase(caseData: Case): CountryCode {
+  const destination = signalValue(caseData, 'destination')
+  if (typeof destination === 'string') {
+    return parseCountry(destination)
+  }
+  return 'IT'
+}
+
+function tripDatesFromCase(caseData: Case): string {
+  const timelineWeeks = signalValue(caseData, 'timeline_weeks')
+  if (typeof timelineWeeks === 'number' && Number.isFinite(timelineWeeks) && timelineWeeks > 0) {
+    return `срок поездки около ${timelineWeeks} нед.`
+  }
+  return 'даты уточняются'
+}
+
 function LabeledField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="group relative block">
@@ -40,35 +63,66 @@ function LabeledField({ label, children }: { label: string; children: React.Reac
 
 export function HumanReviewPageClient() {
   const params = useSearchParams()
+  const caseId = (params.get('caseId') ?? '').trim()
   const [fullName, setFullName] = useState('')
   const [contact, setContact] = useState('')
   const [context, setContext] = useState('')
   const [aiPack, setAiPack] = useState<HumanReviewAiOutput | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [routeState, setRouteState] = useState<'loading' | 'ready' | 'invalid'>(
+    caseId ? 'loading' : 'invalid'
+  )
+  const [routeError, setRouteError] = useState<string | null>(
+    caseId ? null : 'Кейс отсутствует в ссылке.'
+  )
+  const [country, setCountry] = useState<CountryCode>('IT')
+  const [verdict, setVerdict] = useState<VerdictKind>('HUMAN_REVIEW')
+  const [tripDates, setTripDates] = useState('даты уточняются')
 
-  const country = parseCountry(params.get('country'))
-  const verdict = parseVerdict(params.get('verdict'))
-  const departureDate = params.get('departure')
-  const returnDate = params.get('return')
-  const tripDates = departureDate && returnDate ? `${departureDate} — ${returnDate}` : 'даты уточняются'
-  const resultParams = new URLSearchParams()
-  resultParams.set('country', country)
-  resultParams.set('verdict', verdict)
-  if (departureDate) resultParams.set('departure', departureDate)
-  if (returnDate) resultParams.set('return', returnDate)
-  const resultHref = `/result?${resultParams.toString()}`
+  useEffect(() => {
+    if (!caseId) {
+      setRouteState('invalid')
+      setRouteError('Кейс отсутствует в ссылке. Вернитесь к анкете и создайте кейс заново.')
+      return
+    }
+
+    let cancelled = false
+    setRouteState('loading')
+    setRouteError(null)
+
+    void Promise.all([apiClient.getCase(caseId), apiClient.getResult(caseId)])
+      .then(([caseData, result]) => {
+        if (cancelled) return
+        setCountry(countryFromCase(caseData))
+        setVerdict(parseVerdict(result.verdict))
+        setTripDates(tripDatesFromCase(caseData))
+        setRouteState('ready')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRouteState('invalid')
+        setRouteError('Кейс не найден или недоступен. Вернитесь к анкете и соберите кейс заново.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [caseId])
+
+  const resultHref = useMemo(() => {
+    if (!caseId) return '/intake'
+    return `/result?caseId=${encodeURIComponent(caseId)}`
+  }, [caseId])
 
   const canSend = fullName.trim().length > 1 && contact.trim().length > 3
 
   async function generateBrief() {
-    if (!canSend) return
+    if (!canSend || routeState !== 'ready') return
     setAiLoading(true)
     try {
       const data = await fetchHumanReviewAi({
         country,
         verdict,
-        departureDate: departureDate ?? undefined,
-        returnDate: returnDate ?? undefined,
         fullName: fullName.trim(),
         contact: contact.trim(),
         context: context.trim() || undefined,
@@ -79,6 +133,40 @@ export function HumanReviewPageClient() {
     } finally {
       setAiLoading(false)
     }
+  }
+
+  if (routeState !== 'ready') {
+    return (
+      <main className="w-full p-0">
+        <article className="min-h-screen bg-black/20 p-5 pb-10 pt-6 md:p-8">
+          <header className="flex items-center justify-between gap-4">
+            <Link
+              href="/intake"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-white/10 px-3 py-2 text-sm text-foreground/85 transition-colors hover:border-white/20 hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" /> К анкете
+            </Link>
+            <AHEyebrow>Эксперт</AHEyebrow>
+          </header>
+
+          <section className="mt-8 max-w-xl rounded-2xl border border-white/12 bg-[#0e1728]/78 p-5">
+            <p className="text-[15px] text-foreground/84">
+              {routeState === 'loading'
+                ? 'Проверяем caseId и загружаем данные кейса.'
+                : routeError ?? 'Кейс недоступен.'}
+            </p>
+            {routeState === 'invalid' && (
+              <Link
+                href="/intake"
+                className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-foreground/88 transition-colors hover:border-white/25"
+              >
+                Вернуться к анкете
+              </Link>
+            )}
+          </section>
+        </article>
+      </main>
+    )
   }
 
   return (
