@@ -383,6 +383,18 @@ describe("scenario lab HTTP surface", () => {
     expect(invalid.status).toBe(403);
     expect(invalid.json.error).toBe("case_access_forbidden");
 
+    const malformed = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: "short"
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(malformed.status).toBe(403);
+    expect(malformed.json.error).toBe("case_access_forbidden");
+
     const thirdFork = await postJson("/api/cases/s1-rf-italy/fork", {
       title: "S1 — third fork token isolation"
     });

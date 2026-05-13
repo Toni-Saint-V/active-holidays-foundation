@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { recommendationSourceSchema } from "./recommendations";
+import { candidateAccessTokenInputSchema } from "./caseAccess";
 
 export const landingWowBriefSchema = z.object({
   version: z.literal("landing-wow-brief.v1"),
@@ -28,7 +29,7 @@ export type IntakeWowBrief = z.infer<typeof intakeWowBriefSchema>;
 
 export const recommendationWhatIfBriefRequestSchema = z.object({
   candidateCaseId: z.string().min(1),
-  candidateAccessToken: z.string().min(24).optional(),
+  candidateAccessToken: candidateAccessTokenInputSchema,
   offerId: z.string().min(1),
   offerLabel: z.string().min(1).optional()
 });

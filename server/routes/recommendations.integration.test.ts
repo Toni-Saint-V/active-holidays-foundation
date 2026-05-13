@@ -341,6 +341,19 @@ describe("recommendation HTTP surface", () => {
     expect(invalid.status).toBe(403);
     expect(invalid.json.error).toBe("case_access_forbidden");
 
+    const malformed = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        candidateAccessToken: "short",
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(malformed.status).toBe(403);
+    expect(malformed.json.error).toBe("case_access_forbidden");
+
     const thirdFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
     expect(thirdFork.status).toBe(200);
     const thirdToken = thirdFork.json.access.accessToken as string;

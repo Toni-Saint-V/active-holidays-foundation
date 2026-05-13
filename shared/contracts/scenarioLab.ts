@@ -4,7 +4,10 @@ import { nextActionSchema, actionTargetScreenSchema } from "./action";
 import { productTypeSchema } from "./product";
 import { signalIdSchema } from "./signals";
 import { verdictSchema } from "./verdict";
-import { caseAccessCredentialSchema } from "./caseAccess";
+import {
+  caseAccessCredentialSchema,
+  candidateAccessTokenInputSchema
+} from "./caseAccess";
 
 export const scenarioLabPlanStatusSchema = z.enum(["normal", "human_review"]);
 export type ScenarioLabPlanStatus = z.infer<typeof scenarioLabPlanStatusSchema>;
@@ -113,7 +116,7 @@ export type ScenarioLabFamily = z.infer<typeof scenarioLabFamilySchema>;
 export const scenarioLabCompareRequestSchema = z
   .object({
     compareToCaseId: z.string().min(1).optional(),
-    candidateAccessToken: z.string().min(24).optional(),
+    candidateAccessToken: candidateAccessTokenInputSchema,
     title: z.string().min(1).optional(),
     signals: caseSchema.shape.signals.default([]),
     preferences: caseSchema.shape.preferences.optional()
