@@ -107,6 +107,16 @@ async function request<Schema extends z.ZodTypeAny>(
   return parsed.data;
 }
 
+function withInternalToken(token: string): Record<string, string> {
+  const normalized = token.trim();
+  if (!normalized) {
+    throw new Error("Internal API token is required for internal cases client.");
+  }
+  return {
+    "x-active-holidays-internal-token": normalized
+  };
+}
+
 const strictCaseSchema = caseSchema.extend({
   productType: productTypeSchema
 });
@@ -160,6 +170,45 @@ const auditResponseSchema = z.object({
   trail: auditTrailSchema,
   decisions: decisionsLogSchema
 });
+
+export function createInternalCasesApiClient(internalApiToken: string) {
+  const internalHeaders = withInternalToken(internalApiToken);
+
+  return {
+    async humanReview(id: string): Promise<HumanReviewRequest | null> {
+      const response = await request(
+        `/api/cases/${encodeURIComponent(id)}/human-review`,
+        humanReviewResponseSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+      return response.request;
+    },
+    async humanReviewCasePacket(id: string): Promise<HumanReviewCasePacket> {
+      const response = await request(
+        `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
+        humanReviewCasePacketResponseSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+      return response.packet;
+    },
+    async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
+      const body = humanReviewCreateRequestSchema.parse(payload);
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/human-review`,
+        humanReviewCreateResponseSchema,
+        {
+          method: "POST",
+          headers: internalHeaders,
+          body: JSON.stringify(body)
+        }
+      );
+    }
+  };
+}
 
 export const apiClient = {
   async health() {
@@ -226,31 +275,6 @@ export const apiClient = {
   },
   async audit(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema);
-  },
-  async humanReview(id: string): Promise<HumanReviewRequest | null> {
-    const response = await request(
-      `/api/cases/${encodeURIComponent(id)}/human-review`,
-      humanReviewResponseSchema
-    );
-    return response.request;
-  },
-  async humanReviewCasePacket(id: string): Promise<HumanReviewCasePacket> {
-    const response = await request(
-      `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
-      humanReviewCasePacketResponseSchema
-    );
-    return response.packet;
-  },
-  async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
-    const body = humanReviewCreateRequestSchema.parse(payload);
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/human-review`,
-      humanReviewCreateResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(body)
-      }
-    );
   },
   async documents(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema);

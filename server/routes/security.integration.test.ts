@@ -10,6 +10,9 @@ import { resetRateLimitBucketsForTests } from "../middleware/rateLimit";
 import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 
 const INTERNAL_API_TOKEN = "test-internal-security-token";
+const INTERNAL_HEADERS = {
+  "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+} as const;
 
 const previousEnv = {
   internalApiToken: process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN,
@@ -81,6 +84,90 @@ async function requestJson(
   const json = text.length > 0 ? JSON.parse(text) : null;
   return { response, json } as const;
 }
+
+type DenyCaseBoundRoute = {
+  method: "GET" | "POST";
+  path: string;
+  body?: unknown;
+};
+
+const SENSITIVE_CASE_BOUND_ROUTES: readonly DenyCaseBoundRoute[] = [
+  { method: "GET", path: "/api/cases/s1-rf-italy" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/result" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/recommendations/shortlist" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/recommendations/detail",
+    body: { offerId: "path_it_tourist_90" }
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/recommendations/what-if-brief",
+    body: {
+      candidateCaseId: "s1-rf-italy",
+      offerId: "path_it_tourist_90",
+      offerLabel: "Italy Tourist 90"
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/signals",
+    body: { signals: [] }
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/recompute",
+    body: {}
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/override-signal",
+    body: {}
+  },
+  { method: "GET", path: "/api/cases/s1-rf-italy/audit" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/documents" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/human-review" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/human-review/packet" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/human-review/manager-brief",
+    body: {}
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/human-review",
+    body: {
+      channel: "email",
+      contact: "security-test@example.com",
+      message: "Нужна ручная проверка."
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/human-review/transition",
+    body: {
+      requestId: "hr_test",
+      status: "in_queue",
+      note: "Без токена."
+    }
+  },
+  { method: "GET", path: "/api/cases/s1-rf-italy/scenario-lab" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/scenarios" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/scenarios/compare",
+    body: {
+      title: "Security compare",
+      signals: []
+    }
+  },
+  { method: "GET", path: "/api/cases/s1-rf-italy/drift" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/fork",
+    body: {}
+  }
+];
 
 beforeAll(async () => {
   process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
@@ -171,13 +258,23 @@ describe("Express API security hardening", () => {
     expect(detail.json.error).toBe("internal_api_forbidden");
   });
 
+  it("denies all sensitive case-bound routes without internal token (table-driven)", async () => {
+    for (const route of SENSITIVE_CASE_BOUND_ROUTES) {
+      const request = await requestJson(route.method, route.path, {
+        body: route.body
+      });
+      expect(request.response.status, `${route.method} ${route.path}`).toBe(403);
+      expect(request.json.error, `${route.method} ${route.path}`).toBe("internal_api_forbidden");
+    }
+  });
+
   it("requires the internal API token for decision and case-operator routes", async () => {
     const decisionsWithoutToken = await requestJson("GET", "/api/decisions");
     expect(decisionsWithoutToken.response.status).toBe(403);
     expect(decisionsWithoutToken.json.error).toBe("internal_api_forbidden");
 
     const decisionsWithToken = await requestJson("GET", "/api/decisions", {
-      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      headers: INTERNAL_HEADERS
     });
     expect(decisionsWithToken.response.status).toBe(200);
     expect(Array.isArray(decisionsWithToken.json.decisions)).toBe(true);
@@ -187,7 +284,7 @@ describe("Express API security hardening", () => {
     expect(auditWithoutToken.json.error).toBe("internal_api_forbidden");
 
     const auditWithToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit", {
-      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      headers: INTERNAL_HEADERS
     });
     expect(auditWithToken.response.status).toBe(200);
   });
@@ -242,19 +339,19 @@ describe("Express API security hardening", () => {
     const first = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
       headers: {
         ...headers,
-        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+        ...INTERNAL_HEADERS
       }
     });
     const second = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
       headers: {
         ...headers,
-        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+        ...INTERNAL_HEADERS
       }
     });
     const third = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
       headers: {
         ...headers,
-        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+        ...INTERNAL_HEADERS
       }
     });
 

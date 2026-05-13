@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiClient, configureApiBase } from "./apiClient";
+import {
+  ApiError,
+  apiClient,
+  configureApiBase,
+  createInternalCasesApiClient
+} from "./apiClient";
 
 const caseResponse = {
   id: "s4-rf-residency-dnv",
@@ -295,5 +300,121 @@ describe("apiClient strict productType parsing", () => {
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
+  });
+});
+
+describe("apiClient internal/public human-review boundary", () => {
+  beforeEach(() => {
+    configureApiBase("http://api.test");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not expose internal human-review methods on public client", () => {
+    expect("humanReview" in apiClient).toBe(false);
+    expect("humanReviewCasePacket" in apiClient).toBe(false);
+    expect("submitHumanReview" in apiClient).toBe(false);
+  });
+
+  it("sends internal token header for internal human-review GET", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
+        request: null
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+    await expect(internalClient.humanReview("case-123")).resolves.toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
+  });
+
+  it("validates payload and posts to the same internal human-review route", async () => {
+    const now = "2026-04-17T10:00:00.000Z";
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
+        request: {
+          id: "hr-1",
+          caseId: "case-123",
+          status: "submitted",
+          channel: "email",
+          contact: "user@example.com",
+          message: "Нужна помощь по кейсу и документам.",
+          createdAt: now,
+          updatedAt: now,
+          closedAt: null,
+          durability: "persisted",
+          snapshot: {
+            decisionId: null,
+            verdict: "GO",
+            confidence: 0.91,
+            computedAt: now,
+            lastCheckedAt: now,
+            nextActionLabel: "Подготовить документы",
+            summary: "Проверка завершена."
+          },
+          handoff: null,
+          resolution: null,
+          events: [
+            {
+              id: "event-1",
+              at: now,
+              type: "submitted",
+              status: "submitted",
+              changedBy: "traveler",
+              note: null
+            }
+          ]
+        },
+        reused: false
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+
+    await expect(
+      internalClient.submitHumanReview("case-123", {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Нужна помощь по кейсу и документам."
+      })
+    ).resolves.toMatchObject({ reused: false });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
+    expect(init.body).toBe(
+      JSON.stringify({
+        channel: "email",
+        contact: "user@example.com",
+        message: "Нужна помощь по кейсу и документам."
+      })
+    );
+
+    fetchMock.mockClear();
+    await expect(
+      internalClient.submitHumanReview("case-123", {
+        channel: "email",
+        contact: "user@example.com",
+        message: "short"
+      })
+    ).rejects.toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
