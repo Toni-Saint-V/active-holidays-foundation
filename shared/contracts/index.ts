@@ -29,3 +29,4 @@ export * from "./aiBriefs";
 export * from "./m1Scope";
 export * from "./publicReadiness";
 export * from "./aiResultWriter";
+export * from "./documentCheck";
