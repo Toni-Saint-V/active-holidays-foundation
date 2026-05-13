@@ -125,6 +125,12 @@ const SENSITIVE_CASE_BOUND_ROUTES: readonly DenyCaseBoundRoute[] = [
     body: {}
   },
   { method: "GET", path: "/api/cases/s1-rf-italy/audit" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/documents",
+    body: {}
+  },
+  { method: "GET", path: "/api/cases/s1-rf-italy/documents/summary" },
   { method: "GET", path: "/api/cases/s1-rf-italy/documents" },
   { method: "GET", path: "/api/cases/s1-rf-italy/human-review" },
   { method: "GET", path: "/api/cases/s1-rf-italy/human-review/packet" },
