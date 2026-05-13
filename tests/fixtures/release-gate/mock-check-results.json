@@ -1,0 +1,66 @@
+[
+  {
+    "id": "core-verify",
+    "title": "Core verify",
+    "command": "npm run verify",
+    "policy": "blocking",
+    "sideEffecting": false,
+    "status": "pass",
+    "severity": "info",
+    "exitCode": 0,
+    "durationMs": 2100,
+    "hasWarnings": false,
+    "skipReason": null,
+    "outputTail": [
+      "OK: verify passed"
+    ]
+  },
+  {
+    "id": "engine-drift",
+    "title": "Engine drift",
+    "command": "npm run verify:engine",
+    "policy": "blocking",
+    "sideEffecting": false,
+    "status": "fail",
+    "severity": "error",
+    "exitCode": 1,
+    "durationMs": 900,
+    "hasWarnings": false,
+    "skipReason": null,
+    "outputTail": [
+      "drift detected"
+    ]
+  },
+  {
+    "id": "context-surface",
+    "title": "Context surface consistency",
+    "command": "npm run automations:check:context",
+    "policy": "advisory",
+    "sideEffecting": false,
+    "status": "fail",
+    "severity": "warn",
+    "exitCode": 1,
+    "durationMs": 1500,
+    "hasWarnings": true,
+    "skipReason": null,
+    "outputTail": [
+      "[WARN] optional surface missing",
+      "[FAIL] context mismatch"
+    ]
+  },
+  {
+    "id": "autonomous-os-verify",
+    "title": "Autonomous OS verification",
+    "command": "npm run autonomous:verify",
+    "policy": "advisory",
+    "sideEffecting": true,
+    "notes": "Side-effecting check",
+    "status": "skipped",
+    "severity": "info",
+    "exitCode": null,
+    "durationMs": 0,
+    "hasWarnings": false,
+    "skipReason": "side_effecting_check_disabled",
+    "outputTail": []
+  }
+]
