@@ -315,6 +315,63 @@ describe("apiClient strict productType parsing", () => {
     expect(headers["x-active-holidays-case-access"]).toBe("t".repeat(32));
   });
 
+  it("sends candidate access token in compareScenario body and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
+        rootCaseId: caseResponse.id,
+        baseline: scenarioSummary,
+        candidateCase: caseResponse,
+        comparison: {
+          baseline: scenarioSummary,
+          candidate: scenarioSummary,
+          delta: {
+            verdictChanged: false,
+            confidenceDelta: 0,
+            primaryPathChanged: false,
+            documentsScoreDelta: 0,
+            documentsReadyDelta: 0,
+            nextActionChanged: false,
+            humanReviewChanged: false,
+            addedAlternativePathIds: [],
+            removedAlternativePathIds: [],
+            changedSignalIds: [],
+            changedPreferenceIds: [],
+            changedSignals: []
+          }
+        },
+        candidateDecisionRecordId: null
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const baselineToken = "b".repeat(32);
+    const candidateToken = "c".repeat(32);
+    await apiClient.compareScenario(
+      caseResponse.id,
+      {
+        compareToCaseId: "s4-rf-residency-dnv-fork-2",
+        signals: [],
+        candidateAccessToken: candidateToken
+      },
+      baselineToken
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/scenarios/compare");
+    expect(url).not.toContain("accessToken=");
+    expect(url).not.toContain(baselineToken);
+    expect(url).not.toContain(candidateToken);
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe(baselineToken);
+    const payload = JSON.parse(String(init.body)) as {
+      compareToCaseId: string;
+      candidateAccessToken?: string;
+    };
+    expect(payload.compareToCaseId).toBe("s4-rf-residency-dnv-fork-2");
+    expect(payload.candidateAccessToken).toBe(candidateToken);
+  });
+
   it("uses header transport for case-scoped API calls without leaking token to URL", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/result")) return okJson(resultResponse);

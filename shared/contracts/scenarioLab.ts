@@ -113,6 +113,7 @@ export type ScenarioLabFamily = z.infer<typeof scenarioLabFamilySchema>;
 export const scenarioLabCompareRequestSchema = z
   .object({
     compareToCaseId: z.string().min(1).optional(),
+    candidateAccessToken: z.string().min(24).optional(),
     title: z.string().min(1).optional(),
     signals: caseSchema.shape.signals.default([]),
     preferences: caseSchema.shape.preferences.optional()
@@ -120,7 +121,9 @@ export const scenarioLabCompareRequestSchema = z
   .refine(
     (value) =>
       !value.compareToCaseId ||
-      (!value.title && value.signals.length === 0 && value.preferences === undefined),
+      (!value.title &&
+        value.signals.length === 0 &&
+        ((value.preferences?.length ?? 0) === 0)),
     {
       message: "Нельзя одновременно сравнивать существующий кейс и создавать новый fork.",
       path: ["compareToCaseId"]

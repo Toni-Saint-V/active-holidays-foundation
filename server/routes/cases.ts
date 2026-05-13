@@ -113,6 +113,26 @@ function requireCaseAccess(
   }
 }
 
+function requireCaseAccessByToken(
+  req: Request,
+  caseData: Case,
+  token: string | undefined,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): void {
+  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
+    return;
+  }
+  if (allowDevSeedAccessBypass(req, caseData)) return;
+  const normalized = token?.trim();
+  if (!normalized || !getCaseStore().validateCaseAccess(caseData.id, normalized)) {
+    throw new HttpError(
+      403,
+      "Недостаточно прав для доступа к кейсу.",
+      "case_access_forbidden"
+    );
+  }
+}
+
 function orchestratorCatalogs(
   caseId?: string,
   options: { excludeCalibrationRequestIds?: string[] } = {}
@@ -364,7 +384,11 @@ export function casesRouter(): Router {
       requireCaseAccess(req, baselineCase);
       const payload = recommendationWhatIfBriefRequestSchema.parse(req.body);
       const candidateCase = requireCase(payload.candidateCaseId);
-      requireCaseAccess(req, candidateCase);
+      if (candidateCase.id === baselineCase.id) {
+        requireCaseAccess(req, candidateCase);
+      } else {
+        requireCaseAccessByToken(req, candidateCase, payload.candidateAccessToken);
+      }
 
       if (!ensureSameScenarioFamily(getCaseStore(), baselineCase.id, candidateCase.id)) {
         throw new HttpError(
@@ -763,6 +787,7 @@ export function casesRouter(): Router {
       requireCaseAccess(req, baselineCase);
       const {
         compareToCaseId,
+        candidateAccessToken,
         title,
         signals,
         preferences
@@ -770,7 +795,11 @@ export function casesRouter(): Router {
 
       if (compareToCaseId) {
         const candidateCase = requireCase(compareToCaseId);
-        requireCaseAccess(req, candidateCase);
+        if (candidateCase.id === baselineCase.id) {
+          requireCaseAccess(req, candidateCase);
+        } else {
+          requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
+        }
         if (!ensureSameScenarioFamily(store, baselineCase.id, candidateCase.id)) {
           throw new HttpError(
             400,

@@ -164,8 +164,8 @@ async function getJson(path: string, headers?: Record<string, string>) {
   return requestJson("GET", path, undefined, headers);
 }
 
-async function postJson(path: string, body?: unknown) {
-  return requestJson("POST", path, body);
+async function postJson(path: string, body?: unknown, headers?: Record<string, string>) {
+  return requestJson("POST", path, body, headers);
 }
 
 async function withFreshEvidence<T>(run: () => Promise<T>): Promise<T> {
@@ -316,6 +316,81 @@ describe("scenario lab HTTP surface", () => {
     expect(decision.json.record.changedPreferenceIds).toEqual([
       "italy_d_digital_nomad"
     ]);
+  });
+
+  it("compares two existing forked scenarios only with candidate credential", async () => {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+      title: "S1 — baseline fork для dual-token compare"
+    });
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.candidateCase.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const candidateFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+      title: "S1 — candidate fork для dual-token compare",
+      signals: [
+        {
+          id: "insurance_ok",
+          value: true,
+          source: "override",
+          capturedAt: "2026-04-18T10:25:00.000Z"
+        }
+      ]
+    });
+    expect(candidateFork.status).toBe(200);
+    const candidateId = candidateFork.json.candidateCase.id as string;
+    const candidateToken = candidateFork.json.access.accessToken as string;
+
+    const success = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: candidateToken
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(success.status).toBe(200);
+    expect(success.json.rootCaseId).toBe("s1-rf-italy");
+    expect(success.json.candidateCase.id).toBe(candidateId);
+
+    const missing = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      { compareToCaseId: candidateId, signals: [] },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(missing.status).toBe(403);
+    expect(missing.json.error).toBe("case_access_forbidden");
+
+    const invalid = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: `${candidateToken}-tampered`
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(invalid.status).toBe(403);
+    expect(invalid.json.error).toBe("case_access_forbidden");
+
+    const thirdFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+      title: "S1 — third fork token isolation"
+    });
+    expect(thirdFork.status).toBe(200);
+    const thirdToken = thirdFork.json.access.accessToken as string;
+
+    const wrongCaseToken = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: thirdToken
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(wrongCaseToken.status).toBe(403);
+    expect(wrongCaseToken.json.error).toBe("case_access_forbidden");
   });
 
   it("returns the whole fork family with comparisons relative to the root scenario", async () => {

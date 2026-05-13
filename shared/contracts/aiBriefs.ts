@@ -28,6 +28,7 @@ export type IntakeWowBrief = z.infer<typeof intakeWowBriefSchema>;
 
 export const recommendationWhatIfBriefRequestSchema = z.object({
   candidateCaseId: z.string().min(1),
+  candidateAccessToken: z.string().min(24).optional(),
   offerId: z.string().min(1),
   offerLabel: z.string().min(1).optional()
 });
