@@ -3,6 +3,8 @@ import {
   documentKindSchema,
   documentCheckRunSchema,
   documentCheckStatusSchema,
+  documentAllowedFileExtensionSchema,
+  documentObservedFileExtensionSchema,
   publicDocumentCheckItemSchema,
   documentUploadRequestSchema,
   documentUploadResponseSchema,
@@ -31,6 +33,26 @@ describe("document check contract", () => {
       "parsing_queued",
       "parsed",
       "check_failed"
+    ]);
+  });
+
+  it("keeps allowed vs observed extension contracts separated", () => {
+    expect(documentAllowedFileExtensionSchema.options).toEqual([
+      "pdf",
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "heic"
+    ]);
+    expect(documentObservedFileExtensionSchema.options).toEqual([
+      "pdf",
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "heic",
+      "unknown"
     ]);
   });
 
@@ -74,6 +96,58 @@ describe("document check contract", () => {
       aiBoundary: "explanation_only"
     });
     expect(response.uploadStatus).toBe("accepted");
+  });
+
+  it("limits upload response status to intake lifecycle states", () => {
+    const parsed = documentUploadResponseSchema.safeParse({
+      caseId: "case-1",
+      runId: "run-1",
+      assetId: "asset-1",
+      kind: "passport",
+      uploadStatus: "accepted",
+      status: "accepted",
+      publicMessage: "ok",
+      nextStep: "none",
+      source: "user_file",
+      uploadedAt: "2026-05-13T08:00:00.000Z",
+      deterministicOwner: "engine",
+      aiBoundary: "explanation_only"
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects contradictory uploadStatus/status pairs", () => {
+    const rejectedWithReview = documentUploadResponseSchema.safeParse({
+      caseId: "case-1",
+      runId: "run-1",
+      assetId: "asset-1",
+      kind: "passport",
+      uploadStatus: "rejected",
+      status: "needs_review",
+      publicMessage: "ok",
+      nextStep: "none",
+      source: "user_file",
+      uploadedAt: "2026-05-13T08:00:00.000Z",
+      deterministicOwner: "engine",
+      aiBoundary: "explanation_only"
+    });
+    expect(rejectedWithReview.success).toBe(false);
+
+    const acceptedWithFailed = documentUploadResponseSchema.safeParse({
+      caseId: "case-1",
+      runId: "run-1",
+      assetId: "asset-1",
+      kind: "passport",
+      uploadStatus: "accepted",
+      status: "check_failed",
+      publicMessage: "ok",
+      nextStep: "none",
+      source: "user_file",
+      uploadedAt: "2026-05-13T08:00:00.000Z",
+      deterministicOwner: "engine",
+      aiBoundary: "explanation_only"
+    });
+    expect(acceptedWithFailed.success).toBe(false);
   });
 
   it("defines public-safe summary shape for UI evidence chips", () => {

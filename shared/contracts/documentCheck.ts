@@ -25,16 +25,25 @@ export type DocumentCheckStatus = z.infer<typeof documentCheckStatusSchema>;
 export const documentCheckSeveritySchema = z.enum(["critical", "high", "medium", "low"]);
 export type DocumentCheckSeverity = z.infer<typeof documentCheckSeveritySchema>;
 
-export const documentFileExtensionSchema = z.enum([
+export const documentAllowedFileExtensionSchema = z.enum([
   "pdf",
   "png",
   "jpg",
   "jpeg",
   "webp",
-  "heic",
+  "heic"
+]);
+export type DocumentAllowedFileExtension = z.infer<
+  typeof documentAllowedFileExtensionSchema
+>;
+
+export const documentObservedFileExtensionSchema = z.enum([
+  ...documentAllowedFileExtensionSchema.options,
   "unknown"
 ]);
-export type DocumentFileExtension = z.infer<typeof documentFileExtensionSchema>;
+export type DocumentObservedFileExtension = z.infer<
+  typeof documentObservedFileExtensionSchema
+>;
 
 export const documentAssetSchema = z
   .object({
@@ -43,7 +52,7 @@ export const documentAssetSchema = z
     kind: documentKindSchema,
     originalFileName: z.string().min(1),
     normalizedFileName: z.string().min(1),
-    extension: documentFileExtensionSchema,
+    extension: documentObservedFileExtensionSchema,
     mimeType: z.string().min(1),
     sizeBytes: z.number().int().min(1),
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
@@ -58,7 +67,7 @@ export const documentRequirementSchema = z
     kind: documentKindSchema,
     label: z.string().min(1),
     required: z.boolean(),
-    acceptedExtensions: z.array(documentFileExtensionSchema).min(1),
+    acceptedExtensions: z.array(documentAllowedFileExtensionSchema).min(1),
     acceptedMimeTypes: z.array(z.string().min(1)).min(1),
     maxSizeBytes: z.number().int().min(1),
     guidance: z.string().min(1).nullable()
@@ -159,6 +168,34 @@ export const documentUploadResponseSchema = z
     uploadedAt: z.string().datetime(),
     deterministicOwner: z.literal("engine"),
     aiBoundary: z.literal("explanation_only")
+  })
+  .superRefine((value, ctx) => {
+    const allowed = new Set(["parsing_queued", "needs_review", "check_failed"]);
+    if (!allowed.has(value.status)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "upload response status must be parsing_queued|needs_review|check_failed",
+        path: ["status"]
+      });
+    }
+    if (value.uploadStatus === "rejected" && value.status !== "check_failed") {
+      ctx.addIssue({
+        code: "custom",
+        message: "rejected upload must have check_failed status",
+        path: ["status"]
+      });
+    }
+    if (
+      value.uploadStatus === "accepted" &&
+      value.status !== "parsing_queued" &&
+      value.status !== "needs_review"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "accepted upload must have parsing_queued|needs_review status",
+        path: ["status"]
+      });
+    }
   })
   .strict();
 export type DocumentUploadResponse = z.infer<typeof documentUploadResponseSchema>;

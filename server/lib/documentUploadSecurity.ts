@@ -96,11 +96,17 @@ const EXECUTABLE_SEGMENTS = new Set([
   "sh"
 ]);
 
+const EXECUTABLE_SEGMENT_MIN_LENGTH = Math.min(
+  ...Array.from(EXECUTABLE_SEGMENTS, (segment) => segment.length)
+);
+
 const CONFUSABLE_ASCII_CODEPOINT_MAP = new Map<number, string>([
   [0x03b5, "e"], // Greek epsilon
   [0x03c7, "x"], // Greek chi
   [0xab32, "e"], // Latin small letter blackletter e
+  [0xab53, "x"], // Latin small letter chi
   [0x04bd, "e"], // Cyrillic abkhasian che (confusable with e)
+  [0x04b3, "x"], // Cyrillic ha with descender (confusable with x)
   [0x212e, "e"], // Estimated symbol (confusable with e)
   [0x0430, "a"], // Cyrillic a
   [0x0435, "e"], // Cyrillic e
@@ -109,6 +115,7 @@ const CONFUSABLE_ASCII_CODEPOINT_MAP = new Map<number, string>([
   [0x0441, "c"], // Cyrillic es
   [0x0445, "x"], // Cyrillic ha
   [0x0443, "y"], // Cyrillic u
+  [0x0454, "e"], // Cyrillic ie
   [0x0456, "i"], // Cyrillic i
   [0x0458, "j"], // Cyrillic je
   [0x0455, "s"] // Cyrillic dze
@@ -193,16 +200,16 @@ function validateFileName(input: string):
   const segments = baseName.split(".").filter(Boolean);
   if (segments.length >= 2) {
     const nonFinalSegments = segments.slice(0, -1);
-    for (const segment of nonFinalSegments) {
+    for (const [segmentIndex, segment] of nonFinalSegments.entries()) {
       const extensionLikeSegment = segment
         .normalize("NFKC")
         .replace(/[\p{White_Space}\p{Cf}]+/gu, "")
         .toLowerCase();
-      if (extensionLikeSegment.length < 2 || extensionLikeSegment.length > 5) {
+      if (extensionLikeSegment.length < EXECUTABLE_SEGMENT_MIN_LENGTH) {
         continue;
       }
-
-      if (/[^\x00-\x7F]/u.test(extensionLikeSegment)) {
+      const isMiddleExtensionSegment = segmentIndex > 0;
+      if (isMiddleExtensionSegment && /[^\x00-\x7F]/u.test(extensionLikeSegment)) {
         return {
           ok: false,
           auditReason: `filename_contains_non_ascii_extension_segment:${baseName}`

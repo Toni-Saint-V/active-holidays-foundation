@@ -3,6 +3,7 @@ import type {
   DocumentKind,
   DocumentParserProvider as SharedDocumentParserProvider
 } from "@shared/contracts";
+import { documentCheckStatusSchema } from "@shared/contracts";
 
 const PARSER_PROVIDER_ID: SharedDocumentParserProvider["id"] = "deterministic_stub";
 
@@ -98,12 +99,7 @@ export function runDocumentParserStub(
 export type DeterministicStatusOwner = "runtime" | "ai";
 
 const RUNTIME_OWNED_DETERMINISTIC_STATUSES = new Set<DocumentCheckStatus>([
-  "accepted",
-  "rejected",
-  "needs_review",
-  "parsing_queued",
-  "parsed",
-  "check_failed"
+  ...documentCheckStatusSchema.options
 ]);
 
 export function applyDeterministicStatusUpdate(args: {
