@@ -96,7 +96,6 @@ async function requestJson(
           'content-length': String(Buffer.byteLength(payload))
         }
       : {}),
-    'x-active-holidays-internal-token': INTERNAL_API_TOKEN,
     ...(headers ?? {})
   }
   if (payload) {
@@ -186,7 +185,9 @@ describe('case access ownership boundary', () => {
     expect(badHumanReview.status).toBe(403)
     expect(badHumanReview.json.error).toBe('case_access_forbidden')
 
-    const missingPacket = await requestJson('GET', `/api/cases/${caseId}/human-review/packet`)
+    const missingPacket = await requestJson('GET', `/api/cases/${caseId}/human-review/packet`, undefined, {
+      'x-active-holidays-internal-token': INTERNAL_API_TOKEN
+    })
     expect(missingPacket.status).toBe(403)
     expect(missingPacket.json.error).toBe('case_access_forbidden')
 
@@ -213,7 +214,11 @@ describe('case access ownership boundary', () => {
 
     const viaQueryPacket = await requestJson(
       'GET',
-      `/api/cases/${caseId}/human-review/packet?accessToken=${encodeURIComponent(accessToken)}`
+      `/api/cases/${caseId}/human-review/packet?accessToken=${encodeURIComponent(accessToken)}`,
+      undefined,
+      {
+        'x-active-holidays-internal-token': INTERNAL_API_TOKEN
+      }
     )
     expect(viaQueryPacket.status).toBe(403)
     expect(viaQueryPacket.json.error).toBe('case_access_forbidden')
@@ -250,7 +255,8 @@ describe('case access ownership boundary', () => {
       `/api/cases/${caseB}/human-review/packet`,
       undefined,
       {
-        [CASE_ACCESS_HEADER]: tokenA
+        [CASE_ACCESS_HEADER]: tokenA,
+        'x-active-holidays-internal-token': INTERNAL_API_TOKEN
       }
     )
     expect(humanReviewPacketRead.status).toBe(403)
