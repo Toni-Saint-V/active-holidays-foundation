@@ -253,18 +253,18 @@ export function casesRouter(): Router {
     res.json({ cases: caseSummarySchema.array().parse(summaries) });
   });
 
-  router.get("/:id", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     res.json(caseData);
   });
 
-  router.get("/:id/result", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/result", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     const result = computeResult(caseData);
     res.json(result);
   });
 
-  router.get("/:id/recommendations/shortlist", recommendationRateLimit, validateParams(caseIdParams), async (req, res) => {
+  router.get("/:id/recommendations/shortlist", requireInternalApiToken, recommendationRateLimit, validateParams(caseIdParams), async (req, res) => {
     const caseData = requireCase(getId(req));
     const result = computeResult(caseData);
     const shortlist = await buildRecommendationShortlist(caseData, result);
@@ -280,6 +280,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/detail",
+    requireInternalApiToken,
     recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationDetailRequestSchema),
@@ -306,6 +307,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/what-if-brief",
+    requireInternalApiToken,
     recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationWhatIfBriefRequestSchema),
@@ -344,6 +346,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/signals",
+    requireInternalApiToken,
     validateParams(caseIdParams),
     validateBody(z.object({ signals: caseSignalsSchema })),
     (req, res) => {
@@ -378,6 +381,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recompute",
+    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(
@@ -446,7 +450,7 @@ export function casesRouter(): Router {
     });
   });
 
-  router.get("/:id/documents", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/documents", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     const result = computeResult(caseData);
     res.json(result.documents);
@@ -682,13 +686,13 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/scenario-lab", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     const result = computeResult(caseData);
     res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(caseData.id), result));
   });
 
-  router.get("/:id/scenarios", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/scenarios", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
     requireCase(id);
     const family = buildScenarioFamily(getCaseStore(), id, computeResult);
@@ -697,6 +701,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/scenarios/compare",
+    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(scenarioLabCompareRequestSchema),
@@ -826,6 +831,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/fork",
+    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(z.object({ title: z.string().min(1).optional() }).default({})),

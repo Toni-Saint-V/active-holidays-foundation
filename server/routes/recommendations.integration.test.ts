@@ -31,10 +31,13 @@ let app: Express;
 let server: Server;
 let baseUrl = "";
 const previousApiKey = process.env.OPENAI_API_KEY;
+const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+const INTERNAL_API_TOKEN = "test-internal-recommendations-token";
 let restoreFreshCatalogs: (() => void) | null = null;
 
 beforeAll(async () => {
   delete process.env.OPENAI_API_KEY;
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
   app = await createApp();
   server = await new Promise<Server>((resolve) => {
     const instance = app.listen(0, () => resolve(instance));
@@ -72,9 +75,14 @@ afterAll(async () => {
   });
   if (previousApiKey === undefined) {
     delete process.env.OPENAI_API_KEY;
+  } else {
+    process.env.OPENAI_API_KEY = previousApiKey;
+  }
+  if (previousInternalApiToken === undefined) {
+    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
     return;
   }
-  process.env.OPENAI_API_KEY = previousApiKey;
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken;
 });
 
 async function requestJson(
@@ -87,9 +95,13 @@ async function requestJson(
     headers: body
       ? {
           "content-type": "application/json",
-          connection: "close"
+          connection: "close",
+          "x-active-holidays-internal-token": INTERNAL_API_TOKEN
         }
-      : { connection: "close" },
+      : {
+          connection: "close",
+          "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+        },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const text = await response.text();

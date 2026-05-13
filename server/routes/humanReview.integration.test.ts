@@ -533,7 +533,13 @@ describe("human review HTTP surface", () => {
     expect(fetched.json.request.id).toBe(first.json.request.id);
     expect(fetched.json.request.durability).toBe("persisted");
 
-    const recomputed = await requestJson("POST", "/api/cases/s3-us-spb-business/recompute", {});
+    const recomputed = await requestJson(
+      "POST",
+      "/api/cases/s3-us-spb-business/recompute",
+      {},
+      app,
+      { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    );
     expect(recomputed.status).toBe(200);
 
     const afterRecompute = await requestJson("GET", "/api/cases/s3-us-spb-business/human-review");
@@ -773,7 +779,8 @@ describe("human review HTTP surface", () => {
         "POST",
         "/api/cases/s2-tr-spb/recompute",
         {},
-        isolatedApp
+        isolatedApp,
+        { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
       );
       expect(laterRecompute.status).toBe(200);
       expect(laterRecompute.json.result.verdict).toBe("HUMAN_REVIEW");

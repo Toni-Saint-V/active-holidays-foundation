@@ -136,6 +136,41 @@ describe("Express API security hardening", () => {
     );
   });
 
+  it("blocks unauthenticated case-bound reads and does not leak private state", async () => {
+    const caseResponse = await requestJson("GET", "/api/cases/s1-rf-italy");
+    const resultResponse = await requestJson("GET", "/api/cases/s1-rf-italy/result");
+    const documentsResponse = await requestJson("GET", "/api/cases/s1-rf-italy/documents");
+    const reviewResponse = await requestJson("GET", "/api/cases/s1-rf-italy/human-review");
+    const serialized = [
+      JSON.stringify(caseResponse.json),
+      JSON.stringify(resultResponse.json),
+      JSON.stringify(documentsResponse.json),
+      JSON.stringify(reviewResponse.json)
+    ].join("\n");
+
+    expect(caseResponse.response.status).toBe(403);
+    expect(resultResponse.response.status).toBe(403);
+    expect(documentsResponse.response.status).toBe(403);
+    expect(reviewResponse.response.status).toBe(200);
+    expect(serialized).not.toMatch(
+      /caseId|accessToken|resultPayload|travelProfile|readiness|documentsUploaded/i
+    );
+  });
+
+  it("blocks unauthenticated recommendation endpoints", async () => {
+    const shortlist = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist");
+    const detail = await requestJson(
+      "POST",
+      "/api/cases/s1-rf-italy/recommendations/detail",
+      { body: { offerId: "path_it_tourist_90" } }
+    );
+
+    expect(shortlist.response.status).toBe(403);
+    expect(shortlist.json.error).toBe("internal_api_forbidden");
+    expect(detail.response.status).toBe(403);
+    expect(detail.json.error).toBe("internal_api_forbidden");
+  });
+
   it("requires the internal API token for decision and case-operator routes", async () => {
     const decisionsWithoutToken = await requestJson("GET", "/api/decisions");
     expect(decisionsWithoutToken.response.status).toBe(403);
@@ -187,17 +222,26 @@ describe("Express API security hardening", () => {
     expect(rejected.response.headers.get("access-control-allow-origin")).toBeNull();
   });
 
-  it("rate-limits public recommendation generation endpoints", async () => {
+  it("rate-limits recommendation generation endpoints for internal callers", async () => {
     const headers = { "x-forwarded-for": "198.51.100.10" };
 
     const first = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
-      headers
+      headers: {
+        ...headers,
+        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+      }
     });
     const second = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
-      headers
+      headers: {
+        ...headers,
+        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+      }
     });
     const third = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
-      headers
+      headers: {
+        ...headers,
+        "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+      }
     });
 
     expect(first.response.status).toBe(200);
@@ -227,11 +271,16 @@ describe("Express API security hardening", () => {
     }
   });
 
-  it("keeps public recommendation payloads free of internal fallback and provider diagnostics", async () => {
+  it("keeps recommendation payloads free of internal fallback and provider diagnostics", async () => {
     const shortlist = await requestJson(
       "GET",
       "/api/cases/s1-rf-italy/recommendations/shortlist",
-      { headers: { "x-forwarded-for": "198.51.100.20" } }
+      {
+        headers: {
+          "x-forwarded-for": "198.51.100.20",
+          "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+        }
+      }
     );
     const serialized = JSON.stringify(shortlist.json);
 

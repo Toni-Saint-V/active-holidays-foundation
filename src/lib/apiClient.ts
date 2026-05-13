@@ -10,7 +10,6 @@ import {
   sourcesCatalogSchema,
   sourceSchema,
   auditTrailSchema,
-  caseSummarySchema,
   documentsReadinessSchema,
   caseOverrideSchema,
   caseSignalsSchema,
@@ -33,7 +32,6 @@ import {
   type Case,
   type CaseOverride,
   type CaseSignals,
-  type CaseSummary,
   type DecisionLogEntry,
   type HumanReviewCreateRequest,
   type HumanReviewCasePacket,
@@ -109,10 +107,6 @@ async function request<Schema extends z.ZodTypeAny>(
   return parsed.data;
 }
 
-const caseListSchema = z.object({
-  cases: z.array(caseSummarySchema)
-});
-
 const strictCaseSchema = caseSchema.extend({
   productType: productTypeSchema
 });
@@ -178,10 +172,6 @@ export const apiClient = {
         version: z.literal("rdc.v1")
       })
     );
-  },
-  async listCases(): Promise<CaseSummary[]> {
-    const response = await request("/api/cases", caseListSchema);
-    return response.cases;
   },
   async getCase(id: string): Promise<Case> {
     return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema);
