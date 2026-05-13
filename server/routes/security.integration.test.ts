@@ -13,6 +13,9 @@ const INTERNAL_API_TOKEN = "test-internal-security-token";
 const INTERNAL_HEADERS = {
   "x-active-holidays-internal-token": INTERNAL_API_TOKEN
 } as const;
+const INVALID_INTERNAL_HEADERS = {
+  "x-active-holidays-internal-token": "invalid-internal-security-token"
+} as const;
 
 const previousEnv = {
   internalApiToken: process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN,
@@ -268,6 +271,44 @@ describe("Express API security hardening", () => {
     for (const route of SENSITIVE_CASE_BOUND_ROUTES) {
       const request = await requestJson(route.method, route.path, {
         body: route.body
+      });
+      expect(request.response.status, `${route.method} ${route.path}`).toBe(403);
+      expect(request.json.error, `${route.method} ${route.path}`).toBe("internal_api_forbidden");
+    }
+  });
+
+  it("denies sensitive case-bound routes with an invalid internal token", async () => {
+    const routes: readonly DenyCaseBoundRoute[] = [
+      { method: "GET", path: "/api/cases/s1-rf-italy/result" },
+      {
+        method: "POST",
+        path: "/api/cases/s1-rf-italy/scenarios/compare",
+        body: { title: "invalid-token-compare", signals: [] }
+      },
+      {
+        method: "POST",
+        path: "/api/cases/s1-rf-italy/recommendations/what-if-brief",
+        body: {
+          candidateCaseId: "s1-rf-italy",
+          offerId: "path_it_tourist_90",
+          offerLabel: "Italy Tourist 90"
+        }
+      },
+      {
+        method: "POST",
+        path: "/api/cases/s1-rf-italy/human-review/transition",
+        body: {
+          requestId: "hr_test",
+          status: "in_queue",
+          note: "invalid token"
+        }
+      }
+    ];
+
+    for (const route of routes) {
+      const request = await requestJson(route.method, route.path, {
+        body: route.body,
+        headers: INVALID_INTERNAL_HEADERS
       });
       expect(request.response.status, `${route.method} ${route.path}`).toBe(403);
       expect(request.json.error, `${route.method} ${route.path}`).toBe("internal_api_forbidden");
