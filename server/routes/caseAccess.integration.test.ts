@@ -1,11 +1,13 @@
 import type { Express } from 'express'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Duplex } from 'node:stream'
 import { createApp } from '../index'
 import { CASE_ACCESS_HEADER } from '@shared/contracts'
 
 let app: Express
+const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN
+const INTERNAL_API_TOKEN = 'test-internal-case-access-token'
 const devHeaders = {
   'x-active-holidays-dev-seed-access': '1'
 }
@@ -64,7 +66,16 @@ class MockSocket extends Duplex {
 
 beforeAll(async () => {
   process.env.ACTIVE_HOLIDAYS_DEV_SEED_ACCESS = '1'
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN
   app = await createApp()
+})
+
+afterAll(() => {
+  if (previousInternalApiToken === undefined) {
+    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN
+    return
+  }
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken
 })
 
 async function requestJson(
@@ -85,6 +96,7 @@ async function requestJson(
           'content-length': String(Buffer.byteLength(payload))
         }
       : {}),
+    'x-active-holidays-internal-token': INTERNAL_API_TOKEN,
     ...(headers ?? {})
   }
   if (payload) {

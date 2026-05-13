@@ -169,7 +169,7 @@ describe("recommendation boundary ownership", () => {
     expect(primary?.caution).not.toMatch(/вероятност|шанс|скорее всего|гарант/i);
   });
 
-  it("marks generation_unavailable when deterministic recovery is caused by missing OpenAI client/key", async () => {
+  it("marks assistant_limited when rule-based recovery is caused by missing assistant client/key", async () => {
     const { caseData, result } = await loadFixture();
     delete process.env.OPENAI_API_KEY;
     resetRecommendationClientForTests();
@@ -178,12 +178,14 @@ describe("recommendation boundary ownership", () => {
     expect(shortlist).not.toBeNull();
     if (!shortlist) return;
 
-    expect(shortlist.source).toBe("deterministic_recovery");
-    expect(shortlist.uncertainty.reasons).toContain("generation_unavailable");
-    expect(shortlist.uncertainty.reasons).not.toContain("generation_unusable");
+    expect(shortlist.source).toBe("rule_based");
+    expect(shortlist.uncertainty.reasons).toContain("assistant_limited");
+    expect(JSON.stringify(shortlist)).not.toMatch(
+      /generation_unavailable|generation_unusable|deterministic_recovery|fallback|openai/i
+    );
   });
 
-  it("marks generation_unusable when deterministic recovery is caused by refusal/invalid model output", async () => {
+  it("marks assistant_limited when rule-based recovery is caused by refusal/invalid model output", async () => {
     const { caseData, result } = await loadFixture();
     createResponseMock.mockResolvedValue({
       output: [{ type: "message", content: [{ type: "refusal" }] }],
@@ -194,8 +196,10 @@ describe("recommendation boundary ownership", () => {
     expect(shortlist).not.toBeNull();
     if (!shortlist) return;
 
-    expect(shortlist.source).toBe("deterministic_recovery");
-    expect(shortlist.uncertainty.reasons).toContain("generation_unusable");
-    expect(shortlist.uncertainty.reasons).not.toContain("generation_unavailable");
+    expect(shortlist.source).toBe("rule_based");
+    expect(shortlist.uncertainty.reasons).toContain("assistant_limited");
+    expect(JSON.stringify(shortlist)).not.toMatch(
+      /generation_unavailable|generation_unusable|deterministic_recovery|fallback|openai/i
+    );
   });
 });

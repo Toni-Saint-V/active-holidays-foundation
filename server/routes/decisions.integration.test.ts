@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Duplex } from "node:stream";
 import { createApp } from "../index";
@@ -11,6 +11,8 @@ import { installStableRouteTestClock } from "./routeTestClock";
 
 let app: Express;
 let restoreFreshCatalogs: (() => void) | null = null;
+const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+const INTERNAL_API_TOKEN = "test-internal-decision-token";
 
 function markValidEvidenceFresh(): void {
   const catalogs = getCatalogsOrThrow();
@@ -78,8 +80,17 @@ class MockSocket extends Duplex {
 }
 
 beforeAll(async () => {
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
   app = await createApp();
   markValidEvidenceFresh();
+});
+
+afterAll(() => {
+  if (previousInternalApiToken) {
+    process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken;
+  } else {
+    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+  }
 });
 
 installStableRouteTestClock();
@@ -105,12 +116,15 @@ async function requestJson(
   const req = new IncomingMessage(socket as never);
   req.method = method;
   req.url = path;
-  req.headers = payload
-    ? {
-        "content-type": "application/json",
-        "content-length": String(Buffer.byteLength(payload))
-      }
-    : {};
+  req.headers = {
+    ...(payload
+      ? {
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(payload))
+        }
+      : {}),
+    "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+  };
   if (payload) {
     req.push(payload);
   }

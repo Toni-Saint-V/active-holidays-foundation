@@ -52,6 +52,11 @@ import {
 } from "../lib/scenarioLab";
 import { HttpError } from "../middleware/errorHandler";
 import { requireInternalApiToken } from "../middleware/internalApi";
+import {
+  expensiveApiRateLimit,
+  internalExpensiveRateLimit,
+  recommendationRateLimit
+} from "../middleware/rateLimit";
 import { validateBody, validateParams } from "../middleware/validate";
 import {
   driftDiff,
@@ -310,6 +315,8 @@ function captureLearningFeedback(input: {
 export function casesRouter(): Router {
   const router = Router();
 
+  // Phase 2 requires real session/JWT case ownership enforcement for user-specific case routes.
+
   router.get("/", (_req, res) => {
     const summaries = getCaseStore()
       .list()
@@ -352,7 +359,7 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/recommendations/shortlist", validateParams(caseIdParams), async (req, res) => {
+  router.get("/:id/recommendations/shortlist", recommendationRateLimit, validateParams(caseIdParams), async (req, res) => {
     const caseData = requireCase(getId(req));
     requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
@@ -369,6 +376,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/detail",
+    recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationDetailRequestSchema),
     async (req, res) => {
@@ -395,6 +403,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/what-if-brief",
+    recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationWhatIfBriefRequestSchema),
     async (req, res) => {
@@ -474,6 +483,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recompute",
+    expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(
       z
@@ -506,6 +516,8 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/override-signal",
+    requireInternalApiToken,
+    internalExpensiveRateLimit,
     validateParams(caseIdParams),
     validateBody(caseOverrideSchema),
     (req, res) => {
@@ -532,7 +544,7 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/audit", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/audit", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
@@ -556,7 +568,7 @@ export function casesRouter(): Router {
     res.json(humanReviewResponseSchema.parse({ request }));
   });
 
-  router.get("/:id/human-review/packet", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/human-review/packet", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
     requireCaseAccess(req, caseData);
     const request = getCaseStore().activeHumanReviewFor(caseData.id);
@@ -574,6 +586,8 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/human-review/manager-brief",
+    requireInternalApiToken,
+    internalExpensiveRateLimit,
     validateParams(caseIdParams),
     validateBody(humanReviewManagerBriefRequestSchema.default({})),
     async (req, res) => {
@@ -798,6 +812,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/scenarios/compare",
+    expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(scenarioLabCompareRequestSchema),
     (req, res) => {
@@ -887,7 +902,7 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/drift", validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/drift", requireInternalApiToken, internalExpensiveRateLimit, validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
     const currentCase = requireCase(id);
     requireCaseAccess(req, currentCase);
@@ -940,6 +955,7 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/fork",
+    expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(z.object({ title: z.string().min(1).optional() }).default({})),
     (req, res) => {

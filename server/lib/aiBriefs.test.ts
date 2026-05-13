@@ -61,7 +61,7 @@ describe("aiBriefs", () => {
       } as any
     });
 
-    expect(response.source).toBe("deterministic_recovery");
+    expect(response.source).toBe("rule_based");
     expect(response.caseId).toBe("s1-rf-italy");
     expect(response.candidateCaseId).toBe("s1-rf-italy-fork-1");
     expect(response.readinessDeltaSummary).not.toMatch(/%|п\.п\.|confidence/i);
@@ -105,7 +105,7 @@ describe("aiBriefs", () => {
       operatorContext: "Клиент просит срочно закрыть кейс"
     });
 
-    expect(response.source).toBe("deterministic_recovery");
+    expect(response.source).toBe("rule_based");
     expect(response.caseId).toBe("s3-us-spb-business");
     expect(response.requestId).toBe("hr_123");
     expect(response.firstChecks.length).toBeGreaterThan(0);

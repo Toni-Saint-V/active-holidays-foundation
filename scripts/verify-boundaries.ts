@@ -121,6 +121,17 @@ function resolvesInside(root: string, file: string, specifier: string, targetDir
   return isInside(target, path.join(root, targetDir));
 }
 
+function isSrcServerOnly(relativeFile: string): boolean {
+  return (
+    relativeFile.startsWith("src/app/api/") ||
+    /\.server\.(ts|tsx)$/.test(relativeFile)
+  );
+}
+
+function importsServerOnlyModule(specifier: string): boolean {
+  return /\.server($|\.)/.test(specifier);
+}
+
 export function verifyImportBoundaries(root = process.cwd()): BoundaryViolation[] {
   const violations: BoundaryViolation[] = [];
   const existingDirs = SOURCE_DIRS.filter((dir) => {
@@ -136,10 +147,11 @@ export function verifyImportBoundaries(root = process.cwd()): BoundaryViolation[
     const relativeFile = toPosix(path.relative(root, file));
     const source = readFileSync(file, "utf8");
     const inSrc = isInside(file, path.join(root, "src"));
+    const srcServerOnly = inSrc && isSrcServerOnly(relativeFile);
     const inServerOrShared =
       isInside(file, path.join(root, "server")) || isInside(file, path.join(root, "shared"));
 
-    if (inSrc && readsProcessEnv(source)) {
+    if (inSrc && !srcServerOnly && readsProcessEnv(source)) {
       violations.push({
         file: relativeFile,
         rule: "src-no-process-env",
@@ -148,11 +160,19 @@ export function verifyImportBoundaries(root = process.cwd()): BoundaryViolation[
     }
 
     for (const specifier of importSpecifiers(source)) {
-      if (inSrc && specifier.startsWith("node:")) {
+      if (inSrc && !srcServerOnly && specifier.startsWith("node:")) {
         violations.push({
           file: relativeFile,
           rule: "src-no-node-imports",
           detail: `Browser-facing src code imports Node module ${specifier}.`
+        });
+      }
+
+      if (inSrc && !srcServerOnly && importsServerOnlyModule(specifier)) {
+        violations.push({
+          file: relativeFile,
+          rule: "src-no-server-only-imports",
+          detail: `Browser-facing src code imports server-only module ${specifier}.`
         });
       }
 

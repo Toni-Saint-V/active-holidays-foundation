@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const recommendationSourceSchema = z.enum([
   "ai_structured",
-  "deterministic_recovery"
+  "rule_based"
 ]);
 export type RecommendationSource = z.infer<typeof recommendationSourceSchema>;
 
@@ -19,8 +19,7 @@ export const recommendationUncertaintyReasonSchema = z.enum([
   "evidence_conflicting",
   "evidence_manual_only",
   "assumptions_present",
-  "generation_unavailable",
-  "generation_unusable"
+  "assistant_limited"
 ]);
 export type RecommendationUncertaintyReason = z.infer<
   typeof recommendationUncertaintyReasonSchema

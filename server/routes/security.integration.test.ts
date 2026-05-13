@@ -1,0 +1,231 @@
+import express, { type Express } from "express";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+import { createApp } from "../index";
+import { getCatalogsOrThrow, replaceCatalogsForTest } from "../lib/catalogs";
+import { resetRecommendationClientForTests } from "../lib/recommendations";
+import { errorHandler } from "../middleware/errorHandler";
+import { resetRateLimitBucketsForTests } from "../middleware/rateLimit";
+import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
+
+const INTERNAL_API_TOKEN = "test-internal-security-token";
+
+const previousEnv = {
+  internalApiToken: process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN,
+  corsOrigins: process.env.CORS_ORIGINS,
+  allowedOrigins: process.env.ALLOWED_ORIGINS,
+  recommendationLimitMax: process.env.ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_MAX,
+  recommendationLimitWindow: process.env.ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_WINDOW_MS,
+  openaiApiKey: process.env.OPENAI_API_KEY
+};
+
+let app: Express;
+let server: Server;
+let baseUrl = "";
+let restoreFreshCatalogs: (() => void) | null = null;
+
+function restoreEnv(): void {
+  const pairs: Array<[string, string | undefined]> = [
+    ["ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN", previousEnv.internalApiToken],
+    ["CORS_ORIGINS", previousEnv.corsOrigins],
+    ["ALLOWED_ORIGINS", previousEnv.allowedOrigins],
+    ["ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_MAX", previousEnv.recommendationLimitMax],
+    ["ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_WINDOW_MS", previousEnv.recommendationLimitWindow],
+    ["OPENAI_API_KEY", previousEnv.openaiApiKey]
+  ];
+  for (const [key, value] of pairs) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+async function listen(target: Express): Promise<{ server: Server; baseUrl: string }> {
+  const server = await new Promise<Server>((resolve) => {
+    const instance = target.listen(0, () => resolve(instance));
+  });
+  const address = server.address() as AddressInfo;
+  return { server, baseUrl: `http://127.0.0.1:${address.port}` };
+}
+
+async function close(server: Server): Promise<void> {
+  server.closeAllConnections?.();
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function requestJson(
+  method: "GET" | "POST",
+  path: string,
+  options: { body?: unknown; headers?: Record<string, string> } = {}
+) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.headers ?? {})
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const text = await response.text();
+  const json = text.length > 0 ? JSON.parse(text) : null;
+  return { response, json } as const;
+}
+
+beforeAll(async () => {
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
+  process.env.CORS_ORIGINS = "http://localhost:3000";
+  process.env.ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_MAX = "2";
+  process.env.ACTIVE_HOLIDAYS_RATE_LIMIT_RECOMMENDATIONS_WINDOW_MS = "60000";
+  delete process.env.ALLOWED_ORIGINS;
+  delete process.env.OPENAI_API_KEY;
+  resetRecommendationClientForTests();
+
+  app = await createApp();
+  const listening = await listen(app);
+  server = listening.server;
+  baseUrl = listening.baseUrl;
+});
+
+beforeEach(() => {
+  resetRateLimitBucketsForTests();
+  resetRecommendationClientForTests();
+  delete process.env.OPENAI_API_KEY;
+  restoreFreshCatalogs = replaceCatalogsForTest(
+    freshCatalogsForRouteTest(getCatalogsOrThrow())
+  );
+});
+
+afterEach(() => {
+  restoreFreshCatalogs?.();
+  restoreFreshCatalogs = null;
+});
+
+afterAll(async () => {
+  await close(server);
+  restoreEnv();
+});
+
+describe("Express API security hardening", () => {
+  it("keeps public allowlisted routes accessible without the internal token", async () => {
+    const health = await requestJson("GET", "/api/health");
+
+    expect(health.response.status).toBe(200);
+    expect(health.json.status).toBe("ok");
+  });
+
+  it("requires the internal API token for decision and case-operator routes", async () => {
+    const decisionsWithoutToken = await requestJson("GET", "/api/decisions");
+    expect(decisionsWithoutToken.response.status).toBe(403);
+    expect(decisionsWithoutToken.json.error).toBe("internal_api_forbidden");
+
+    const decisionsWithToken = await requestJson("GET", "/api/decisions", {
+      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    });
+    expect(decisionsWithToken.response.status).toBe(200);
+    expect(Array.isArray(decisionsWithToken.json.decisions)).toBe(true);
+
+    const auditWithoutToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit");
+    expect(auditWithoutToken.response.status).toBe(403);
+    expect(auditWithoutToken.json.error).toBe("internal_api_forbidden");
+
+    const auditWithToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit", {
+      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+    });
+    expect(auditWithToken.response.status).toBe(200);
+  });
+
+  it("fails closed for human-review packet and manager brief routes without token", async () => {
+    const packet = await requestJson("GET", "/api/cases/s2-tr-spb/human-review/packet");
+    expect(packet.response.status).toBe(403);
+    expect(packet.json.error).toBe("internal_api_forbidden");
+
+    const managerBrief = await requestJson(
+      "POST",
+      "/api/cases/s2-tr-spb/human-review/manager-brief",
+      { body: {} }
+    );
+    expect(managerBrief.response.status).toBe(403);
+    expect(managerBrief.json.error).toBe("internal_api_forbidden");
+  });
+
+  it("only emits CORS allow-origin for configured browser origins", async () => {
+    const allowed = await requestJson("GET", "/api/health", {
+      headers: { origin: "http://localhost:3000" }
+    });
+    expect(allowed.response.status).toBe(200);
+    expect(allowed.response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000"
+    );
+
+    const rejected = await requestJson("GET", "/api/health", {
+      headers: { origin: "https://evil.example" }
+    });
+    expect(rejected.response.status).toBe(200);
+    expect(rejected.response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("rate-limits public recommendation generation endpoints", async () => {
+    const headers = { "x-forwarded-for": "198.51.100.10" };
+
+    const first = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
+      headers
+    });
+    const second = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
+      headers
+    });
+    const third = await requestJson("GET", "/api/cases/s1-rf-italy/recommendations/shortlist", {
+      headers
+    });
+
+    expect(first.response.status).toBe(200);
+    expect(second.response.status).toBe(200);
+    expect(third.response.status).toBe(429);
+    expect(third.json.error).toBe("rate_limited");
+  });
+
+  it("does not expose raw error messages, stacks, or provider diagnostics for generic 500s", async () => {
+    const unsafeApp = express();
+    unsafeApp.get("/boom", () => {
+      throw new Error("OpenAI provider stack secret at unsafe frame");
+    });
+    unsafeApp.use(errorHandler);
+
+    const isolated = await listen(unsafeApp);
+    try {
+      const response = await fetch(`${isolated.baseUrl}/boom`);
+      const json = await response.json();
+      const serialized = JSON.stringify(json);
+
+      expect(response.status).toBe(500);
+      expect(serialized).not.toMatch(/OpenAI|provider|stack|secret|unsafe frame/i);
+      expect(json.error).toBe("server_error");
+    } finally {
+      await close(isolated.server);
+    }
+  });
+
+  it("keeps public recommendation payloads free of internal fallback and provider diagnostics", async () => {
+    const shortlist = await requestJson(
+      "GET",
+      "/api/cases/s1-rf-italy/recommendations/shortlist",
+      { headers: { "x-forwarded-for": "198.51.100.20" } }
+    );
+    const serialized = JSON.stringify(shortlist.json);
+
+    expect(shortlist.response.status).toBe(200);
+    expect(serialized).not.toMatch(
+      /confidence|score|quality|\/100|\d{1,3}%|fallback|openai|provider|deterministic_recovery|generation_unavailable|generation_unusable/i
+    );
+  });
+});

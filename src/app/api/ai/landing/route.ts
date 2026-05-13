@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { buildLandingAi } from '@/lib/aiSurfaces'
+import { buildLandingAi } from '@/lib/aiSurfaces.server'
+import { checkAiApiRateLimit } from '@/lib/aiApiRateLimit.server'
 import { landingAiInputSchema } from '@/lib/aiSurfaceContracts'
 
 export async function POST(request: Request) {
+  const limited = checkAiApiRateLimit(request)
+  if (limited) return limited
+
   const payload = await request.json().catch(() => ({}))
   const parsed = landingAiInputSchema.safeParse(payload)
   if (!parsed.success) {

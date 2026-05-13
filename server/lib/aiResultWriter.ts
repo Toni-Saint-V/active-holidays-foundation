@@ -21,7 +21,7 @@ type BuildAiResultPayloadInput = {
   shortlist?: RecommendationShortlist | null;
 };
 
-type FallbackReason = "generation_unavailable" | "generation_unusable" | null;
+type FallbackReason = "assistant_limited" | null;
 
 type ClaimGuardResult = {
   value: string;
@@ -218,11 +218,8 @@ function actionTypeFromResult(result: ResultPayload, readiness: PublicReadinessP
 }
 
 function fallbackReasonLabel(reason: FallbackReason): string {
-  if (reason === "generation_unavailable") {
+  if (reason === "assistant_limited") {
     return "Разбор сформирован по проверенным правилам кейса: автоматическая генерация сейчас ограничена.";
-  }
-  if (reason === "generation_unusable") {
-    return "Разбор сформирован по проверенным правилам кейса: автоматически сгенерированный текст не прошёл проверку безопасности.";
   }
   return "Ответ построен по текущим проверенным данным кейса.";
 }
@@ -230,14 +227,14 @@ function fallbackReasonLabel(reason: FallbackReason): string {
 function deterministicUncertainty(args: {
   result: ResultPayload;
   readiness: PublicReadinessProjection;
-  source: "deterministic" | "ai_structured" | "deterministic_recovery";
+  source: "deterministic" | "ai_structured" | "rule_based";
   fallbackReason: FallbackReason;
 }) {
   if (args.fallbackReason) {
     return aiResultWriterUncertaintySchema.parse({
-      label: "deterministic_recovery",
+      label: "assistant_limited",
       reason: fallbackReasonLabel(args.fallbackReason),
-      source: "deterministic_recovery"
+      source: "rule_based"
     });
   }
 
@@ -447,7 +444,7 @@ function buildDeterministicPayload(args: {
   result: ResultPayload;
   readiness: PublicReadinessProjection;
   shortlist?: RecommendationShortlist | null;
-  source: "deterministic" | "ai_structured" | "deterministic_recovery";
+  source: "deterministic" | "ai_structured" | "rule_based";
   fallbackReason: FallbackReason;
   claimGuard?: { blockedClaims: string[]; sanitized: boolean };
 }): AiResultPayload {
@@ -607,8 +604,8 @@ export async function buildAiResultPayload(
       result: input.result,
       readiness,
       shortlist: input.shortlist,
-      source: "deterministic_recovery",
-      fallbackReason: "generation_unavailable"
+      source: "rule_based",
+      fallbackReason: "assistant_limited"
     });
   }
 
@@ -643,8 +640,8 @@ export async function buildAiResultPayload(
         result: input.result,
         readiness,
         shortlist: input.shortlist,
-        source: "deterministic_recovery",
-        fallbackReason: "generation_unusable"
+        source: "rule_based",
+        fallbackReason: "assistant_limited"
       });
     }
 
@@ -688,8 +685,8 @@ export async function buildAiResultPayload(
         result: input.result,
         readiness,
         shortlist: input.shortlist,
-        source: "deterministic_recovery",
-        fallbackReason: "generation_unusable",
+        source: "rule_based",
+        fallbackReason: "assistant_limited",
         claimGuard: {
           blockedClaims: Array.from(guard.blockedClaims),
           sanitized: true
@@ -726,8 +723,8 @@ export async function buildAiResultPayload(
       result: input.result,
       readiness,
       shortlist: input.shortlist,
-      source: "deterministic_recovery",
-      fallbackReason: "generation_unusable"
+      source: "rule_based",
+      fallbackReason: "assistant_limited"
     });
   }
 }

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { driftDiff, fingerprintResult, runDecision } from "@shared/domain/engine";
 import { getCaseStore } from "../lib/caseStore";
 import { HttpError } from "../middleware/errorHandler";
+import { requireInternalApiToken } from "../middleware/internalApi";
+import { internalExpensiveRateLimit } from "../middleware/rateLimit";
 import { validateParams } from "../middleware/validate";
 
 const decisionIdParams = z.object({ id: z.string().min(1) });
@@ -14,6 +16,8 @@ function getId(req: Request): string {
 
 export function decisionsRouter(): Router {
   const router = Router();
+
+  router.use(requireInternalApiToken);
 
   router.get("/", (_req, res) => {
     res.json({ decisions: getCaseStore().allDecisions() });
@@ -32,7 +36,7 @@ export function decisionsRouter(): Router {
     res.json({ record });
   });
 
-  router.post("/:id/replay", validateParams(decisionIdParams), (req, res) => {
+  router.post("/:id/replay", internalExpensiveRateLimit, validateParams(decisionIdParams), (req, res) => {
     const id = getId(req);
     const record = getCaseStore().getRecord(id);
     if (!record) {
