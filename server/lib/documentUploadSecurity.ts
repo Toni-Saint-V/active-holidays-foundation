@@ -98,6 +98,10 @@ const EXECUTABLE_SEGMENTS = new Set([
 
 const CONFUSABLE_ASCII_CODEPOINT_MAP = new Map<number, string>([
   [0x03b5, "e"], // Greek epsilon
+  [0x03c7, "x"], // Greek chi
+  [0xab32, "e"], // Latin small letter blackletter e
+  [0x04bd, "e"], // Cyrillic abkhasian che (confusable with e)
+  [0x212e, "e"], // Estimated symbol (confusable with e)
   [0x0430, "a"], // Cyrillic a
   [0x0435, "e"], // Cyrillic e
   [0x043e, "o"], // Cyrillic o
@@ -146,7 +150,8 @@ function hasControlCharacters(value: string): boolean {
 
 function normalizeExecutableSegment(segment: string): string {
   const normalized = segment
-    .normalize("NFKC")
+    .normalize("NFKD")
+    .replace(/\p{Mark}+/gu, "")
     .replace(/[\p{White_Space}\p{Cf}]+/gu, "")
     .toLowerCase();
 
@@ -157,7 +162,7 @@ function normalizeExecutableSegment(segment: string): string {
       (codePoint === undefined ? undefined : CONFUSABLE_ASCII_CODEPOINT_MAP.get(codePoint)) ??
       char;
   }
-  return skeleton;
+  return skeleton.replace(/[^a-z0-9]/g, "");
 }
 
 function validateFileName(input: string):
@@ -188,15 +193,28 @@ function validateFileName(input: string):
   const segments = baseName.split(".").filter(Boolean);
   if (segments.length >= 2) {
     const nonFinalSegments = segments.slice(0, -1);
-    if (
-      nonFinalSegments.some((segment) =>
-        EXECUTABLE_SEGMENTS.has(normalizeExecutableSegment(segment))
-      )
-    ) {
-      return {
-        ok: false,
-        auditReason: `filename_contains_suspicious_double_extension:${baseName}`
-      };
+    for (const segment of nonFinalSegments) {
+      const extensionLikeSegment = segment
+        .normalize("NFKC")
+        .replace(/[\p{White_Space}\p{Cf}]+/gu, "")
+        .toLowerCase();
+      if (extensionLikeSegment.length < 2 || extensionLikeSegment.length > 5) {
+        continue;
+      }
+
+      if (/[^\x00-\x7F]/u.test(extensionLikeSegment)) {
+        return {
+          ok: false,
+          auditReason: `filename_contains_non_ascii_extension_segment:${baseName}`
+        };
+      }
+
+      if (EXECUTABLE_SEGMENTS.has(normalizeExecutableSegment(extensionLikeSegment))) {
+        return {
+          ok: false,
+          auditReason: `filename_contains_suspicious_double_extension:${baseName}`
+        };
+      }
     }
   }
 

@@ -31,7 +31,8 @@ export const documentFileExtensionSchema = z.enum([
   "jpg",
   "jpeg",
   "webp",
-  "heic"
+  "heic",
+  "unknown"
 ]);
 export type DocumentFileExtension = z.infer<typeof documentFileExtensionSchema>;
 
@@ -120,12 +121,58 @@ export const documentCheckRunSchema = z
   .strict();
 export type DocumentCheckRun = z.infer<typeof documentCheckRunSchema>;
 
-export const publicDocumentCheckSummarySchema = z
+export const publicDocumentCheckItemSchema = z
   .object({
     kind: documentKindSchema,
     status: documentCheckStatusSchema,
     publicMessage: z.string().min(1),
     nextStep: z.enum(["none", "replace_file", "retry_upload", "human_review"]),
+    deterministicOwner: z.literal("engine"),
+    aiBoundary: z.literal("explanation_only")
+  })
+  .strict();
+export type PublicDocumentCheckItem = z.infer<typeof publicDocumentCheckItemSchema>;
+
+export const documentUploadRequestSchema = z
+  .object({
+    kind: documentKindSchema,
+    fileName: z.string().min(1),
+    mimeType: z.string().min(1),
+    sizeBytes: z.number().int().min(1),
+    contentBase64: z.string().min(1),
+    source: z.literal("user_file").default("user_file")
+  })
+  .strict();
+export type DocumentUploadRequest = z.infer<typeof documentUploadRequestSchema>;
+
+export const documentUploadResponseSchema = z
+  .object({
+    caseId: z.string().min(1),
+    runId: z.string().min(1),
+    assetId: z.string().min(1),
+    kind: documentKindSchema,
+    uploadStatus: z.enum(["accepted", "rejected"]),
+    status: documentCheckStatusSchema,
+    publicMessage: z.string().min(1),
+    nextStep: z.enum(["none", "replace_file", "retry_upload", "human_review"]),
+    source: z.literal("user_file"),
+    uploadedAt: z.string().datetime(),
+    deterministicOwner: z.literal("engine"),
+    aiBoundary: z.literal("explanation_only")
+  })
+  .strict();
+export type DocumentUploadResponse = z.infer<typeof documentUploadResponseSchema>;
+
+export const publicDocumentCheckSummarySchema = z
+  .object({
+    caseId: z.string().min(1),
+    uploadedCount: z.number().int().min(0),
+    acceptedCount: z.number().int().min(0),
+    rejectedCount: z.number().int().min(0),
+    needsReviewCount: z.number().int().min(0),
+    documentKindsSeen: z.array(documentKindSchema),
+    items: z.array(publicDocumentCheckItemSchema),
+    publicEvidenceChips: z.array(z.string().min(1)).min(1),
     deterministicOwner: z.literal("engine"),
     aiBoundary: z.literal("explanation_only")
   })

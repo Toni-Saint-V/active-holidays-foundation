@@ -217,6 +217,213 @@ describe("document upload security and trust boundary", () => {
     }
   });
 
+  it("invoice.greek-εχε.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u03B5\u03C7\u03B5.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.estimated-symbol-℮x℮.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u212Ex\u212E.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.cyrillic-ҽxҽ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u04BDx\u04BD.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.blackletter-ꬲxꬲ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\uAB32x\uAB32.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.accented-ẹxẹ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u1EB9x\u1EB9.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.accented-èxè.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u00E8x\u00E8.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.ex⒠.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.ex\u24A0.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.exℯ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.ex\u212F.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.exᵉ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.ex\u1D49.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.exₑ.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.ex\u2091.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.eҳe.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.e\u04B3e.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.eӽe.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.e\u04FDe.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.e×e.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.e\u00D7e.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.eᶍe.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.e\u1D8De.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("cyrillic basename without extra extension stays valid", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "паспорт.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("accepted");
+  });
+
   it("executable tail extension rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
