@@ -14,6 +14,8 @@ let app: Express;
 let humanReviewTempDir: string;
 let restoreFreshCatalogs: (() => void) | null = null;
 const previousHumanReviewsFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+const INTERNAL_API_TOKEN = "test-internal-scenario-lab-token";
 
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
@@ -73,6 +75,7 @@ beforeAll(async () => {
     humanReviewTempDir,
     "human-reviews.json"
   );
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
   app = await createApp();
 });
 
@@ -95,6 +98,11 @@ afterAll(async () => {
   } else {
     delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
   }
+  if (previousInternalApiToken) {
+    process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken;
+  } else {
+    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+  }
   if (humanReviewTempDir) {
     await rm(humanReviewTempDir, { recursive: true, force: true });
   }
@@ -110,12 +118,15 @@ async function requestJson(
   const req = new IncomingMessage(socket as never);
   req.method = method;
   req.url = path;
-  req.headers = payload
-    ? {
-        "content-type": "application/json",
-        "content-length": String(Buffer.byteLength(payload))
-      }
-    : {};
+  req.headers = {
+    ...(payload
+      ? {
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(payload))
+        }
+      : {}),
+    "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+  };
   if (payload) req.push(payload);
   req.push(null);
 
@@ -252,8 +263,8 @@ describe("scenario lab HTTP surface", () => {
     expect(compare.status).toBe(400);
     expect(compare.json.error).toBe("validation_failed");
     expect(
-      compare.json.issues.some((issue: { message: string }) =>
-        /хотя бы один сценарный сдвиг/i.test(issue.message)
+      compare.json.issues.some((issue: { code: string; path: string }) =>
+        issue.code === "custom" && issue.path === "signals"
       )
     ).toBe(true);
   });

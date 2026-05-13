@@ -140,7 +140,8 @@ describe("ai result writer", () => {
     });
 
     const payload = await buildAiResultPayload({ caseData, result });
-    expect(payload.uncertainty.source).toBe("deterministic_recovery");
+    expect(payload.uncertainty.source).toBe("rule_based");
+    expect(payload.uncertainty.label).toBe("assistant_limited");
     expect(`${payload.statusSummary} ${payload.safeRecommendationText}`).not.toMatch(
       /chain[- ]of[- ]thought|reasoning|thinking process|пошагов|рассуждени/i
     );
@@ -196,7 +197,8 @@ describe("ai result writer", () => {
     resetAiResultWriterClientForTests();
 
     const payload = await buildAiResultPayload({ caseData, result });
-    expect(payload.uncertainty.source).toBe("deterministic_recovery");
+    expect(payload.uncertainty.source).toBe("rule_based");
+    expect(payload.uncertainty.label).toBe("assistant_limited");
     expect(payload.uncertainty.reason).not.toMatch(/model_unavailable|fallback|AI-модель недоступна/i);
   });
 
@@ -208,7 +210,8 @@ describe("ai result writer", () => {
     });
 
     const payload = await buildAiResultPayload({ caseData, result });
-    expect(payload.uncertainty.source).toBe("deterministic_recovery");
+    expect(payload.uncertainty.source).toBe("rule_based");
+    expect(payload.uncertainty.label).toBe("assistant_limited");
     expect(payload.uncertainty.reason).not.toMatch(/model_response_unusable|fallback/i);
   });
 

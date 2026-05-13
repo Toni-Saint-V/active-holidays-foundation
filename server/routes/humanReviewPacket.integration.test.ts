@@ -14,6 +14,8 @@ let app: Express;
 let humanReviewTempDir: string;
 let restoreFreshCatalogs: (() => void) | null = null;
 const previousHumanReviewsFile = process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
+const INTERNAL_API_TOKEN = "test-internal-human-review-packet-token";
 
 class MockSocket extends Duplex {
   readonly chunks: Buffer[] = [];
@@ -75,6 +77,7 @@ beforeEach(async () => {
     humanReviewTempDir,
     "human-reviews.json"
   );
+  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
   app = await createApp();
   restoreFreshCatalogs = replaceCatalogsForTest(
     freshCatalogsForRouteTest(getCatalogsOrThrow())
@@ -88,6 +91,11 @@ afterEach(async () => {
     process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE = previousHumanReviewsFile;
   } else {
     delete process.env.ACTIVE_HOLIDAYS_HUMAN_REVIEWS_FILE;
+  }
+  if (previousInternalApiToken) {
+    process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken;
+  } else {
+    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
   }
   if (humanReviewTempDir) {
     await rm(humanReviewTempDir, { recursive: true, force: true });
@@ -104,12 +112,15 @@ async function requestJson(
   const req = new IncomingMessage(socket as never);
   req.method = method;
   req.url = route;
-  req.headers = payload
-    ? {
-        "content-type": "application/json",
-        "content-length": String(Buffer.byteLength(payload))
-      }
-    : {};
+  req.headers = {
+    ...(payload
+      ? {
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(payload))
+        }
+      : {}),
+    "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+  };
   if (payload) req.push(payload);
   req.push(null);
 

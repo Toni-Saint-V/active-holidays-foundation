@@ -20,7 +20,7 @@ export const aiResultWriterUncertaintyLabelSchema = z.enum([
   "within_confirmed_data",
   "needs_more_data",
   "human_review_recommended",
-  "deterministic_recovery"
+  "assistant_limited"
 ]);
 export type AiResultWriterUncertaintyLabel = z.infer<
   typeof aiResultWriterUncertaintyLabelSchema
@@ -29,7 +29,7 @@ export type AiResultWriterUncertaintyLabel = z.infer<
 export const aiResultWriterUncertaintySourceSchema = z.enum([
   "deterministic",
   "ai_structured",
-  "deterministic_recovery"
+  "rule_based"
 ]);
 export type AiResultWriterUncertaintySource = z.infer<
   typeof aiResultWriterUncertaintySourceSchema
