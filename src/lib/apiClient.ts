@@ -157,8 +157,10 @@ const scenariosResponseSchema = z.object({
 const decisionsResponseSchema = z.object({ decisions: decisionsLogSchema });
 const caseResultResponseSchema = z.object({
   case: strictCaseSchema,
-  result: strictResultPayloadSchema
+  result: strictResultPayloadSchema,
+  decisionRecordId: z.string().min(1).optional()
 });
+export type CaseResultResponse = z.infer<typeof caseResultResponseSchema>;
 const pathsResponseSchema = z.object({ paths: offersSchema });
 const rulesResponseSchema = z.object({ rules: z.array(strictRuleMetadataSchema) });
 const sourcesResponseSchema = z.object({ sources: sourcesCatalogSchema });
@@ -212,19 +214,19 @@ export const apiClient = {
       }
     );
   },
-  async patchSignals(id: string, signals: CaseSignals) {
+  async patchSignals(id: string, signals: CaseSignals): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {
       method: "POST",
       body: JSON.stringify({ signals })
     });
   },
-  async recompute(id: string, preferences?: PathPreferences) {
+  async recompute(id: string, preferences?: PathPreferences): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/recompute`, caseResultResponseSchema, {
       method: "POST",
       body: JSON.stringify({ preferences })
     });
   },
-  async overrideSignal(id: string, override: CaseOverride) {
+  async overrideSignal(id: string, override: CaseOverride): Promise<CaseResultResponse> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/override-signal`,
       caseResultResponseSchema,
@@ -265,11 +267,21 @@ export const apiClient = {
   async documents(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema);
   },
-  async fork(id: string, title?: string) {
+  async fork(id: string, title?: string): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/fork`, caseResultResponseSchema, {
       method: "POST",
       body: JSON.stringify({ title })
     });
+  },
+  async forkCaseWithSignals(
+    id: string,
+    payload: { title?: string; signals?: CaseSignals } = {}
+  ): Promise<CaseResultResponse> {
+    const forked = await apiClient.fork(id, payload.title);
+    if (!payload.signals || payload.signals.length === 0) {
+      return forked;
+    }
+    return apiClient.patchSignals(forked.case.id, payload.signals);
   },
   async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
     return request(
