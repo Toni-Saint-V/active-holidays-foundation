@@ -224,6 +224,39 @@ describe('case access ownership boundary', () => {
     expect(viaQueryPacket.json.error).toBe('case_access_forbidden')
   })
 
+  it('rotates case token via internal access grant and invalidates the old token', async () => {
+    const forked = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
+    expect(forked.status).toBe(200)
+
+    const caseId = forked.json.case.id as string
+    const oldToken = forked.json.access.accessToken as string
+
+    const grant = await requestJson(
+      'POST',
+      `/api/cases/${caseId}/access/grant`,
+      {},
+      { 'x-active-holidays-internal-token': INTERNAL_API_TOKEN }
+    )
+    expect(grant.status).toBe(200)
+
+    const newToken = grant.json.access.accessToken as string
+    expect(typeof newToken).toBe('string')
+    expect(newToken.length).toBeGreaterThanOrEqual(24)
+    expect(newToken).not.toBe(oldToken)
+
+    const oldTokenRead = await requestJson('GET', `/api/cases/${caseId}`, undefined, {
+      [CASE_ACCESS_HEADER]: oldToken
+    })
+    expect(oldTokenRead.status).toBe(403)
+    expect(oldTokenRead.json.error).toBe('case_access_forbidden')
+
+    const newTokenRead = await requestJson('GET', `/api/cases/${caseId}`, undefined, {
+      [CASE_ACCESS_HEADER]: newToken
+    })
+    expect(newTokenRead.status).toBe(200)
+    expect(newTokenRead.json.id).toBe(caseId)
+  })
+
   it('rejects case A token when accessing case B', async () => {
     const first = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
     const second = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)

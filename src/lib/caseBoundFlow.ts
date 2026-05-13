@@ -57,7 +57,8 @@ export type CaseBoundFlowClient = {
   ) => Promise<{ case: { id: string; productType: ProductType }; access?: CaseAccessCredential }>;
   patchSignals: (
     id: string,
-    signals: CaseSignals
+    signals: CaseSignals,
+    accessToken?: string
   ) => Promise<{ case: { id: string; productType: ProductType }; access?: CaseAccessCredential }>;
 };
 
@@ -187,7 +188,11 @@ export async function createOrReuseTravelCaseFromIntakeDraft(
   const reusedExistingCase = Boolean(existingCaseId);
 
   const response = reusedExistingCase
-    ? await client.patchSignals(existingCaseId as string, signals)
+    ? await client.patchSignals(
+        existingCaseId as string,
+        signals,
+        input.existingCaseAccessToken ?? undefined
+      )
     : await client.forkCaseWithSignals(baseCaseId, {
         title: input.forkTitle,
         signals

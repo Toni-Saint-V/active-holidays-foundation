@@ -145,7 +145,11 @@ describe("caseBoundFlow", () => {
 
     expect(forkCaseWithSignals).not.toHaveBeenCalled();
     expect(patchSignals).toHaveBeenCalledTimes(1);
-    expect(patchSignals).toHaveBeenCalledWith("case-live-42", expect.any(Array));
+    expect(patchSignals).toHaveBeenCalledWith(
+      "case-live-42",
+      expect.any(Array),
+      "b".repeat(32)
+    );
     expect(outcome.caseId).toBe("case-live-42");
     expect(outcome.caseAccessToken).toBe("b".repeat(32));
     expect(outcome.reusedExistingCase).toBe(true);
