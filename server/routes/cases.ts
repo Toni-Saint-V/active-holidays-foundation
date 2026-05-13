@@ -334,7 +334,7 @@ export function casesRouter(): Router {
 
   // Phase 2 requires real session/JWT case ownership enforcement for user-specific case routes.
 
-  router.get("/", (_req, res) => {
+  router.get("/", requireInternalApiToken, (_req, res) => {
     const summaries = getCaseStore()
       .list()
       .map((caseData) => ({

@@ -10,6 +10,44 @@ import { resetRateLimitBucketsForTests } from "../middleware/rateLimit";
 import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 
 const INTERNAL_API_TOKEN = "test-internal-security-token";
+const INVALID_INTERNAL_API_TOKEN = "test-internal-security-token-invalid";
+const INTERNAL_HEADERS = { "x-active-holidays-internal-token": INTERNAL_API_TOKEN };
+
+const SENSITIVE_INTERNAL_ROUTES: Array<{
+  method: "GET" | "POST";
+  path: string;
+  body?: unknown;
+}> = [
+  { method: "GET", path: "/api/cases" },
+  { method: "GET", path: "/api/decisions" },
+  { method: "POST", path: "/api/cases/s1-rf-italy/access/grant" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/audit" },
+  { method: "GET", path: "/api/cases/s1-rf-italy/drift" },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/override-signal",
+    body: {
+      signalId: "timeline_weeks",
+      value: 3,
+      reason: "Security negative test",
+      appliedAt: "2026-05-13T12:00:00.000Z"
+    }
+  },
+  { method: "GET", path: "/api/cases/s2-tr-spb/human-review/packet" },
+  {
+    method: "POST",
+    path: "/api/cases/s2-tr-spb/human-review/manager-brief",
+    body: {}
+  },
+  {
+    method: "POST",
+    path: "/api/cases/s2-tr-spb/human-review/transition",
+    body: {
+      requestId: "hr_missing",
+      status: "in_review"
+    }
+  }
+];
 
 const previousEnv = {
   internalApiToken: process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN,
@@ -125,12 +163,22 @@ describe("Express API security hardening", () => {
   });
 
   it("requires the internal API token for decision and case-operator routes", async () => {
+    const casesWithoutToken = await requestJson("GET", "/api/cases");
+    expect(casesWithoutToken.response.status).toBe(403);
+    expect(casesWithoutToken.json.error).toBe("internal_api_forbidden");
+
+    const casesWithToken = await requestJson("GET", "/api/cases", {
+      headers: INTERNAL_HEADERS
+    });
+    expect(casesWithToken.response.status).toBe(200);
+    expect(Array.isArray(casesWithToken.json.cases)).toBe(true);
+
     const decisionsWithoutToken = await requestJson("GET", "/api/decisions");
     expect(decisionsWithoutToken.response.status).toBe(403);
     expect(decisionsWithoutToken.json.error).toBe("internal_api_forbidden");
 
     const decisionsWithToken = await requestJson("GET", "/api/decisions", {
-      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      headers: INTERNAL_HEADERS
     });
     expect(decisionsWithToken.response.status).toBe(200);
     expect(Array.isArray(decisionsWithToken.json.decisions)).toBe(true);
@@ -140,9 +188,23 @@ describe("Express API security hardening", () => {
     expect(auditWithoutToken.json.error).toBe("internal_api_forbidden");
 
     const auditWithToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit", {
-      headers: { "x-active-holidays-internal-token": INTERNAL_API_TOKEN }
+      headers: INTERNAL_HEADERS
     });
     expect(auditWithToken.response.status).toBe(200);
+  });
+
+  it("fails closed for invalid internal token on sensitive internal routes (table-driven)", async () => {
+    for (const route of SENSITIVE_INTERNAL_ROUTES) {
+      const denied = await requestJson(route.method, route.path, {
+        body: route.body,
+        headers: { "x-active-holidays-internal-token": INVALID_INTERNAL_API_TOKEN }
+      });
+
+      expect(denied.response.status, `${route.method} ${route.path}`).toBe(403);
+      expect(denied.json.error, `${route.method} ${route.path}`).toBe(
+        "internal_api_forbidden"
+      );
+    }
   });
 
   it("fails closed for human-review packet and manager brief routes without token", async () => {

@@ -200,6 +200,38 @@ export function createInternalCasesApiClient(internalApiToken: string) {
   const internalHeaders = withInternalToken(internalApiToken);
 
   return {
+    async listCases(): Promise<CaseSummary[]> {
+      const response = await request("/api/cases", caseListSchema, {
+        headers: internalHeaders
+      });
+      return response.cases;
+    },
+    async decisions(): Promise<DecisionLogEntry[]> {
+      const response = await request("/api/decisions", decisionsResponseSchema, {
+        headers: internalHeaders
+      });
+      return response.decisions;
+    },
+    async audit(id: string, accessToken?: string) {
+      return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema, {
+        headers: withCaseAccessHeader(internalHeaders, id, accessToken)
+      });
+    },
+    async overrideSignal(
+      id: string,
+      override: CaseOverride,
+      accessToken?: string
+    ): Promise<CaseResultResponse> {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/override-signal`,
+        caseResultResponseSchema,
+        {
+          method: "POST",
+          body: JSON.stringify(override),
+          headers: withCaseAccessHeader(internalHeaders, id, accessToken)
+        }
+      );
+    },
     async humanReviewCasePacket(id: string, accessToken?: string): Promise<HumanReviewCasePacket> {
       const response = await request(
         `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
@@ -224,10 +256,6 @@ export const apiClient = {
         version: z.literal("rdc.v1")
       })
     );
-  },
-  async listCases(): Promise<CaseSummary[]> {
-    const response = await request("/api/cases", caseListSchema);
-    return response.cases;
   },
   async getCase(id: string, accessToken?: string): Promise<Case> {
     return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema, {
@@ -287,26 +315,6 @@ export const apiClient = {
     return request(`/api/cases/${encodeURIComponent(id)}/recompute`, caseResultResponseSchema, {
       method: "POST",
       body: JSON.stringify({ preferences }),
-      headers: withCaseAccessHeader(undefined, id, accessToken)
-    });
-  },
-  async overrideSignal(
-    id: string,
-    override: CaseOverride,
-    accessToken?: string
-  ): Promise<CaseResultResponse> {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/override-signal`,
-      caseResultResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(override),
-        headers: withCaseAccessHeader(undefined, id, accessToken)
-      }
-    );
-  },
-  async audit(id: string, accessToken?: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema, {
       headers: withCaseAccessHeader(undefined, id, accessToken)
     });
   },
@@ -431,10 +439,6 @@ export const apiClient = {
       `/api/intake/preview/${encodeURIComponent(caseId)}`,
       intakePreviewSchema
     );
-  },
-  async decisions(): Promise<DecisionLogEntry[]> {
-    const response = await request("/api/decisions", decisionsResponseSchema);
-    return response.decisions;
   },
   async scenarios(): Promise<ScenarioCard[]> {
     const response = await request("/api/scenarios", scenariosResponseSchema);

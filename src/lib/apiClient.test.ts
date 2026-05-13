@@ -18,6 +18,16 @@ const caseResponse = {
   forkedFrom: null
 };
 
+const caseSummaryResponse = {
+  id: caseResponse.id,
+  title: caseResponse.title,
+  productType: caseResponse.productType,
+  createdAt: caseResponse.createdAt,
+  updatedAt: caseResponse.updatedAt,
+  signalCount: caseResponse.signals.length,
+  forkedFrom: caseResponse.forkedFrom
+};
+
 const resultResponse = {
   version: "rdc.v1",
   productType: "residency_es",
@@ -504,10 +514,11 @@ describe("apiClient strict productType parsing", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const token = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
 
     await apiClient.getResult(caseResponse.id, token);
     await apiClient.recompute(caseResponse.id, undefined, token);
-    await apiClient.overrideSignal(
+    await internalClient.overrideSignal(
       caseResponse.id,
       {
         signalId: "timeline_weeks",
@@ -562,7 +573,11 @@ describe("apiClient strict productType parsing", () => {
     );
   });
 
-  it("does not expose internal packet route on public client", () => {
+  it("does not expose internal-only endpoints on public client", () => {
+    expect("listCases" in apiClient).toBe(false);
+    expect("decisions" in apiClient).toBe(false);
+    expect("audit" in apiClient).toBe(false);
+    expect("overrideSignal" in apiClient).toBe(false);
     expect("humanReviewCasePacket" in apiClient).toBe(false);
   });
 
@@ -597,5 +612,72 @@ describe("apiClient strict productType parsing", () => {
     const headers = (init.headers ?? {}) as Record<string, string>;
     expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
     expect(headers["x-active-holidays-internal-token"]).toBe(internalToken);
+  });
+
+  it("uses explicit internal client for listCases and decisions", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson({ cases: [caseSummaryResponse] }))
+      .mockResolvedValueOnce(okJson({ decisions: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(internalClient.listCases()).resolves.toHaveLength(1);
+    await expect(internalClient.decisions()).resolves.toEqual([]);
+
+    const [listUrl, listInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(listUrl).toBe("http://api.test/api/cases");
+    expect((listInit.headers as Record<string, string>)["x-active-holidays-internal-token"]).toBe(
+      "internal-token"
+    );
+
+    const [decisionsUrl, decisionsInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(decisionsUrl).toBe("http://api.test/api/decisions");
+    expect(
+      (decisionsInit.headers as Record<string, string>)["x-active-holidays-internal-token"]
+    ).toBe("internal-token");
+  });
+
+  it("uses explicit internal client for audit and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ trail: resultResponse.auditTrail, decisions: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(internalClient.audit(caseResponse.id, caseToken)).resolves.toBeTruthy();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/audit");
+    expect(url).not.toContain("accessToken=");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-active-holidays-internal-token"]).toBe("internal-token");
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
+  });
+
+  it("uses explicit internal client for override-signal and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ case: caseResponse, result: resultResponse }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(
+      internalClient.overrideSignal(
+        caseResponse.id,
+        {
+          signalId: "timeline_weeks",
+          value: 3,
+          reason: "Тестовый override",
+          appliedAt: "2026-05-13T12:00:00.000Z"
+        },
+        caseToken
+      )
+    ).resolves.toBeTruthy();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/override-signal");
+    expect(url).not.toContain("accessToken=");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-active-holidays-internal-token"]).toBe("internal-token");
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
   });
 });
