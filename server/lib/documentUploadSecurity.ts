@@ -133,8 +133,7 @@ function hasControlCharacters(value: string): boolean {
 function normalizeExecutableSegment(segment: string): string {
   return segment
     .normalize("NFKC")
-    .replace(/[\p{White_Space}\p{Cf}]+/gu, " ")
-    .trim()
+    .replace(/[\p{White_Space}\p{Cf}]+/gu, "")
     .toLowerCase();
 }
 
@@ -253,6 +252,10 @@ function mimeMatchesDetectedFormat(
 export function validateDocumentUpload(
   input: DocumentUploadValidationInput
 ): DocumentUploadValidationResult {
+  if (!Number.isFinite(input.sizeLimitBytes) || input.sizeLimitBytes <= 0) {
+    return fail("file_too_large", `invalid_size_limit:${input.sizeLimitBytes}`);
+  }
+
   const fileNameResult = validateFileName(input.filename);
   if (!fileNameResult.ok) {
     return fail("unsafe_filename", fileNameResult.auditReason);

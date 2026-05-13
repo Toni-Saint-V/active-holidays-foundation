@@ -175,6 +175,20 @@ describe("document upload security and trust boundary", () => {
     }
   });
 
+  it("invoice.e x e.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.e x e.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
   it("executable tail extension rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
@@ -213,6 +227,21 @@ describe("document upload security and trust boundary", () => {
     );
     expect(result.status).toBe("rejected");
     if (result.status === "rejected") expect(result.reason).toBe("file_too_large");
+  });
+
+  it("invalid size limit rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "passport.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]),
+        sizeLimitBytes: Number.NaN
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("file_too_large");
+    }
   });
 
   it("unknown document kind safe", () => {
