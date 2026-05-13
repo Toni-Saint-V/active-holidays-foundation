@@ -340,4 +340,35 @@ describe("recommendation HTTP surface", () => {
     expect(wrongCaseToken.status).toBe(403);
     expect(wrongCaseToken.json.error).toBe("case_access_forbidden");
   });
+
+  it("allows same-case what-if brief without candidate credential when baseline token is valid", async () => {
+    const baselineFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.case.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const shortlist = await requestJson(
+      "GET",
+      `/api/cases/${baselineId}/recommendations/shortlist`,
+      undefined,
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(shortlist.status).toBe(200);
+    const offerId = shortlist.json.items[0].offerId as string;
+
+    const response = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: baselineId,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+
+    expect(response.status).toBe(200);
+    const parsed = recommendationWhatIfBriefSchema.parse(response.json);
+    expect(parsed.caseId).toBe(baselineId);
+    expect(parsed.candidateCaseId).toBe(baselineId);
+  });
 });

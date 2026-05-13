@@ -94,23 +94,39 @@ function isPublicSeedTemplateCase(caseData: Case): boolean {
   return caseData.forkedFrom === null;
 }
 
+function canBypassCaseAccess(
+  req: Request,
+  caseData: Case,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): boolean {
+  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
+    return true;
+  }
+  return allowDevSeedAccessBypass(req, caseData);
+}
+
+function throwCaseAccessForbidden(): never {
+  throw new HttpError(
+    403,
+    "Недостаточно прав для доступа к кейсу.",
+    "case_access_forbidden"
+  );
+}
+
+function assertCaseToken(caseId: string, token: string | null | undefined): void {
+  const normalized = token?.trim();
+  if (!normalized || !getCaseStore().validateCaseAccess(caseId, normalized)) {
+    throwCaseAccessForbidden();
+  }
+}
+
 function requireCaseAccess(
   req: Request,
   caseData: Case,
   options: { allowPublicSeedTemplateBypass?: boolean } = {}
 ): void {
-  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
-    return;
-  }
-  if (allowDevSeedAccessBypass(req, caseData)) return;
-  const token = caseAccessTokenFromHeader(req);
-  if (!token || !getCaseStore().validateCaseAccess(caseData.id, token)) {
-    throw new HttpError(
-      403,
-      "Недостаточно прав для доступа к кейсу.",
-      "case_access_forbidden"
-    );
-  }
+  if (canBypassCaseAccess(req, caseData, options)) return;
+  assertCaseToken(caseData.id, caseAccessTokenFromHeader(req));
 }
 
 function requireCaseAccessByToken(
@@ -119,18 +135,21 @@ function requireCaseAccessByToken(
   token: string | undefined,
   options: { allowPublicSeedTemplateBypass?: boolean } = {}
 ): void {
-  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
+  if (canBypassCaseAccess(req, caseData, options)) return;
+  assertCaseToken(caseData.id, token);
+}
+
+function requireCandidateCaseAccess(
+  req: Request,
+  baselineCase: Case,
+  candidateCase: Case,
+  candidateAccessToken: string | undefined
+): void {
+  if (candidateCase.id === baselineCase.id) {
+    requireCaseAccess(req, candidateCase);
     return;
   }
-  if (allowDevSeedAccessBypass(req, caseData)) return;
-  const normalized = token?.trim();
-  if (!normalized || !getCaseStore().validateCaseAccess(caseData.id, normalized)) {
-    throw new HttpError(
-      403,
-      "Недостаточно прав для доступа к кейсу.",
-      "case_access_forbidden"
-    );
-  }
+  requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
 }
 
 function orchestratorCatalogs(
@@ -384,11 +403,12 @@ export function casesRouter(): Router {
       requireCaseAccess(req, baselineCase);
       const payload = recommendationWhatIfBriefRequestSchema.parse(req.body);
       const candidateCase = requireCase(payload.candidateCaseId);
-      if (candidateCase.id === baselineCase.id) {
-        requireCaseAccess(req, candidateCase);
-      } else {
-        requireCaseAccessByToken(req, candidateCase, payload.candidateAccessToken);
-      }
+      requireCandidateCaseAccess(
+        req,
+        baselineCase,
+        candidateCase,
+        payload.candidateAccessToken
+      );
 
       if (!ensureSameScenarioFamily(getCaseStore(), baselineCase.id, candidateCase.id)) {
         throw new HttpError(
@@ -795,11 +815,12 @@ export function casesRouter(): Router {
 
       if (compareToCaseId) {
         const candidateCase = requireCase(compareToCaseId);
-        if (candidateCase.id === baselineCase.id) {
-          requireCaseAccess(req, candidateCase);
-        } else {
-          requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
-        }
+        requireCandidateCaseAccess(
+          req,
+          baselineCase,
+          candidateCase,
+          candidateAccessToken
+        );
         if (!ensureSameScenarioFamily(store, baselineCase.id, candidateCase.id)) {
           throw new HttpError(
             400,

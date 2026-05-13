@@ -324,6 +324,7 @@ describe("scenario lab HTTP surface", () => {
     });
     expect(baselineFork.status).toBe(200);
     const baselineId = baselineFork.json.candidateCase.id as string;
+    const baselineRootId = baselineFork.json.rootCaseId as string;
     const baselineToken = baselineFork.json.access.accessToken as string;
 
     const candidateFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
@@ -391,6 +392,30 @@ describe("scenario lab HTTP surface", () => {
     );
     expect(wrongCaseToken.status).toBe(403);
     expect(wrongCaseToken.json.error).toBe("case_access_forbidden");
+  });
+
+  it("allows same-case compare without candidate credential when baseline token is valid", async () => {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+      title: "S1 — baseline fork для same-case compare"
+    });
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.candidateCase.id as string;
+    const baselineRootId = baselineFork.json.rootCaseId as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const sameCase = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: baselineId,
+        signals: []
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+
+    expect(sameCase.status).toBe(200);
+    expect(sameCase.json.rootCaseId).toBe(baselineRootId);
+    expect(sameCase.json.baseline.caseId).toBe(baselineId);
+    expect(sameCase.json.candidateCase.id).toBe(baselineId);
   });
 
   it("returns the whole fork family with comparisons relative to the root scenario", async () => {
