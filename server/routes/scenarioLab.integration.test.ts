@@ -328,27 +328,18 @@ describe("scenario lab HTTP surface", () => {
   });
 
   it("compares two existing forked scenarios only with candidate credential", async () => {
-    const baselineFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/fork", {
       title: "S1 — baseline fork для dual-token compare"
     });
     expect(baselineFork.status).toBe(200);
-    const baselineId = baselineFork.json.candidateCase.id as string;
-    const baselineRootId = baselineFork.json.rootCaseId as string;
+    const baselineId = baselineFork.json.case.id as string;
     const baselineToken = baselineFork.json.access.accessToken as string;
 
-    const candidateFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
-      title: "S1 — candidate fork для dual-token compare",
-      signals: [
-        {
-          id: "insurance_ok",
-          value: true,
-          source: "override",
-          capturedAt: "2026-04-18T10:25:00.000Z"
-        }
-      ]
+    const candidateFork = await postJson("/api/cases/s1-rf-italy/fork", {
+      title: "S1 — candidate fork для dual-token compare"
     });
     expect(candidateFork.status).toBe(200);
-    const candidateId = candidateFork.json.candidateCase.id as string;
+    const candidateId = candidateFork.json.case.id as string;
     const candidateToken = candidateFork.json.access.accessToken as string;
 
     const success = await postJson(
@@ -372,6 +363,14 @@ describe("scenario lab HTTP surface", () => {
     expect(missing.status).toBe(403);
     expect(missing.json.error).toBe("case_access_forbidden");
 
+    const queryInjected = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare?candidateAccessToken=${candidateToken}`,
+      { compareToCaseId: candidateId, signals: [] },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(queryInjected.status).toBe(403);
+    expect(queryInjected.json.error).toBe("case_access_forbidden");
+
     const invalid = await postJson(
       `/api/cases/${baselineId}/scenarios/compare`,
       {
@@ -384,7 +383,7 @@ describe("scenario lab HTTP surface", () => {
     expect(invalid.status).toBe(403);
     expect(invalid.json.error).toBe("case_access_forbidden");
 
-    const thirdFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+    const thirdFork = await postJson("/api/cases/s1-rf-italy/fork", {
       title: "S1 — third fork token isolation"
     });
     expect(thirdFork.status).toBe(200);
@@ -404,12 +403,11 @@ describe("scenario lab HTTP surface", () => {
   });
 
   it("allows same-case compare without candidate credential when baseline token is valid", async () => {
-    const baselineFork = await postJson("/api/cases/s1-rf-italy/scenarios/compare", {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/fork", {
       title: "S1 — baseline fork для same-case compare"
     });
     expect(baselineFork.status).toBe(200);
-    const baselineId = baselineFork.json.candidateCase.id as string;
-    const baselineRootId = baselineFork.json.rootCaseId as string;
+    const baselineId = baselineFork.json.case.id as string;
     const baselineToken = baselineFork.json.access.accessToken as string;
 
     const sameCase = await postJson(
@@ -422,7 +420,7 @@ describe("scenario lab HTTP surface", () => {
     );
 
     expect(sameCase.status).toBe(200);
-    expect(sameCase.json.rootCaseId).toBe(baselineRootId);
+    expect(sameCase.json.rootCaseId).toBe("s1-rf-italy");
     expect(sameCase.json.baseline.caseId).toBe(baselineId);
     expect(sameCase.json.candidateCase.id).toBe(baselineId);
   });

@@ -18,6 +18,8 @@ import {
   caseSummarySchema,
   CASE_ACCESS_HEADER,
   DEV_SEED_ACCESS_HEADER,
+  hasCandidateAccessToken,
+  isCrossCaseAccess,
   type Case,
   type CaseSignals,
   type DecisionKind,
@@ -150,9 +152,12 @@ function requireCandidateCaseAccess(
   candidateCase: Case,
   candidateAccessToken: string | undefined
 ): void {
-  if (candidateCase.id === baselineCase.id) {
+  if (!isCrossCaseAccess(baselineCase.id, candidateCase.id)) {
     requireCaseAccess(req, candidateCase);
     return;
+  }
+  if (!hasCandidateAccessToken(candidateAccessToken)) {
+    throwCaseAccessForbidden();
   }
   requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
 }

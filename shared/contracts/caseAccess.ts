@@ -10,3 +10,14 @@ export const caseAccessCredentialSchema = z.object({
   transport: z.literal(CASE_ACCESS_HEADER)
 });
 export type CaseAccessCredential = z.infer<typeof caseAccessCredentialSchema>;
+
+export function isCrossCaseAccess(
+  baselineCaseId: string,
+  candidateCaseId: string
+): boolean {
+  return baselineCaseId !== candidateCaseId;
+}
+
+export function hasCandidateAccessToken(token: string | undefined): boolean {
+  return Boolean(token?.trim());
+}

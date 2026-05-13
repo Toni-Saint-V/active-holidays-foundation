@@ -316,6 +316,18 @@ describe("recommendation HTTP surface", () => {
     expect(missing.status).toBe(403);
     expect(missing.json.error).toBe("case_access_forbidden");
 
+    const queryInjected = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief?candidateAccessToken=${candidateToken}`,
+      {
+        candidateCaseId: candidateId,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(queryInjected.status).toBe(403);
+    expect(queryInjected.json.error).toBe("case_access_forbidden");
+
     const invalid = await requestJson(
       "POST",
       `/api/cases/${baselineId}/recommendations/what-if-brief`,
