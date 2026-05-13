@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { checkAiApiRateLimit, resetAiApiRateLimitForTests } from './aiApiRateLimit'
+import { checkAiApiRateLimit, resetAiApiRateLimitForTests } from './aiApiRateLimit.server'
 
 const previousEnv = {
   max: process.env.ACTIVE_HOLIDAYS_RATE_LIMIT_AI_MAX,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { buildResultAi } from '@/lib/aiSurfaces'
-import { checkAiApiRateLimit } from '@/lib/aiApiRateLimit'
+import { buildResultAi } from '@/lib/aiSurfaces.server'
+import { checkAiApiRateLimit } from '@/lib/aiApiRateLimit.server'
 import { resultAiInputSchema } from '@/lib/aiSurfaceContracts'
 
 export async function POST(request: Request) {

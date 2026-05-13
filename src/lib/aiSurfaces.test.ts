@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildHumanReviewAi, buildIntakeAi, buildLandingAi, buildResultAi } from '@/lib/aiSurfaces'
+import { buildHumanReviewAi, buildIntakeAi, buildLandingAi, buildResultAi } from '@/lib/aiSurfaces.server'
 
 describe('screen AI public payload', () => {
   it('returns schema-safe outputs without internal quality diagnostics', async () => {

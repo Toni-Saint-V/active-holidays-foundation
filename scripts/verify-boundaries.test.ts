@@ -116,4 +116,28 @@ describe("verifyImportBoundaries", () => {
       }
     );
   });
+
+  it("allows env and node imports only in src server-only modules", async () => {
+    await withFixture(
+      {
+        "src/app/api/ai/route.ts": [
+          'import { read } from "@/lib/ai.server";',
+          "export const value = process.env.OPENAI_API_KEY;"
+        ].join("\n"),
+        "src/lib/ai.server.ts": [
+          'import crypto from "node:crypto";',
+          "export const value = process.env.SECRET ?? crypto.randomUUID();"
+        ].join("\n"),
+        "src/page.tsx": 'import { value } from "@/lib/ai.server";\nexport const ok = value;'
+      },
+      async (root) => {
+        const violations = verifyImportBoundaries(root);
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toMatchObject({
+          file: "src/page.tsx",
+          rule: "src-no-server-only-imports"
+        });
+      }
+    );
+  });
 });
