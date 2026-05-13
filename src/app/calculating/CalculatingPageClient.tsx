@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 import { AHEyebrow } from '@/components/AHEyebrow'
 import { RouteMap } from '@/components/RouteMap'
 import { apiClient } from '@/lib/apiClient'
+import { hasCaseAccessToken } from '@/lib/caseAccessSession'
+import { buildResultUrl } from '@/lib/caseRoutes'
 
 export function CalculatingPageClient() {
   const router = useRouter()
@@ -18,6 +20,11 @@ export function CalculatingPageClient() {
   useEffect(() => {
     if (!caseId) {
       setRecoveryMessage('Кейс не найден в ссылке. Откройте анкету и сформируйте кейс заново.')
+      setIsCaseReady(false)
+      return
+    }
+    if (!hasCaseAccessToken(caseId)) {
+      setRecoveryMessage('Токен доступа к кейсу не найден. Вернитесь к анкете и соберите кейс заново.')
       setIsCaseReady(false)
       return
     }
@@ -35,7 +42,7 @@ export function CalculatingPageClient() {
         setIsCaseReady(true)
         if (!freezePreview) {
           redirectTimer = window.setTimeout(() => {
-            router.replace(`/result?caseId=${encodeURIComponent(caseId)}`)
+            router.replace(buildResultUrl(caseId))
           }, 1100)
         }
       })

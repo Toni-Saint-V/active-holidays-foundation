@@ -1,12 +1,18 @@
 import { derivePublicReadinessFromResult, type Case, type PublicReadinessProjection, type ResultPayload } from '@shared/contracts'
 import { ApiError } from '@/lib/apiClient'
+import { getCaseAccessToken } from '@/lib/caseAccessSession'
 import type { CountryCode } from '@/lib/constants'
 
 type SearchParamsLike = {
   get(name: string): string | null
 }
 
-export type ResultTruthRecoveryCode = 'missing_case_id' | 'case_not_found' | 'unavailable'
+export type ResultTruthRecoveryCode =
+  | 'missing_case_id'
+  | 'missing_case_access'
+  | 'case_access_forbidden'
+  | 'case_not_found'
+  | 'unavailable'
 export type ResultType = 'preliminary' | 'verified'
 export type ConfidenceBand = 'low' | 'medium' | 'high'
 
@@ -114,6 +120,7 @@ export async function resolveResultTruth(input: {
   searchParams: SearchParamsLike
   getCase: (caseId: string) => Promise<Case>
   getResult: (caseId: string) => Promise<ResultPayload>
+  getAccessToken?: (caseId: string) => string | null
 }): Promise<ResultTruthResolution> {
   const caseId = parseCaseId(input.searchParams)
 
@@ -123,6 +130,15 @@ export async function resolveResultTruth(input: {
       code: 'missing_case_id',
       caseId: null,
       message: 'Не найден идентификатор кейса. Начните с анкеты, чтобы собрать результат честно.'
+    }
+  }
+  const accessToken = (input.getAccessToken ?? getCaseAccessToken)(caseId)
+  if (!accessToken) {
+    return {
+      status: 'recovery',
+      code: 'missing_case_access',
+      caseId,
+      message: 'Токен доступа к кейсу не найден. Начните с анкеты, чтобы открыть результат безопасно.'
     }
   }
 
@@ -171,6 +187,14 @@ export async function resolveResultTruth(input: {
         code: 'case_not_found',
         caseId,
         message: `Кейс ${caseId} не найден. Запустите анкету заново.`
+      }
+    }
+    if (error instanceof ApiError && error.code === 'case_access_forbidden') {
+      return {
+        status: 'recovery',
+        code: 'case_access_forbidden',
+        caseId,
+        message: 'Доступ к кейсу закрыт. Вернитесь к анкете и соберите новый кейс.'
       }
     }
 

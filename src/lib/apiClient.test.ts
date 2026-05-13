@@ -296,4 +296,39 @@ describe("apiClient strict productType parsing", () => {
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
   });
+
+  it("sends case access token via header and never puts it into URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson(caseResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.getCase(caseResponse.id, "t".repeat(32));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv");
+    expect(url).not.toContain("accessToken=");
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe("t".repeat(32));
+  });
+
+  it("keeps case access error code on rejected getResult", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: vi.fn().mockResolvedValue({
+          error: "case_access_forbidden",
+          message: "Недостаточно прав для доступа к кейсу."
+        })
+      } as unknown as Response)
+    );
+
+    await expect(apiClient.getResult(resultResponse.caseId, "t".repeat(32))).rejects.toMatchObject(
+      {
+        status: 403,
+        code: "case_access_forbidden"
+      } satisfies Partial<ApiError>
+    );
+  });
 });

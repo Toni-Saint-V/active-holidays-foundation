@@ -1,0 +1,182 @@
+import type { Express } from 'express'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { IncomingMessage, ServerResponse } from 'node:http'
+import { Duplex } from 'node:stream'
+import { createApp } from '../index'
+import { CASE_ACCESS_HEADER } from '@shared/contracts'
+
+let app: Express
+const devHeaders = {
+  'x-active-holidays-dev-seed-access': '1'
+}
+
+class MockSocket extends Duplex {
+  readonly chunks: Buffer[] = []
+  remoteAddress = '127.0.0.1'
+
+  _read(): void {}
+
+  _write(
+    chunk: string | Buffer,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void
+  ): void {
+    this.chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    callback()
+  }
+
+  setTimeout(): this {
+    return this
+  }
+
+  setNoDelay(): this {
+    return this
+  }
+
+  setKeepAlive(): this {
+    return this
+  }
+
+  connect(): this {
+    return this
+  }
+
+  resetAndDestroy(): void {
+    this.destroy()
+  }
+
+  address() {
+    return { address: '127.0.0.1', family: 'IPv4', port: 0 }
+  }
+
+  ref(): this {
+    return this
+  }
+
+  unref(): this {
+    return this
+  }
+
+  destroySoon(): void {
+    this.destroy()
+  }
+}
+
+beforeAll(async () => {
+  process.env.ACTIVE_HOLIDAYS_DEV_SEED_ACCESS = '1'
+  app = await createApp()
+})
+
+async function requestJson(
+  method: 'GET' | 'POST',
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>
+) {
+  const payload = body === undefined ? null : JSON.stringify(body)
+  const socket = new MockSocket()
+  const req = new IncomingMessage(socket as never)
+  req.method = method
+  req.url = path
+  req.headers = {
+    ...(payload
+      ? {
+          'content-type': 'application/json',
+          'content-length': String(Buffer.byteLength(payload))
+        }
+      : {}),
+    ...(headers ?? {})
+  }
+  if (payload) {
+    req.push(payload)
+  }
+  req.push(null)
+
+  const res = new ServerResponse(req)
+  res.assignSocket(socket as never)
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const resolveOnce = () => {
+      if (settled) return
+      settled = true
+      resolve()
+    }
+    const rejectOnce = (error: Error) => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+
+    res.on('finish', resolveOnce)
+    res.on('close', () => {
+      if (res.writableEnded) resolveOnce()
+    })
+    res.on('error', reject)
+    app(req as never, res as never, (error?: unknown) => {
+      if (error instanceof Error) {
+        rejectOnce(error)
+        return
+      }
+      if (res.writableEnded) resolveOnce()
+    })
+  })
+
+  const raw = Buffer.concat(socket.chunks).toString('utf8')
+  const bodyText = raw.split('\r\n\r\n').slice(1).join('\r\n\r\n')
+  const json = bodyText.length > 0 ? JSON.parse(bodyText) : null
+  return { status: res.statusCode, json } as const
+}
+
+describe('case access ownership boundary', () => {
+  it('returns access credential on fork and enforces it on reads', async () => {
+    const forked = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
+    expect(forked.status).toBe(200)
+
+    const caseId = forked.json.case.id as string
+    const accessToken = forked.json.access.accessToken as string
+
+    expect(caseId).toMatch(/^s1-rf-italy-fork-\d+$/)
+    expect(typeof accessToken).toBe('string')
+    expect(accessToken.length).toBeGreaterThanOrEqual(24)
+    expect(accessToken).not.toContain(caseId)
+
+    const missing = await requestJson('GET', `/api/cases/${caseId}`)
+    expect(missing.status).toBe(403)
+    expect(missing.json.error).toBe('case_access_forbidden')
+
+    const allowed = await requestJson('GET', `/api/cases/${caseId}`, undefined, {
+      [CASE_ACCESS_HEADER]: accessToken
+    })
+    expect(allowed.status).toBe(200)
+    expect(allowed.json.id).toBe(caseId)
+
+    const bad = await requestJson('GET', `/api/cases/${caseId}/result`, undefined, {
+      [CASE_ACCESS_HEADER]: `${accessToken}-tampered`
+    })
+    expect(bad.status).toBe(403)
+    expect(bad.json.error).toBe('case_access_forbidden')
+
+    const viaQuery = await requestJson(
+      'GET',
+      `/api/cases/${caseId}/result?accessToken=${encodeURIComponent(accessToken)}`
+    )
+    expect(viaQuery.status).toBe(403)
+    expect(viaQuery.json.error).toBe('case_access_forbidden')
+  })
+
+  it('rejects case A token when accessing case B', async () => {
+    const first = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
+    const second = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
+
+    const tokenA = first.json.access.accessToken as string
+    const caseB = second.json.case.id as string
+
+    const response = await requestJson('GET', `/api/cases/${caseB}/result`, undefined, {
+      [CASE_ACCESS_HEADER]: tokenA
+    })
+
+    expect(response.status).toBe(403)
+    expect(response.json.error).toBe('case_access_forbidden')
+  })
+})

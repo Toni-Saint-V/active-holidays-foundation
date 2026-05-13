@@ -72,6 +72,12 @@ describe("caseBoundFlow", () => {
       case: {
         id: "s1-rf-italy-fork-77",
         productType: "travel" as ProductType
+      },
+      access: {
+        caseId: "s1-rf-italy-fork-77",
+        accessToken: "a".repeat(32),
+        issuedAt: "2026-05-10T00:00:00.000Z",
+        transport: "x-active-holidays-case-access" as const
       }
     }));
 
@@ -99,6 +105,7 @@ describe("caseBoundFlow", () => {
       expect.objectContaining({ title: "Intake draft" })
     );
     expect(outcome.caseId).toBe("s1-rf-italy-fork-77");
+    expect(outcome.caseAccessToken).toBe("a".repeat(32));
     expect(outcome.reusedExistingCase).toBe(false);
     expect(outcome.productType).toBe("travel");
     expect(outcome.patchedSignalIds).toEqual([
@@ -126,6 +133,7 @@ describe("caseBoundFlow", () => {
     const outcome = await createOrReuseTravelCaseFromIntakeDraft(
       {
         existingCaseId: "case-live-42",
+        existingCaseAccessToken: "b".repeat(32),
         draft: {
           country: "GR",
           departureDate: "2026-06-20",
@@ -139,6 +147,7 @@ describe("caseBoundFlow", () => {
     expect(patchSignals).toHaveBeenCalledTimes(1);
     expect(patchSignals).toHaveBeenCalledWith("case-live-42", expect.any(Array));
     expect(outcome.caseId).toBe("case-live-42");
+    expect(outcome.caseAccessToken).toBe("b".repeat(32));
     expect(outcome.reusedExistingCase).toBe(true);
   });
 });

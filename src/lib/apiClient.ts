@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  CASE_ACCESS_HEADER,
   caseSchema,
+  caseAccessCredentialSchema,
   resultPayloadSchema,
   intakeQueueSchema,
   intakePreviewSchema,
@@ -53,6 +55,7 @@ import {
   type ScenarioLabPayload,
   type Source
 } from "@shared/contracts";
+import { getCaseAccessToken } from "./caseAccessSession";
 
 const DEFAULT_BASE = (() => {
   if (typeof window === "undefined") return "http://localhost:3001";
@@ -109,6 +112,19 @@ async function request<Schema extends z.ZodTypeAny>(
   return parsed.data;
 }
 
+function withCaseAccessHeader(
+  headers: RequestInit["headers"],
+  caseId: string,
+  explicitToken?: string
+): RequestInit["headers"] {
+  const token = explicitToken?.trim() || getCaseAccessToken(caseId);
+  if (!token) return headers;
+  return {
+    ...(headers ?? {}),
+    [CASE_ACCESS_HEADER]: token
+  };
+}
+
 const caseListSchema = z.object({
   cases: z.array(caseSummarySchema)
 });
@@ -158,7 +174,8 @@ const decisionsResponseSchema = z.object({ decisions: decisionsLogSchema });
 const caseResultResponseSchema = z.object({
   case: strictCaseSchema,
   result: strictResultPayloadSchema,
-  decisionRecordId: z.string().min(1).optional()
+  decisionRecordId: z.string().min(1).optional(),
+  access: caseAccessCredentialSchema.optional()
 });
 export type CaseResultResponse = z.infer<typeof caseResultResponseSchema>;
 const pathsResponseSchema = z.object({ paths: offersSchema });
@@ -185,13 +202,18 @@ export const apiClient = {
     const response = await request("/api/cases", caseListSchema);
     return response.cases;
   },
-  async getCase(id: string): Promise<Case> {
-    return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema);
+  async getCase(id: string, accessToken?: string): Promise<Case> {
+    return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema, {
+      headers: withCaseAccessHeader(undefined, id, accessToken)
+    });
   },
-  async getResult(id: string): Promise<ResultPayload> {
+  async getResult(id: string, accessToken?: string): Promise<ResultPayload> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/result`,
-      strictResultPayloadSchema
+      strictResultPayloadSchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
   },
   async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
@@ -214,10 +236,15 @@ export const apiClient = {
       }
     );
   },
-  async patchSignals(id: string, signals: CaseSignals): Promise<CaseResultResponse> {
+  async patchSignals(
+    id: string,
+    signals: CaseSignals,
+    accessToken?: string
+  ): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {
       method: "POST",
-      body: JSON.stringify({ signals })
+      body: JSON.stringify({ signals }),
+      headers: withCaseAccessHeader(undefined, id, accessToken)
     });
   },
   async recompute(id: string, preferences?: PathPreferences): Promise<CaseResultResponse> {
@@ -239,17 +266,23 @@ export const apiClient = {
   async audit(id: string) {
     return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema);
   },
-  async humanReview(id: string): Promise<HumanReviewRequest | null> {
+  async humanReview(id: string, accessToken?: string): Promise<HumanReviewRequest | null> {
     const response = await request(
       `/api/cases/${encodeURIComponent(id)}/human-review`,
-      humanReviewResponseSchema
+      humanReviewResponseSchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
     return response.request;
   },
-  async humanReviewCasePacket(id: string): Promise<HumanReviewCasePacket> {
+  async humanReviewCasePacket(id: string, accessToken?: string): Promise<HumanReviewCasePacket> {
     const response = await request(
       `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
-      humanReviewCasePacketResponseSchema
+      humanReviewCasePacketResponseSchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
     return response.packet;
   },
@@ -281,7 +314,14 @@ export const apiClient = {
     if (!payload.signals || payload.signals.length === 0) {
       return forked;
     }
-    return apiClient.patchSignals(forked.case.id, payload.signals);
+    const patched = await apiClient.patchSignals(
+      forked.case.id,
+      payload.signals,
+      forked.access?.accessToken
+    );
+    if (patched.access) return patched;
+    if (!forked.access) return patched;
+    return { ...patched, access: forked.access };
   },
   async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
     return request(

@@ -16,6 +16,8 @@ import {
   recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
   caseSummarySchema,
+  CASE_ACCESS_HEADER,
+  DEV_SEED_ACCESS_HEADER,
   type Case,
   type CaseSignals,
   type DecisionKind,
@@ -59,6 +61,7 @@ import {
 } from "@shared/domain/engine";
 
 const caseIdParams = z.object({ id: z.string().min(1) });
+const DEV_SEED_ACCESS_ENABLED = process.env.ACTIVE_HOLIDAYS_DEV_SEED_ACCESS === "1";
 
 function getId(req: Request): string {
   const raw = req.params.id;
@@ -71,6 +74,32 @@ function requireCase(id: string): Case {
     throw new HttpError(404, `Кейс ${id} не найден.`, "case_not_found");
   }
   return existing;
+}
+
+function caseAccessTokenFromHeader(req: Request): string | null {
+  const raw = req.header(CASE_ACCESS_HEADER);
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function allowDevSeedAccessBypass(req: Request, caseData: Case): boolean {
+  if (caseData.forkedFrom !== null) return false;
+  if (process.env.NODE_ENV === "test") return true;
+  if (!DEV_SEED_ACCESS_ENABLED) return false;
+  return req.header(DEV_SEED_ACCESS_HEADER) === "1";
+}
+
+function requireCaseAccess(req: Request, caseData: Case): void {
+  if (allowDevSeedAccessBypass(req, caseData)) return;
+  const token = caseAccessTokenFromHeader(req);
+  if (!token || !getCaseStore().validateCaseAccess(caseData.id, token)) {
+    throw new HttpError(
+      403,
+      "Недостаточно прав для доступа к кейсу.",
+      "case_access_forbidden"
+    );
+  }
 }
 
 function orchestratorCatalogs(
@@ -248,14 +277,30 @@ export function casesRouter(): Router {
 
   router.get("/:id", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     res.json(caseData);
   });
 
   router.get("/:id/result", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(result);
   });
+
+  router.post(
+    "/:id/access/grant",
+    requireInternalApiToken,
+    validateParams(caseIdParams),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      const access = getCaseStore().issueCaseAccess(caseData.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для кейса.");
+      }
+      res.json({ access });
+    }
+  );
 
   router.get("/:id/recommendations/shortlist", validateParams(caseIdParams), async (req, res) => {
     const caseData = requireCase(getId(req));
@@ -442,12 +487,14 @@ export function casesRouter(): Router {
 
   router.get("/:id/human-review", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const request = getCaseStore().latestHumanReviewFor(caseData.id);
     res.json(humanReviewResponseSchema.parse({ request }));
   });
 
   router.get("/:id/human-review/packet", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const request = getCaseStore().activeHumanReviewFor(caseData.id);
     if (!request) {
       throw new HttpError(
@@ -820,13 +867,17 @@ export function casesRouter(): Router {
       const title = (req.body as { title?: string }).title;
       const forked = store.fork(id, { title });
       if (!forked) throw new HttpError(500, "Не удалось форкнуть кейс.");
+      const access = store.issueCaseAccess(forked.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для кейса.");
+      }
       const { result, record } = recordDecision(
         forked,
         `Форк кейса ${id}.`,
         "fork",
         { changedSignalIds: [] }
       );
-      res.json({ case: forked, result, decisionRecordId: record.decisionId });
+      res.json({ case: forked, result, decisionRecordId: record.decisionId, access });
     }
   );
 

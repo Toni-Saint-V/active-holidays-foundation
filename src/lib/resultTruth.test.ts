@@ -143,7 +143,12 @@ describe('resultTruth', () => {
     const getCase = vi.fn(async () => caseData)
     const getResult = vi.fn(async () => serverResult)
 
-    const resolved = await resolveResultTruth({ searchParams, getCase, getResult })
+    const resolved = await resolveResultTruth({
+      searchParams,
+      getCase,
+      getResult,
+      getAccessToken: () => 'tok'.padEnd(32, 'x')
+    })
 
     expect(getCase).toHaveBeenCalledWith('case-123')
     expect(getResult).toHaveBeenCalledWith('case-123')
@@ -169,7 +174,8 @@ describe('resultTruth', () => {
     const resolved = await resolveResultTruth({
       searchParams,
       getCase: vi.fn(async () => createCase()),
-      getResult: vi.fn(async () => createResult())
+      getResult: vi.fn(async () => createResult()),
+      getAccessToken: () => 'tok'.padEnd(32, 'x')
     })
 
     expect(resolved).toMatchObject({
@@ -187,13 +193,54 @@ describe('resultTruth', () => {
       getCase: vi.fn(async () => {
         throw new ApiError('not found', 404, 'case_not_found')
       }),
-      getResult: vi.fn(async () => createResult())
+      getResult: vi.fn(async () => createResult()),
+      getAccessToken: () => 'tok'.padEnd(32, 'x')
     })
 
     expect(resolved).toMatchObject({
       status: 'recovery',
       code: 'case_not_found',
       caseId: 'missing-case'
+    })
+  })
+
+  it('returns recovery when case access token is missing', async () => {
+    const searchParams = new URLSearchParams('caseId=case-123')
+    const getCase = vi.fn(async () => createCase())
+    const getResult = vi.fn(async () => createResult())
+
+    const resolved = await resolveResultTruth({
+      searchParams,
+      getCase,
+      getResult,
+      getAccessToken: () => null
+    })
+
+    expect(resolved).toMatchObject({
+      status: 'recovery',
+      code: 'missing_case_access',
+      caseId: 'case-123'
+    })
+    expect(getCase).not.toHaveBeenCalled()
+    expect(getResult).not.toHaveBeenCalled()
+  })
+
+  it('returns recovery when case access token is invalid', async () => {
+    const searchParams = new URLSearchParams('caseId=case-123')
+
+    const resolved = await resolveResultTruth({
+      searchParams,
+      getCase: vi.fn(async () => {
+        throw new ApiError('forbidden', 403, 'case_access_forbidden')
+      }),
+      getResult: vi.fn(async () => createResult()),
+      getAccessToken: () => 'tok'.padEnd(32, 'x')
+    })
+
+    expect(resolved).toMatchObject({
+      status: 'recovery',
+      code: 'case_access_forbidden',
+      caseId: 'case-123'
     })
   })
 })

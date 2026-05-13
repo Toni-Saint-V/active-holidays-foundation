@@ -7,7 +7,9 @@ import { AHEyebrow } from '@/components/AHEyebrow'
 import { StepRail } from '@/components/StepRail'
 import { fetchIntakeAi } from '@/lib/aiSurfaceClient'
 import type { IntakeAiOutput } from '@/lib/aiSurfaceContracts'
+import { storeCaseAccessToken } from '@/lib/caseAccessSession'
 import { createOrReuseTravelCaseFromIntakeDraft } from '@/lib/caseBoundFlow'
+import { buildCalculatingUrl } from '@/lib/caseRoutes'
 import { COUNTRIES } from '@/lib/countryData'
 import type { CountryCode } from '@/lib/constants'
 
@@ -137,9 +139,8 @@ export function IntakePageClient() {
           refusalContext: travelProfile.refusal_context,
         },
       })
-      const params = new URLSearchParams()
-      params.set('caseId', outcome.caseId)
-      router.push(`/calculating?${params.toString()}`)
+      storeCaseAccessToken(outcome.caseId, outcome.caseAccessToken)
+      router.push(buildCalculatingUrl(outcome.caseId))
     } catch {
       router.push('/intake')
     } finally {

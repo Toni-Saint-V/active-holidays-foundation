@@ -1,5 +1,6 @@
 import {
   caseSignalsSchema,
+  type CaseAccessCredential,
   type CaseSignals,
   type ProductType,
   type TravelPurpose
@@ -41,6 +42,7 @@ export type ExtractedTravelIntakeDraft = {
 
 export type CaseBoundFlowOutcome = {
   caseId: string;
+  caseAccessToken: string;
   baseCaseId: string;
   productType: "travel";
   reusedExistingCase: boolean;
@@ -52,11 +54,11 @@ export type CaseBoundFlowClient = {
   forkCaseWithSignals: (
     id: string,
     payload: { title?: string; signals?: CaseSignals }
-  ) => Promise<{ case: { id: string; productType: ProductType } }>;
+  ) => Promise<{ case: { id: string; productType: ProductType }; access?: CaseAccessCredential }>;
   patchSignals: (
     id: string,
     signals: CaseSignals
-  ) => Promise<{ case: { id: string; productType: ProductType } }>;
+  ) => Promise<{ case: { id: string; productType: ProductType }; access?: CaseAccessCredential }>;
 };
 
 export type CreateOrReuseTravelCaseInput = {
@@ -66,6 +68,7 @@ export type CreateOrReuseTravelCaseInput = {
   forkTitle?: string;
   now?: Date;
   ignoredTruthQueryKeys?: ForbiddenTruthQueryKey[];
+  existingCaseAccessToken?: string | null;
 };
 
 function parseCountry(value: string | null | undefined): "IT" | "ES" | "FR" | "GR" {
@@ -190,6 +193,15 @@ export async function createOrReuseTravelCaseFromIntakeDraft(
         signals
       });
 
+  const caseAccessToken = resolveCaseAccessToken({
+    response,
+    caseId: response.case.id,
+    fallbackToken: input.existingCaseAccessToken
+  });
+  if (!caseAccessToken) {
+    throw new Error("Сервер не вернул access credential для case-bound потока.");
+  }
+
   if (response.case.productType !== "travel") {
     throw new Error(
       `Ожидался travel-кейс, но получен ${response.case.productType}.`
@@ -198,10 +210,27 @@ export async function createOrReuseTravelCaseFromIntakeDraft(
 
   return {
     caseId: response.case.id,
+    caseAccessToken,
     baseCaseId,
     productType,
     reusedExistingCase,
     patchedSignalIds: signals.map((signal) => signal.id),
     ignoredTruthQueryKeys: input.ignoredTruthQueryKeys ?? []
   };
+}
+
+function resolveCaseAccessToken(input: {
+  response: { case: { id: string }; access?: CaseAccessCredential };
+  caseId: string;
+  fallbackToken?: string | null;
+}): string | null {
+  const access = input.response.access;
+  if (access && access.caseId === input.caseId) {
+    return access.accessToken;
+  }
+  const fallback = input.fallbackToken?.trim();
+  if (fallback && fallback.length >= 24) {
+    return fallback;
+  }
+  return null;
 }

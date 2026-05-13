@@ -11,6 +11,8 @@ import { RouteMap } from '@/components/RouteMap'
 import { fetchHumanReviewAi } from '@/lib/aiSurfaceClient'
 import type { HumanReviewAiOutput } from '@/lib/aiSurfaceContracts'
 import { apiClient } from '@/lib/apiClient'
+import { hasCaseAccessToken } from '@/lib/caseAccessSession'
+import { buildResultUrl } from '@/lib/caseRoutes'
 import { COUNTRIES } from '@/lib/countryData'
 import { VERDICT_HEADLINE, type CountryCode, type VerdictKind } from '@/lib/constants'
 import type { Case, SignalRecord } from '@shared/contracts'
@@ -85,6 +87,11 @@ export function HumanReviewPageClient() {
       setRouteError('Кейс отсутствует в ссылке. Вернитесь к анкете и создайте кейс заново.')
       return
     }
+    if (!hasCaseAccessToken(caseId)) {
+      setRouteState('invalid')
+      setRouteError('Токен доступа к кейсу не найден. Вернитесь к анкете и соберите кейс заново.')
+      return
+    }
 
     let cancelled = false
     setRouteState('loading')
@@ -111,7 +118,7 @@ export function HumanReviewPageClient() {
 
   const resultHref = useMemo(() => {
     if (!caseId) return '/intake'
-    return `/result?caseId=${encodeURIComponent(caseId)}`
+    return buildResultUrl(caseId)
   }, [caseId])
 
   const canSend = fullName.trim().length > 1 && contact.trim().length > 3

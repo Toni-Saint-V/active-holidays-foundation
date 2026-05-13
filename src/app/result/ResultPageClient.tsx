@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AmberCTA } from '@/components/AmberCTA'
 import { apiClient } from '@/lib/apiClient'
+import { buildHumanReviewUrl } from '@/lib/caseRoutes'
 import { COUNTRIES } from '@/lib/countryData'
 import { ENGINE_CLASS, VERDICT_HEADLINE } from '@/lib/constants'
 import { IMAGE_BLURS } from '@/lib/imageBlurs'
@@ -238,9 +239,7 @@ export function ResultPageClient() {
   const readinessPercent = Math.max(0, Math.min(100, Math.round(truth.result.documents.score * 100)))
 
   const humanReviewUrl = useMemo(() => {
-    const qp = new URLSearchParams()
-    qp.set('caseId', truth.caseId)
-    return `/human-review?${qp.toString()}`
+    return buildHumanReviewUrl(truth.caseId)
   }, [truth.caseId])
 
   const frameTitle = isVerified ? 'Серверный результат подтверждён' : 'Предварительный серверный результат'

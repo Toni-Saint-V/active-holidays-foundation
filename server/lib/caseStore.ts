@@ -1,5 +1,6 @@
 import type {
   Case,
+  CaseAccessCredential,
   CaseOverride,
   CaseSignals,
   DecisionKind,
@@ -37,6 +38,7 @@ import {
   type OrchestratorCatalogs
 } from "@shared/domain/engine";
 import type { Catalogs } from "./catalogs";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export type SnapshotDecisionRecordInput = {
   case: Case;
@@ -117,6 +119,10 @@ export class CaseStore {
   private readonly byCaseId = new Map<string, DecisionRecord[]>();
   private readonly latestByCaseId = new Map<string, DecisionRecord>();
   private readonly humanReviews: HumanReviewRequest[] = [];
+  private readonly caseAccessByCaseId = new Map<
+    string,
+    { tokenHashHex: string; issuedAt: string }
+  >();
   private readonly humanReviewById = new Map<string, HumanReviewRequest>();
   private readonly humanReviewByCaseId = new Map<string, HumanReviewRequest[]>();
   private readonly persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
@@ -696,6 +702,55 @@ export class CaseStore {
     if (!this.persistHumanReviews) return;
     this.persistHumanReviews(requests.map((request) => structuredClone(request)));
   }
+
+  issueCaseAccess(caseId: string, now = new Date()): CaseAccessCredential | null {
+    if (!this.cases.has(caseId)) return null;
+    const existing = this.caseAccessByCaseId.get(caseId);
+    if (existing) {
+      const raw = randomBytes(32).toString("base64url");
+      this.caseAccessByCaseId.set(caseId, {
+        tokenHashHex: hashAccessToken(raw),
+        issuedAt: now.toISOString()
+      });
+      return {
+        caseId,
+        accessToken: raw,
+        issuedAt: now.toISOString(),
+        transport: "x-active-holidays-case-access"
+      };
+    }
+    const raw = randomBytes(32).toString("base64url");
+    const issuedAt = now.toISOString();
+    this.caseAccessByCaseId.set(caseId, {
+      tokenHashHex: hashAccessToken(raw),
+      issuedAt
+    });
+    return {
+      caseId,
+      accessToken: raw,
+      issuedAt,
+      transport: "x-active-holidays-case-access"
+    };
+  }
+
+  validateCaseAccess(caseId: string, token: string | null | undefined): boolean {
+    if (!token || token.trim().length < 24) return false;
+    const entry = this.caseAccessByCaseId.get(caseId);
+    if (!entry) return false;
+    const providedHash = hashAccessToken(token.trim());
+    return safeEqualHex(entry.tokenHashHex, providedHash);
+  }
+}
+
+function hashAccessToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function safeEqualHex(leftHex: string, rightHex: string): boolean {
+  const left = Buffer.from(leftHex, "hex");
+  const right = Buffer.from(rightHex, "hex");
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
 }
 
 let singleton: CaseStore | null = null;
