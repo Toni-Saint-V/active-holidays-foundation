@@ -15,6 +15,9 @@ import {
   recommendationWhatIfBriefRequestSchema,
   recommendationDetailRequestSchema,
   scenarioLabCompareRequestSchema,
+  documentUploadRequestSchema,
+  documentUploadResponseSchema,
+  publicDocumentCheckSummarySchema,
   caseSummarySchema,
   CASE_ACCESS_HEADER,
   DEV_SEED_ACCESS_HEADER,
@@ -52,6 +55,11 @@ import {
   buildScenarioFamily,
   ensureSameScenarioFamily
 } from "../lib/scenarioLab";
+import {
+  buildDocumentIntakeEntry,
+  buildPublicDocumentSummary,
+  DocumentIntakeInputError
+} from "../lib/documentIntakeService";
 import { HttpError } from "../middleware/errorHandler";
 import { requireInternalApiToken } from "../middleware/internalApi";
 import {
@@ -160,6 +168,10 @@ function requireCandidateCaseAccess(
     throwCaseAccessForbidden();
   }
   requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
+}
+
+function assertCaseDocumentAccess(_req: Request, _caseId: string): void {
+  // Document intake routes stay internal-token scoped in this merged stream.
 }
 
 function orchestratorCatalogs(
@@ -558,6 +570,48 @@ export function casesRouter(): Router {
       decisions: getCaseStore().decisionsFor(caseData.id)
     });
   });
+
+  router.post(
+    "/:id/documents",
+    requireInternalApiToken,
+    validateParams(caseIdParams),
+    validateBody(documentUploadRequestSchema),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      assertCaseDocumentAccess(req, caseData.id);
+      const payload = documentUploadRequestSchema.parse(req.body);
+      try {
+        const built = buildDocumentIntakeEntry({
+          caseId: caseData.id,
+          request: payload
+        });
+        getCaseStore().appendDocumentEntry(built.entry);
+        const response = documentUploadResponseSchema.parse(built.response);
+        res.status(response.uploadStatus === "accepted" ? 201 : 200).json(response);
+      } catch (error) {
+        if (error instanceof DocumentIntakeInputError) {
+          throw new HttpError(400, error.message, "document_upload_invalid_payload");
+        }
+        throw error;
+      }
+    }
+  );
+
+  router.get(
+    "/:id/documents/summary",
+    requireInternalApiToken,
+    validateParams(caseIdParams),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      assertCaseDocumentAccess(req, caseData.id);
+      const entries = getCaseStore().documentEntriesFor(caseData.id);
+      const summary = buildPublicDocumentSummary({
+        caseId: caseData.id,
+        entries
+      });
+      res.json(publicDocumentCheckSummarySchema.parse(summary));
+    }
+  );
 
   router.get("/:id/documents", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));

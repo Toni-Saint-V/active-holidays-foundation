@@ -186,6 +186,33 @@ const auditResponseSchema = z.object({
   decisions: decisionsLogSchema
 });
 
+function withInternalToken(token: string): Record<string, string> {
+  const normalized = token.trim();
+  if (!normalized) {
+    throw new Error("Internal API token is required for internal cases client.");
+  }
+  return {
+    "x-active-holidays-internal-token": normalized
+  };
+}
+
+export function createInternalCasesApiClient(internalApiToken: string) {
+  const internalHeaders = withInternalToken(internalApiToken);
+
+  return {
+    async humanReviewCasePacket(id: string, accessToken?: string): Promise<HumanReviewCasePacket> {
+      const response = await request(
+        `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
+        humanReviewCasePacketResponseSchema,
+        {
+          headers: withCaseAccessHeader(internalHeaders, id, accessToken)
+        }
+      );
+      return response.packet;
+    }
+  };
+}
+
 export const apiClient = {
   async health() {
     return request(
@@ -292,16 +319,6 @@ export const apiClient = {
       }
     );
     return response.request;
-  },
-  async humanReviewCasePacket(id: string, accessToken?: string): Promise<HumanReviewCasePacket> {
-    const response = await request(
-      `/api/cases/${encodeURIComponent(id)}/human-review/packet`,
-      humanReviewCasePacketResponseSchema,
-      {
-        headers: withCaseAccessHeader(undefined, id, accessToken)
-      }
-    );
-    return response.packet;
   },
   async submitHumanReview(
     id: string,

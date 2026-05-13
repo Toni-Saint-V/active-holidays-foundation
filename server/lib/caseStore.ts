@@ -17,7 +17,9 @@ import type {
   HumanReviewResolution,
   HumanReviewRequest,
   HumanReviewSnapshot,
-  HumanReviewStatus
+  HumanReviewStatus,
+  DocumentAsset,
+  DocumentCheckRun
 } from "@shared/contracts";
 import {
   decisionLedgerEntrySchema,
@@ -81,6 +83,13 @@ export type CaseStoreOptions = {
   persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
 };
 
+export type StoredDocumentIntakeEntry = {
+  caseId: string;
+  asset: DocumentAsset;
+  run: DocumentCheckRun;
+  uploadStatus: "accepted" | "rejected";
+};
+
 export class HumanReviewHandoffConflictError extends Error {
   constructor(message: string) {
     super(message);
@@ -125,6 +134,7 @@ export class CaseStore {
   >();
   private readonly humanReviewById = new Map<string, HumanReviewRequest>();
   private readonly humanReviewByCaseId = new Map<string, HumanReviewRequest[]>();
+  private readonly documentEntriesByCaseId = new Map<string, StoredDocumentIntakeEntry[]>();
   private readonly persistHumanReviews?: (requests: HumanReviewRequest[]) => void;
   private counter = 0;
 
@@ -588,6 +598,27 @@ export class CaseStore {
     );
     this.replaceHumanReview(next);
     return structuredClone(next);
+  }
+
+  appendDocumentEntry(input: StoredDocumentIntakeEntry): StoredDocumentIntakeEntry {
+    const entry = structuredClone(input);
+    const bucket = this.documentEntriesByCaseId.get(input.caseId) ?? [];
+    bucket.push(entry);
+    this.documentEntriesByCaseId.set(input.caseId, bucket);
+    return structuredClone(entry);
+  }
+
+  documentEntriesFor(caseId: string): StoredDocumentIntakeEntry[] {
+    return (this.documentEntriesByCaseId.get(caseId) ?? [])
+      .map((entry, index) => ({ entry, index }))
+      .sort((left, right) => {
+        const byCreatedAt = right.entry.run.createdAt.localeCompare(left.entry.run.createdAt);
+        if (byCreatedAt !== 0) {
+          return byCreatedAt;
+        }
+        return right.index - left.index;
+      })
+      .map(({ entry }) => structuredClone(entry));
   }
 
   // Back-compat: some call sites may still want to record a minimal row when

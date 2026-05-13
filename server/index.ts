@@ -38,6 +38,7 @@ export async function createApp(): Promise<express.Express> {
   });
 
   app.use(configuredCors());
+  app.use("/api/cases/:id/documents", express.json({ limit: "16mb" }));
   app.use(express.json({ limit: "256kb" }));
   app.use(requestLogger);
 

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiClient, configureApiBase } from "./apiClient";
+import {
+  ApiError,
+  apiClient,
+  configureApiBase,
+  createInternalCasesApiClient
+} from "./apiClient";
 
 const caseResponse = {
   id: "s4-rf-residency-dnv",
@@ -555,5 +560,42 @@ describe("apiClient strict productType parsing", () => {
         code: "case_access_forbidden"
       } satisfies Partial<ApiError>
     );
+  });
+
+  it("does not expose internal packet route on public client", () => {
+    expect("humanReviewCasePacket" in apiClient).toBe(false);
+  });
+
+  it("uses explicit internal client for packet route and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: vi.fn().mockResolvedValue({
+        error: "internal_api_forbidden",
+        message: "Internal token required."
+      })
+    } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalToken = "internal-token";
+    const internalClient = createInternalCasesApiClient(internalToken);
+
+    await expect(
+      internalClient.humanReviewCasePacket(caseResponse.id, caseToken)
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "internal_api_forbidden"
+    } satisfies Partial<ApiError>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/human-review/packet");
+    expect(url).not.toContain("accessToken=");
+    expect(url).not.toContain(caseToken);
+    expect(url).not.toContain(internalToken);
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
+    expect(headers["x-active-holidays-internal-token"]).toBe(internalToken);
   });
 });
