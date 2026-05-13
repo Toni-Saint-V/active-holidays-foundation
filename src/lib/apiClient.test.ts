@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiClient, configureApiBase } from "./apiClient";
+import {
+  ApiError,
+  apiClient,
+  configureApiBase,
+  createInternalCasesApiClient
+} from "./apiClient";
 
 const caseResponse = {
   id: "s4-rf-residency-dnv",
@@ -143,9 +148,12 @@ function okJson(body: unknown): Response {
 }
 
 describe("apiClient strict productType parsing", () => {
+  let internalClient: ReturnType<typeof createInternalCasesApiClient>;
+
   beforeEach(() => {
     configureApiBase("http://api.test");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    internalClient = createInternalCasesApiClient("internal-test-token");
   });
 
   afterEach(() => {
@@ -157,7 +165,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = caseResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(apiClient.getCase(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.getCase(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -167,7 +175,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = resultResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -185,7 +193,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -204,7 +212,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.recompute(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.recompute(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -234,7 +242,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -273,7 +281,7 @@ describe("apiClient strict productType parsing", () => {
     );
 
     await expect(
-      apiClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
+      internalClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
     ).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
@@ -295,5 +303,153 @@ describe("apiClient strict productType parsing", () => {
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
+  });
+});
+
+describe("apiClient internal/public boundary", () => {
+  beforeEach(() => {
+    configureApiBase("http://api.test");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not expose internal-only case-bound methods on public client", () => {
+    expect("getCase" in apiClient).toBe(false);
+    expect("getResult" in apiClient).toBe(false);
+    expect("recommendationShortlist" in apiClient).toBe(false);
+    expect("recommendationDetail" in apiClient).toBe(false);
+    expect("patchSignals" in apiClient).toBe(false);
+    expect("recompute" in apiClient).toBe(false);
+    expect("overrideSignal" in apiClient).toBe(false);
+    expect("audit" in apiClient).toBe(false);
+    expect("documents" in apiClient).toBe(false);
+    expect("fork" in apiClient).toBe(false);
+    expect("scenarioFamily" in apiClient).toBe(false);
+    expect("compareScenario" in apiClient).toBe(false);
+    expect("decisionScenarioLab" in apiClient).toBe(false);
+    expect("decisions" in apiClient).toBe(false);
+    expect("humanReview" in apiClient).toBe(false);
+    expect("humanReviewCasePacket" in apiClient).toBe(false);
+    expect("submitHumanReview" in apiClient).toBe(false);
+  });
+
+  it("sends internal token header for internal case reads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson(caseResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+    await expect(internalClient.getCase("case-123")).resolves.toMatchObject({
+      id: caseResponse.id
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
+  });
+
+  it("sends internal token header for internal human-review GET", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
+        request: null
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+    await expect(internalClient.humanReview("case-123")).resolves.toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
+  });
+
+  it("validates payload and posts to the same internal human-review route", async () => {
+    const now = "2026-04-17T10:00:00.000Z";
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
+        request: {
+          id: "hr-1",
+          caseId: "case-123",
+          status: "submitted",
+          channel: "email",
+          contact: "user@example.com",
+          message: "Нужна помощь по кейсу и документам.",
+          createdAt: now,
+          updatedAt: now,
+          closedAt: null,
+          durability: "persisted",
+          snapshot: {
+            decisionId: null,
+            verdict: "GO",
+            confidence: 0.91,
+            computedAt: now,
+            lastCheckedAt: now,
+            nextActionLabel: "Подготовить документы",
+            summary: "Проверка завершена."
+          },
+          handoff: null,
+          resolution: null,
+          events: [
+            {
+              id: "event-1",
+              at: now,
+              type: "submitted",
+              status: "submitted",
+              changedBy: "traveler",
+              note: null
+            }
+          ]
+        },
+        reused: false
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+
+    await expect(
+      internalClient.submitHumanReview("case-123", {
+        channel: "email",
+        contact: "user@example.com",
+        message: "Нужна помощь по кейсу и документам."
+      })
+    ).resolves.toMatchObject({ reused: false });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
+    expect(init.body).toBe(
+      JSON.stringify({
+        channel: "email",
+        contact: "user@example.com",
+        message: "Нужна помощь по кейсу и документам."
+      })
+    );
+
+    fetchMock.mockClear();
+    await expect(
+      internalClient.submitHumanReview("case-123", {
+        channel: "email",
+        contact: "user@example.com",
+        message: "short"
+      })
+    ).rejects.toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
