@@ -1,6 +1,12 @@
-import type { DocumentCheckStatus, DocumentKind } from "@shared/contracts";
+import type {
+  DocumentCheckStatus,
+  DocumentKind,
+  DocumentParserProvider as SharedDocumentParserProvider
+} from "@shared/contracts";
 
-export type DocumentParserProvider = "stub_deterministic";
+const PARSER_PROVIDER_ID: SharedDocumentParserProvider["id"] = "deterministic_stub";
+
+export type DocumentParserProvider = SharedDocumentParserProvider["id"];
 
 export type DocumentParserStubInput = {
   documentId: string;
@@ -46,7 +52,7 @@ export function runDocumentParserStub(
       documentId: input.documentId,
       status: "check_failed",
       outcome: "upload_rejected",
-      provider: "stub_deterministic",
+      provider: PARSER_PROVIDER_ID,
       deterministic: true,
       ownership: "runtime_deterministic",
       ocrPerformed: false,
@@ -62,7 +68,7 @@ export function runDocumentParserStub(
       documentId: input.documentId,
       status: "needs_review",
       outcome: "unsupported",
-      provider: "stub_deterministic",
+      provider: PARSER_PROVIDER_ID,
       deterministic: true,
       ownership: "runtime_deterministic",
       ocrPerformed: false,
@@ -78,7 +84,7 @@ export function runDocumentParserStub(
     documentId: input.documentId,
     status: "parsing_queued",
     outcome: "queued_for_parser",
-    provider: "stub_deterministic",
+    provider: PARSER_PROVIDER_ID,
     deterministic: true,
     ownership: "runtime_deterministic",
     ocrPerformed: false,

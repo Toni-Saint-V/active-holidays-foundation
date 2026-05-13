@@ -130,6 +130,14 @@ function hasControlCharacters(value: string): boolean {
   return /[\u0000-\u001F\u007F]/u.test(value);
 }
 
+function normalizeExecutableSegment(segment: string): string {
+  return segment
+    .normalize("NFKC")
+    .replace(/[\p{White_Space}\p{Cf}]+/gu, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function validateFileName(input: string):
   | { ok: true; normalizedFileName: string }
   | { ok: false; auditReason: string } {
@@ -155,10 +163,14 @@ function validateFileName(input: string):
     return { ok: false, auditReason: "filename_has_empty_basename" };
   }
 
-  const segments = baseName.toLowerCase().split(".").filter(Boolean);
+  const segments = baseName.split(".").filter(Boolean);
   if (segments.length >= 2) {
     const nonFinalSegments = segments.slice(0, -1);
-    if (nonFinalSegments.some((segment) => EXECUTABLE_SEGMENTS.has(segment))) {
+    if (
+      nonFinalSegments.some((segment) =>
+        EXECUTABLE_SEGMENTS.has(normalizeExecutableSegment(segment))
+      )
+    ) {
       return {
         ok: false,
         auditReason: `filename_contains_suspicious_double_extension:${baseName}`

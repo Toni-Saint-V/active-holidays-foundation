@@ -119,6 +119,62 @@ describe("document upload security and trust boundary", () => {
     }
   });
 
+  it("invoice.exe .pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.exe .pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.exe NBSP .pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.exe\u00A0.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.ExE .pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.ExE .pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.exe zero-width-space .pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.exe\u200B.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
   it("executable tail extension rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
@@ -196,7 +252,9 @@ describe("document upload security and trust boundary", () => {
       expect(result.publicMessage.length).toBeGreaterThan(0);
       expect(result.auditReason.length).toBeGreaterThan(0);
       expect(result.publicMessage).not.toBe(result.auditReason);
-      expect(result.publicMessage).not.toMatch(/signature|magic|mismatch|ftyp|mz/i);
+      expect(result.publicMessage).not.toMatch(
+        /signature|magic|mismatch|ftyp|mz|internal|audit|reason/i
+      );
     }
   });
 

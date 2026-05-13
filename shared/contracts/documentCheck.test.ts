@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  documentKindSchema,
   documentCheckRunSchema,
   documentCheckStatusSchema,
   publicDocumentCheckSummarySchema
 } from "./documentCheck";
 
 describe("document check contract", () => {
+  it("defines the document kind set exactly", () => {
+    expect(documentKindSchema.options).toEqual([
+      "passport",
+      "bank_statement",
+      "hotel_booking",
+      "insurance",
+      "flight_or_route",
+      "visa_form",
+      "photo",
+      "unknown"
+    ]);
+  });
+
   it("defines the deterministic status set exactly", () => {
     expect(documentCheckStatusSchema.options).toEqual([
       "accepted",
