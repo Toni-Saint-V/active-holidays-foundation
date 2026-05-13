@@ -277,35 +277,8 @@ describe("Express API security hardening", () => {
     }
   });
 
-  it("denies sensitive case-bound routes with an invalid internal token", async () => {
-    const routes: readonly DenyCaseBoundRoute[] = [
-      { method: "GET", path: "/api/cases/s1-rf-italy/result" },
-      {
-        method: "POST",
-        path: "/api/cases/s1-rf-italy/scenarios/compare",
-        body: { title: "invalid-token-compare", signals: [] }
-      },
-      {
-        method: "POST",
-        path: "/api/cases/s1-rf-italy/recommendations/what-if-brief",
-        body: {
-          candidateCaseId: "s1-rf-italy",
-          offerId: "path_it_tourist_90",
-          offerLabel: "Italy Tourist 90"
-        }
-      },
-      {
-        method: "POST",
-        path: "/api/cases/s1-rf-italy/human-review/transition",
-        body: {
-          requestId: "hr_test",
-          status: "in_queue",
-          note: "invalid token"
-        }
-      }
-    ];
-
-    for (const route of routes) {
+  it("denies all sensitive case-bound routes with an invalid internal token (table-driven)", async () => {
+    for (const route of SENSITIVE_CASE_BOUND_ROUTES) {
       const request = await requestJson(route.method, route.path, {
         body: route.body,
         headers: INVALID_INTERNAL_HEADERS
@@ -320,11 +293,23 @@ describe("Express API security hardening", () => {
     expect(decisionsWithoutToken.response.status).toBe(403);
     expect(decisionsWithoutToken.json.error).toBe("internal_api_forbidden");
 
+    const decisionsWithInvalidToken = await requestJson("GET", "/api/decisions", {
+      headers: INVALID_INTERNAL_HEADERS
+    });
+    expect(decisionsWithInvalidToken.response.status).toBe(403);
+    expect(decisionsWithInvalidToken.json.error).toBe("internal_api_forbidden");
+
     const decisionsWithToken = await requestJson("GET", "/api/decisions", {
       headers: INTERNAL_HEADERS
     });
     expect(decisionsWithToken.response.status).toBe(200);
     expect(Array.isArray(decisionsWithToken.json.decisions)).toBe(true);
+
+    const operatorQueueWithInvalidToken = await requestJson("GET", "/api/human-review/ops/queue", {
+      headers: INVALID_INTERNAL_HEADERS
+    });
+    expect(operatorQueueWithInvalidToken.response.status).toBe(403);
+    expect(operatorQueueWithInvalidToken.json.error).toBe("internal_api_forbidden");
 
     const auditWithoutToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit");
     expect(auditWithoutToken.response.status).toBe(403);
