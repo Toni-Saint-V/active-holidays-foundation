@@ -48,6 +48,10 @@ const resultResponse = {
       capsApplied: [],
       factors: []
     },
+    evidenceStatus: "valid",
+    freshnessStatus: "fresh",
+    blockingReason: null,
+    humanReviewReason: null,
     volatilityScore: 0.1,
     sources: [],
     lastCheckedAt: "2026-04-17T10:00:00.000Z"
@@ -309,6 +313,170 @@ describe("apiClient strict productType parsing", () => {
     expect(url).not.toContain("accessToken=");
     const headers = (init.headers ?? {}) as Record<string, string>;
     expect(headers["x-active-holidays-case-access"]).toBe("t".repeat(32));
+  });
+
+  it("uses header transport for case-scoped API calls without leaking token to URL", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/result")) return okJson(resultResponse);
+      if (url.endsWith("/human-review")) {
+        if ((init?.method ?? "GET").toUpperCase() === "POST") {
+          return okJson({
+            request: {
+              id: "hr_case_1",
+              caseId: caseResponse.id,
+              status: "submitted",
+              channel: "telegram",
+              contact: "@qa_case",
+              message: "Нужна ручная проверка по безопасному каналу.",
+              createdAt: "2026-04-17T10:00:00.000Z",
+              updatedAt: "2026-04-17T10:00:00.000Z",
+              closedAt: null,
+              durability: "volatile",
+              snapshot: {
+                decisionId: null,
+                verdict: "GO",
+                confidence: 0.91,
+                computedAt: "2026-04-17T10:00:00.000Z",
+                lastCheckedAt: "2026-04-17T10:00:00.000Z",
+                nextActionLabel: "Подготовить документы",
+                summary: "Тестовый snapshot"
+              },
+              handoff: null,
+              resolution: null,
+              events: [
+                {
+                  id: "ev_1",
+                  at: "2026-04-17T10:00:00.000Z",
+                  type: "submitted",
+                  status: "submitted",
+                  changedBy: "traveler",
+                  note: null
+                }
+              ]
+            },
+            reused: false
+          });
+        }
+        return okJson({ request: null });
+      }
+      if (url.endsWith("/documents")) {
+        return okJson({
+          score: 1,
+          readyCount: 1,
+          requiredCount: 1,
+          items: []
+        });
+      }
+      if (url.endsWith("/scenarios")) {
+        return okJson({
+          rootCaseId: caseResponse.id,
+          focusCaseId: caseResponse.id,
+          baseline: scenarioSummary,
+          scenarios: [scenarioSummary],
+          comparisons: []
+        });
+      }
+      if (url.endsWith("/scenarios/compare")) {
+        return okJson({
+          rootCaseId: caseResponse.id,
+          baseline: scenarioSummary,
+          candidateCase: caseResponse,
+          comparison: {
+            baseline: scenarioSummary,
+            candidate: scenarioSummary,
+            delta: {
+              verdictChanged: false,
+              confidenceDelta: 0,
+              primaryPathChanged: false,
+              documentsScoreDelta: 0,
+              documentsReadyDelta: 0,
+              nextActionChanged: false,
+              humanReviewChanged: false,
+              addedAlternativePathIds: [],
+              removedAlternativePathIds: [],
+              changedSignalIds: [],
+              changedPreferenceIds: [],
+              changedSignals: []
+            }
+          },
+          candidateDecisionRecordId: null
+        });
+      }
+      if (url.endsWith("/scenario-lab")) {
+        return okJson({
+          version: "scenario-lab.v2",
+          caseId: caseResponse.id,
+          generatedAt: "2026-04-17T10:00:00.000Z",
+          baseResult: resultResponse,
+          issues: [],
+          scenarios: [],
+          recommendedScenarioId: null,
+          noHelpfulScenarios: false,
+          humanReviewEscalation: {
+            required: false,
+            title: "Ручная проверка не нужна",
+            detail: "Автоматический сценарий остаётся рабочим.",
+            triggeredBy: []
+          }
+        });
+      }
+      if (url.endsWith("/fork")) {
+        return okJson({
+          case: caseResponse,
+          result: resultResponse,
+          access: {
+            caseId: caseResponse.id,
+            accessToken: "u".repeat(32),
+            issuedAt: "2026-04-17T10:00:00.000Z",
+            transport: "x-active-holidays-case-access"
+          }
+        });
+      }
+      if (url.endsWith("/recompute") || url.endsWith("/override-signal")) {
+        return okJson({
+          case: caseResponse,
+          result: resultResponse
+        });
+      }
+      return okJson(caseResponse);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const token = "u".repeat(32);
+
+    await apiClient.getResult(caseResponse.id, token);
+    await apiClient.recompute(caseResponse.id, undefined, token);
+    await apiClient.overrideSignal(
+      caseResponse.id,
+      {
+        signalId: "timeline_weeks",
+        value: 3,
+        reason: "Тест",
+        appliedAt: "2026-05-13T12:00:00.000Z"
+      },
+      token
+    );
+    await apiClient.humanReview(caseResponse.id, token);
+    await apiClient.submitHumanReview(
+      caseResponse.id,
+      {
+        channel: "telegram",
+        contact: "@qa_case",
+        message: "Нужна ручная проверка по безопасному каналу."
+      },
+      token
+    );
+    await apiClient.documents(caseResponse.id, token);
+    await apiClient.fork(caseResponse.id, "Fork test", token);
+    await apiClient.scenarioFamily(caseResponse.id, token);
+    await apiClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] }, token);
+    await apiClient.decisionScenarioLab(caseResponse.id, token);
+
+    expect(fetchMock).toHaveBeenCalled();
+    for (const [url, init] of fetchMock.mock.calls as [string, RequestInit][]) {
+      expect(url).not.toContain("accessToken=");
+      const headers = (init.headers ?? {}) as Record<string, string>;
+      expect(headers["x-active-holidays-case-access"]).toBe(token);
+    }
   });
 
   it("keeps case access error code on rejected getResult", async () => {

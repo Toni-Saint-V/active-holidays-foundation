@@ -216,15 +216,19 @@ export const apiClient = {
       }
     );
   },
-  async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
+  async recommendationShortlist(id: string, accessToken?: string): Promise<RecommendationShortlist> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/recommendations/shortlist`,
-      recommendationShortlistSchema
+      recommendationShortlistSchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
   },
   async recommendationDetail(
     id: string,
-    offerId: string
+    offerId: string,
+    accessToken?: string
   ): Promise<RecommendationDetail> {
     const body = recommendationDetailRequestSchema.parse({ offerId });
     return request(
@@ -232,7 +236,8 @@ export const apiClient = {
       recommendationDetailSchema,
       {
         method: "POST",
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        headers: withCaseAccessHeader(undefined, id, accessToken)
       }
     );
   },
@@ -247,24 +252,36 @@ export const apiClient = {
       headers: withCaseAccessHeader(undefined, id, accessToken)
     });
   },
-  async recompute(id: string, preferences?: PathPreferences): Promise<CaseResultResponse> {
+  async recompute(
+    id: string,
+    preferences?: PathPreferences,
+    accessToken?: string
+  ): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/recompute`, caseResultResponseSchema, {
       method: "POST",
-      body: JSON.stringify({ preferences })
+      body: JSON.stringify({ preferences }),
+      headers: withCaseAccessHeader(undefined, id, accessToken)
     });
   },
-  async overrideSignal(id: string, override: CaseOverride): Promise<CaseResultResponse> {
+  async overrideSignal(
+    id: string,
+    override: CaseOverride,
+    accessToken?: string
+  ): Promise<CaseResultResponse> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/override-signal`,
       caseResultResponseSchema,
       {
         method: "POST",
-        body: JSON.stringify(override)
+        body: JSON.stringify(override),
+        headers: withCaseAccessHeader(undefined, id, accessToken)
       }
     );
   },
-  async audit(id: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema);
+  async audit(id: string, accessToken?: string) {
+    return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema, {
+      headers: withCaseAccessHeader(undefined, id, accessToken)
+    });
   },
   async humanReview(id: string, accessToken?: string): Promise<HumanReviewRequest | null> {
     const response = await request(
@@ -286,24 +303,32 @@ export const apiClient = {
     );
     return response.packet;
   },
-  async submitHumanReview(id: string, payload: HumanReviewCreateRequest) {
+  async submitHumanReview(
+    id: string,
+    payload: HumanReviewCreateRequest,
+    accessToken?: string
+  ) {
     const body = humanReviewCreateRequestSchema.parse(payload);
     return request(
       `/api/cases/${encodeURIComponent(id)}/human-review`,
       humanReviewCreateResponseSchema,
       {
         method: "POST",
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        headers: withCaseAccessHeader(undefined, id, accessToken)
       }
     );
   },
-  async documents(id: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema);
+  async documents(id: string, accessToken?: string) {
+    return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema, {
+      headers: withCaseAccessHeader(undefined, id, accessToken)
+    });
   },
-  async fork(id: string, title?: string): Promise<CaseResultResponse> {
+  async fork(id: string, title?: string, accessToken?: string): Promise<CaseResultResponse> {
     return request(`/api/cases/${encodeURIComponent(id)}/fork`, caseResultResponseSchema, {
       method: "POST",
-      body: JSON.stringify({ title })
+      body: JSON.stringify({ title }),
+      headers: withCaseAccessHeader(undefined, id, accessToken)
     });
   },
   async forkCaseWithSignals(
@@ -323,15 +348,19 @@ export const apiClient = {
     if (!forked.access) return patched;
     return { ...patched, access: forked.access };
   },
-  async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
+  async scenarioFamily(id: string, accessToken?: string): Promise<ScenarioLabFamily> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/scenarios`,
-      scenarioLabFamilySchema
+      scenarioLabFamilySchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
   },
   async compareScenario(
     id: string,
-    payload: ScenarioLabCompareRequest
+    payload: ScenarioLabCompareRequest,
+    accessToken?: string
   ): Promise<ScenarioLabCompareResponse> {
     const body = scenarioLabCompareRequestSchema.parse(payload);
     return request(
@@ -339,14 +368,18 @@ export const apiClient = {
       strictScenarioLabCompareResponseSchema,
       {
         method: "POST",
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        headers: withCaseAccessHeader(undefined, id, accessToken)
       }
     );
   },
-  async decisionScenarioLab(id: string): Promise<ScenarioLabPayload> {
+  async decisionScenarioLab(id: string, accessToken?: string): Promise<ScenarioLabPayload> {
     return request(
       `/api/cases/${encodeURIComponent(id)}/scenario-lab`,
-      strictScenarioLabPayloadSchema
+      strictScenarioLabPayloadSchema,
+      {
+        headers: withCaseAccessHeader(undefined, id, accessToken)
+      }
     );
   },
   async paths(caseId: string): Promise<Offer[]> {

@@ -4,6 +4,7 @@ import { nextActionSchema, actionTargetScreenSchema } from "./action";
 import { productTypeSchema } from "./product";
 import { signalIdSchema } from "./signals";
 import { verdictSchema } from "./verdict";
+import { caseAccessCredentialSchema } from "./caseAccess";
 
 export const scenarioLabPlanStatusSchema = z.enum(["normal", "human_review"]);
 export type ScenarioLabPlanStatus = z.infer<typeof scenarioLabPlanStatusSchema>;
@@ -143,6 +144,7 @@ export const scenarioLabCompareResponseSchema = z.object({
   baseline: scenarioLabSummarySchema,
   candidateCase: caseSchema,
   comparison: scenarioLabComparisonSchema,
-  candidateDecisionRecordId: z.string().min(1).nullable()
+  candidateDecisionRecordId: z.string().min(1).nullable(),
+  access: caseAccessCredentialSchema.optional()
 });
 export type ScenarioLabCompareResponse = z.infer<typeof scenarioLabCompareResponseSchema>;

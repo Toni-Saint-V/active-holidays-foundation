@@ -90,7 +90,18 @@ function allowDevSeedAccessBypass(req: Request, caseData: Case): boolean {
   return req.header(DEV_SEED_ACCESS_HEADER) === "1";
 }
 
-function requireCaseAccess(req: Request, caseData: Case): void {
+function isPublicSeedTemplateCase(caseData: Case): boolean {
+  return caseData.forkedFrom === null;
+}
+
+function requireCaseAccess(
+  req: Request,
+  caseData: Case,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): void {
+  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
+    return;
+  }
   if (allowDevSeedAccessBypass(req, caseData)) return;
   const token = caseAccessTokenFromHeader(req);
   if (!token || !getCaseStore().validateCaseAccess(caseData.id, token)) {
@@ -304,6 +315,7 @@ export function casesRouter(): Router {
 
   router.get("/:id/recommendations/shortlist", validateParams(caseIdParams), async (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     const shortlist = await buildRecommendationShortlist(caseData, result);
     if (!shortlist) {
@@ -322,6 +334,7 @@ export function casesRouter(): Router {
     validateBody(recommendationDetailRequestSchema),
     async (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const result = computeResult(caseData);
       const { offerId } = recommendationDetailRequestSchema.parse(req.body);
 
@@ -348,8 +361,10 @@ export function casesRouter(): Router {
     async (req, res) => {
       const id = getId(req);
       const baselineCase = requireCase(id);
+      requireCaseAccess(req, baselineCase);
       const payload = recommendationWhatIfBriefRequestSchema.parse(req.body);
       const candidateCase = requireCase(payload.candidateCaseId);
+      requireCaseAccess(req, candidateCase);
 
       if (!ensureSameScenarioFamily(getCaseStore(), baselineCase.id, candidateCase.id)) {
         throw new HttpError(
@@ -385,7 +400,8 @@ export function casesRouter(): Router {
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const caseData = requireCase(id);
+      requireCaseAccess(req, caseData);
       const signals = (req.body as { signals: CaseSignals }).signals;
       for (const signal of signals) {
         const parsed = signalValueSchema.safeParse({
@@ -426,6 +442,7 @@ export function casesRouter(): Router {
       const id = getId(req);
       const store = getCaseStore();
       const existing = requireCase(id);
+      requireCaseAccess(req, existing);
       const preferences = (req.body as { preferences?: typeof existing.preferences }).preferences;
       const updated = preferences
         ? store.setPreferences(existing.id, preferences) ?? existing
@@ -450,7 +467,8 @@ export function casesRouter(): Router {
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const caseData = requireCase(id);
+      requireCaseAccess(req, caseData);
       const override = req.body as z.infer<typeof caseOverrideSchema>;
       const updated = store.overrideSignal(id, override);
       if (!updated) {
@@ -472,6 +490,7 @@ export function casesRouter(): Router {
 
   router.get("/:id/audit", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json({
       trail: result.auditTrail,
@@ -481,6 +500,7 @@ export function casesRouter(): Router {
 
   router.get("/:id/documents", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(result.documents);
   });
@@ -514,6 +534,7 @@ export function casesRouter(): Router {
     validateBody(humanReviewManagerBriefRequestSchema.default({})),
     async (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const request = getCaseStore().activeHumanReviewFor(caseData.id);
       if (!request) {
         throw new HttpError(
@@ -541,6 +562,7 @@ export function casesRouter(): Router {
     validateBody(humanReviewCreateRequestSchema),
     (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const payload = humanReviewCreateRequestSchema.parse(req.body);
       const catalogs = orchestratorCatalogs(caseData.id);
       const result = computeResult(caseData, catalogs);
@@ -717,6 +739,7 @@ export function casesRouter(): Router {
 
   router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(caseData.id), result));
   });
@@ -736,6 +759,7 @@ export function casesRouter(): Router {
       const id = getId(req);
       const store = getCaseStore();
       const baselineCase = requireCase(id);
+      requireCaseAccess(req, baselineCase);
       const {
         compareToCaseId,
         title,
@@ -745,6 +769,7 @@ export function casesRouter(): Router {
 
       if (compareToCaseId) {
         const candidateCase = requireCase(compareToCaseId);
+        requireCaseAccess(req, candidateCase);
         if (!ensureSameScenarioFamily(store, baselineCase.id, candidateCase.id)) {
           throw new HttpError(
             400,
@@ -766,6 +791,10 @@ export function casesRouter(): Router {
       const forked = store.fork(id, { title });
       if (!forked) {
         throw new HttpError(500, "Не удалось создать сценарный fork.");
+      }
+      const access = store.issueCaseAccess(forked.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для сценарного fork.");
       }
 
       let candidateCase = forked;
@@ -794,21 +823,23 @@ export function casesRouter(): Router {
         }
       );
 
-      res.json(
-        buildScenarioCompareResponse({
+      res.json({
+        ...buildScenarioCompareResponse({
           store,
           baselineCase,
           candidateCase,
           candidateDecisionRecordId: record.decisionId,
           computeResult
-        })
-      );
+        }),
+        access
+      });
     }
   );
 
   router.get("/:id/drift", validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
     const currentCase = requireCase(id);
+    requireCaseAccess(req, currentCase);
     const latest = getCaseStore().latestRecordFor(id);
     if (!latest) {
       throw new HttpError(
@@ -863,7 +894,8 @@ export function casesRouter(): Router {
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const baseCase = requireCase(id);
+      requireCaseAccess(req, baseCase, { allowPublicSeedTemplateBypass: true });
       const title = (req.body as { title?: string }).title;
       const forked = store.fork(id, { title });
       if (!forked) throw new HttpError(500, "Не удалось форкнуть кейс.");

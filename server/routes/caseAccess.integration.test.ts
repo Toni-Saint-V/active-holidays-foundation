@@ -157,12 +157,54 @@ describe('case access ownership boundary', () => {
     expect(bad.status).toBe(403)
     expect(bad.json.error).toBe('case_access_forbidden')
 
+    const missingResult = await requestJson('GET', `/api/cases/${caseId}/result`)
+    expect(missingResult.status).toBe(403)
+    expect(missingResult.json.error).toBe('case_access_forbidden')
+
+    const missingHumanReview = await requestJson('GET', `/api/cases/${caseId}/human-review`)
+    expect(missingHumanReview.status).toBe(403)
+    expect(missingHumanReview.json.error).toBe('case_access_forbidden')
+
+    const badHumanReview = await requestJson(
+      'GET',
+      `/api/cases/${caseId}/human-review`,
+      undefined,
+      { [CASE_ACCESS_HEADER]: `${accessToken}-tampered` }
+    )
+    expect(badHumanReview.status).toBe(403)
+    expect(badHumanReview.json.error).toBe('case_access_forbidden')
+
+    const missingPacket = await requestJson('GET', `/api/cases/${caseId}/human-review/packet`)
+    expect(missingPacket.status).toBe(403)
+    expect(missingPacket.json.error).toBe('case_access_forbidden')
+
     const viaQuery = await requestJson(
       'GET',
       `/api/cases/${caseId}/result?accessToken=${encodeURIComponent(accessToken)}`
     )
     expect(viaQuery.status).toBe(403)
     expect(viaQuery.json.error).toBe('case_access_forbidden')
+
+    const viaQueryCase = await requestJson(
+      'GET',
+      `/api/cases/${caseId}?accessToken=${encodeURIComponent(accessToken)}`
+    )
+    expect(viaQueryCase.status).toBe(403)
+    expect(viaQueryCase.json.error).toBe('case_access_forbidden')
+
+    const viaQueryHumanReview = await requestJson(
+      'GET',
+      `/api/cases/${caseId}/human-review?accessToken=${encodeURIComponent(accessToken)}`
+    )
+    expect(viaQueryHumanReview.status).toBe(403)
+    expect(viaQueryHumanReview.json.error).toBe('case_access_forbidden')
+
+    const viaQueryPacket = await requestJson(
+      'GET',
+      `/api/cases/${caseId}/human-review/packet?accessToken=${encodeURIComponent(accessToken)}`
+    )
+    expect(viaQueryPacket.status).toBe(403)
+    expect(viaQueryPacket.json.error).toBe('case_access_forbidden')
   })
 
   it('rejects case A token when accessing case B', async () => {
@@ -178,5 +220,42 @@ describe('case access ownership boundary', () => {
 
     expect(response.status).toBe(403)
     expect(response.json.error).toBe('case_access_forbidden')
+
+    const caseRead = await requestJson('GET', `/api/cases/${caseB}`, undefined, {
+      [CASE_ACCESS_HEADER]: tokenA
+    })
+    expect(caseRead.status).toBe(403)
+    expect(caseRead.json.error).toBe('case_access_forbidden')
+
+    const humanReviewRead = await requestJson('GET', `/api/cases/${caseB}/human-review`, undefined, {
+      [CASE_ACCESS_HEADER]: tokenA
+    })
+    expect(humanReviewRead.status).toBe(403)
+    expect(humanReviewRead.json.error).toBe('case_access_forbidden')
+
+    const humanReviewPacketRead = await requestJson(
+      'GET',
+      `/api/cases/${caseB}/human-review/packet`,
+      undefined,
+      {
+        [CASE_ACCESS_HEADER]: tokenA
+      }
+    )
+    expect(humanReviewPacketRead.status).toBe(403)
+    expect(humanReviewPacketRead.json.error).toBe('case_access_forbidden')
+  })
+
+  it('rejects write and derived routes without token for forked cases', async () => {
+    const forked = await requestJson('POST', '/api/cases/s1-rf-italy/fork', {}, devHeaders)
+    expect(forked.status).toBe(200)
+    const caseId = forked.json.case.id as string
+
+    const signals = await requestJson('POST', `/api/cases/${caseId}/signals`, { signals: [] })
+    expect(signals.status).toBe(403)
+    expect(signals.json.error).toBe('case_access_forbidden')
+
+    const recompute = await requestJson('POST', `/api/cases/${caseId}/recompute`, {})
+    expect(recompute.status).toBe(403)
+    expect(recompute.json.error).toBe('case_access_forbidden')
   })
 })
