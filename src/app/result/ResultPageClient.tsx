@@ -64,31 +64,25 @@ export function ResultPageClient() {
   const resultUploadRef = useRef<HTMLInputElement | null>(null)
   const [heroImageBroken, setHeroImageBroken] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const fromFlowDocumentsFlag = params.get('documentsUploaded') === 'true'
-  const fromFlowHasCoreContext = Boolean(
-    params.get('country') && params.get('departure') && params.get('return')
-  )
-  const [documentsAddedByUser, setDocumentsAddedByUser] = useState(
-    fromFlowDocumentsFlag && fromFlowHasCoreContext
-  )
+  const [documentsAddedByUser, setDocumentsAddedByUser] = useState(false)
 
   const country = parseCountry(params.get('country'))
   const departureDate = params.get('departure')
   const returnDate = params.get('return')
+  const purpose = params.get('purpose')
   const explicitDays = parseDays(params.get('days'))
   const daysToTrip = departureDate ? daysFromDeparture(departureDate) : explicitDays
   const countryEntry = COUNTRIES[country]
   const hasBlur = Boolean(IMAGE_BLURS[country])
   const documentsUploaded = documentsAddedByUser
-  const forcedVerdict = params.get('verdict') as VerdictKind | null
 
   const missingCriticalFields = useMemo(() => {
-    return !departureDate || !returnDate || !params.get('purpose')
-  }, [departureDate, params, returnDate])
+    return !departureDate || !returnDate || !purpose
+  }, [departureDate, purpose, returnDate])
 
   const derivedVerdict = deriveVerdict(daysToTrip, missingCriticalFields)
-  const verdict = forcedVerdict === 'HUMAN_REVIEW' ? 'HUMAN_REVIEW' : derivedVerdict
-  const hasCaseId = false
+  const verdict = derivedVerdict
+  // Until Stream 1 case payload binding is wired, /result stays explicitly preliminary.
   const sourceLabel = 'ответы пользователя'
   const mapType = 'Предварительная карта'
 
@@ -101,14 +95,14 @@ export function ResultPageClient() {
       params.get('verdict'),
       params.get('days'),
       params.get('documentsUploaded'),
-      params.get('caseId'),
     ].some((value) => Boolean(value))
   }, [params])
 
-  const hasMinimalTravelContext = Boolean(
+  const hasBaseTravelContext = Boolean(
     params.get('country') && params.get('departure') && params.get('return')
   )
-  const needsRecovery = !hasContext || (!hasMinimalTravelContext && forcedVerdict !== 'HUMAN_REVIEW')
+  const hasMinimalTravelContext = hasBaseTravelContext
+  const needsRecovery = !hasContext || !hasMinimalTravelContext
 
   const status = statusFromState(verdict, documentsUploaded)
   const mainCtaLabel = verdict === 'HUMAN_REVIEW' ? 'Передать эксперту' : 'Разобрать с экспертом'
@@ -117,11 +111,11 @@ export function ResultPageClient() {
     const qp = new URLSearchParams()
     qp.set('country', country)
     qp.set('verdict', verdict)
-    qp.set('resultType', hasCaseId ? 'case' : 'preliminary')
+    qp.set('resultType', 'preliminary')
     if (departureDate) qp.set('departure', departureDate)
     if (returnDate) qp.set('return', returnDate)
     return `/human-review?${qp.toString()}`
-  }, [country, departureDate, hasCaseId, returnDate, verdict])
+  }, [country, departureDate, returnDate, verdict])
 
   function handleResultDocumentPicked(file: File | undefined) {
     if (!file) return
