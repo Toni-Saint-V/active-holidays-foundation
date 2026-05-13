@@ -8,6 +8,7 @@ Repo-level operating contract for Codex and reviewers. Keep this file short. Kee
 - `docs/workflows/codex-delivery-flow.md`
 - `docs/workflows/merge-readiness-checklist.md`
 - `docs/workflows/parallel-codex-streams.md`
+- `docs/workflows/project-handoff-ledger.md`
 - `docs/templates/codex-task-template.md`
 - `docs/templates/pr-report-template.md`
 
