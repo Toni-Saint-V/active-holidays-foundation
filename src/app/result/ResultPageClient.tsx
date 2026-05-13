@@ -240,10 +240,8 @@ export function ResultPageClient() {
   const humanReviewUrl = useMemo(() => {
     const qp = new URLSearchParams()
     qp.set('caseId', truth.caseId)
-    qp.set('country', truth.country)
-    qp.set('verdict', truth.result.verdict)
     return `/human-review?${qp.toString()}`
-  }, [truth.caseId, truth.country, truth.result.verdict])
+  }, [truth.caseId])
 
   const frameTitle = isVerified ? 'Серверный результат подтверждён' : 'Предварительный серверный результат'
   const trustLine = isVerified
