@@ -156,10 +156,9 @@ function validateFileName(input: string):
   }
 
   const segments = baseName.toLowerCase().split(".").filter(Boolean);
-  if (segments.length >= 3) {
-    const last = segments[segments.length - 1] ?? "";
-    const previous = segments[segments.length - 2] ?? "";
-    if (EXECUTABLE_SEGMENTS.has(last) && !EXECUTABLE_SEGMENTS.has(previous)) {
+  if (segments.length >= 2) {
+    const nonFinalSegments = segments.slice(0, -1);
+    if (nonFinalSegments.some((segment) => EXECUTABLE_SEGMENTS.has(segment))) {
       return {
         ok: false,
         auditReason: `filename_contains_suspicious_double_extension:${baseName}`

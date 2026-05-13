@@ -102,9 +102,10 @@ describe("document upload security and trust boundary", () => {
       })
     );
     expect(result.status).toBe("rejected");
+    if (result.status === "rejected") expect(result.reason).toBe("unsupported_extension");
   });
 
-  it("renamed exe.pdf rejected by signature mismatch", () => {
+  it("renamed exe.pdf rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
         filename: "payload.exe.pdf",
@@ -114,7 +115,21 @@ describe("document upload security and trust boundary", () => {
     );
     expect(result.status).toBe("rejected");
     if (result.status === "rejected") {
-      expect(result.reason).toBe("magic_signature_mismatch");
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("executable tail extension rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "payload.pdf.exe",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsupported_extension");
     }
   });
 
@@ -152,6 +167,18 @@ describe("document upload security and trust boundary", () => {
     });
     expect(parseResult.status).toBe("needs_review");
     expect(parseResult.outcome).toBe("unsupported");
+    expect(parseResult.verified).toBe(false);
+    expect(parseResult.ocrPerformed).toBe(false);
+  });
+
+  it("rejected upload becomes check_failed in parser stub", () => {
+    const parseResult = runDocumentParserStub({
+      documentId: "doc-2",
+      documentKind: "passport",
+      uploadStatus: "rejected"
+    });
+    expect(parseResult.status).toBe("check_failed");
+    expect(parseResult.outcome).toBe("upload_rejected");
     expect(parseResult.verified).toBe(false);
     expect(parseResult.ocrPerformed).toBe(false);
   });
