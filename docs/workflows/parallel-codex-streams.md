@@ -12,6 +12,23 @@ Run work in three explicit streams:
 2. Stream 2 - Premium UI Experience
 3. Stream 3 - AI Integrations / Infra / Audit
 
+## One-Touch Launchers
+
+Use the launchers in `docs/workflows/stream-launchers/` when each stream should start without manually pasting the prompt:
+
+- `launch-stream-1-business-core.command`
+- `launch-stream-2-premium-ui.command`
+- `launch-stream-3-ai-infra-audit.command`
+
+Each launcher performs the stream hard stops before starting Codex:
+
+- expected worktree exists
+- expected branch is active
+- working tree is clean except local `.codex/notes` or `.codex/local` notes
+- required workflow docs exist
+
+If a hard stop fails, the launcher exits before starting Codex.
+
 ## Stream 1 - Business Logic Core
 
 Owns:
