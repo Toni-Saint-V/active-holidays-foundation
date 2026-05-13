@@ -124,6 +124,18 @@ describe("Express API security hardening", () => {
     expect(health.json.status).toBe("ok");
   });
 
+  it("blocks unauthenticated case list enumeration and does not leak case payload keys", async () => {
+    const response = await requestJson("GET", "/api/cases");
+    const serialized = JSON.stringify(response.json);
+
+    expect(response.response.status).toBe(403);
+    expect(response.json.error).toBe("internal_api_forbidden");
+    expect(response.json.cases).toBeUndefined();
+    expect(serialized).not.toMatch(
+      /caseId|accessToken|resultPayload|travelProfile|readiness|documentsUploaded/i
+    );
+  });
+
   it("requires the internal API token for decision and case-operator routes", async () => {
     const decisionsWithoutToken = await requestJson("GET", "/api/decisions");
     expect(decisionsWithoutToken.response.status).toBe(403);
