@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, ChevronDown, ChevronUp, FilePlus2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { COUNTRIES } from '@/lib/countryData'
 import type { CountryCode, VerdictKind } from '@/lib/constants'
 import { cn } from '@/lib/utils'
@@ -94,6 +94,7 @@ export function EvidenceChips({
         </Chip>
         <Chip>Источник: {source}</Chip>
       </div>
+      <p className="mt-2 text-[11px] text-foreground/56 md:hidden">Прокрутите факты вправо, чтобы увидеть все основания.</p>
     </section>
   )
 }
@@ -117,8 +118,9 @@ export function AiExplanationDrawer({
   verdict: VerdictKind
   documentsUploaded: boolean
 }) {
-  const panelId = 'result-ai-explanation-panel'
-  const triggerId = 'result-ai-explanation-trigger'
+  const id = useId()
+  const panelId = `${id}-panel`
+  const triggerId = `${id}-trigger`
   const secondPoint = documentsUploaded
     ? 'Документы добавлены пользователем, но финальная верификация консульством не подтверждена.'
     : 'Документы не загружены, поэтому вывод остаётся предварительным.'

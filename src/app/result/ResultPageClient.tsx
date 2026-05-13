@@ -55,7 +55,7 @@ function statusSubtitle(status: CockpitStatus): string {
   if (status === 'DOCS_REVIEW_REQUIRED') {
     return 'Пока это предварительная карта: документы не загружены, поэтому часть рисков не подтверждена.'
   }
-  return 'Карта собрана на текущих данных кейса, но не заменяет решение консульства.'
+  return 'Карта собрана по текущим ответам пользователя и не заменяет решение консульства.'
 }
 
 export function ResultPageClient() {
@@ -64,7 +64,7 @@ export function ResultPageClient() {
   const resultUploadRef = useRef<HTMLInputElement | null>(null)
   const [heroImageBroken, setHeroImageBroken] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [documentsAddedByUser, setDocumentsAddedByUser] = useState(false)
+  const [documentSelectedLocally, setDocumentSelectedLocally] = useState(false)
 
   const country = parseCountry(params.get('country'))
   const departureDate = params.get('departure')
@@ -74,7 +74,9 @@ export function ResultPageClient() {
   const daysToTrip = departureDate ? daysFromDeparture(departureDate) : explicitDays
   const countryEntry = COUNTRIES[country]
   const hasBlur = Boolean(IMAGE_BLURS[country])
-  const documentsUploaded = documentsAddedByUser
+  // Until Stream 1 case-bound upload contracts are wired, docs verification truth stays server-owned.
+  const documentsUploaded = false
+  const documentsAddedByUser = documentSelectedLocally
 
   const missingCriticalFields = useMemo(() => {
     return !departureDate || !returnDate || !purpose
@@ -92,9 +94,7 @@ export function ResultPageClient() {
       params.get('departure'),
       params.get('return'),
       params.get('purpose'),
-      params.get('verdict'),
       params.get('days'),
-      params.get('documentsUploaded'),
     ].some((value) => Boolean(value))
   }, [params])
 
@@ -119,7 +119,7 @@ export function ResultPageClient() {
 
   function handleResultDocumentPicked(file: File | undefined) {
     if (!file) return
-    setDocumentsAddedByUser(true)
+    setDocumentSelectedLocally(true)
   }
 
   return (
@@ -177,23 +177,14 @@ export function ResultPageClient() {
             <EvidenceChips
               country={country}
               daysToTrip={daysToTrip}
-              documentsUploaded={documentsUploaded}
+              documentsUploaded={documentsAddedByUser}
               source={sourceLabel}
             />
 
-            <AiExplanationDrawer
-              open={drawerOpen}
-              onToggle={() => setDrawerOpen((current) => !current)}
-              verdict={verdict}
-              documentsUploaded={documentsUploaded}
-            />
-
             <div className="flex flex-wrap gap-2">
-              {!documentsUploaded && (
-                <SecondaryActionButton onClick={() => resultUploadRef.current?.click()}>
-                  Добавить документы
-                </SecondaryActionButton>
-              )}
+              <SecondaryActionButton onClick={() => resultUploadRef.current?.click()}>
+                {documentsAddedByUser ? 'Выбрать другой документ' : 'Добавить документы'}
+              </SecondaryActionButton>
               <button
                 type="button"
                 onClick={() => router.push('/intake')}
@@ -202,13 +193,22 @@ export function ResultPageClient() {
                 Вернуться к анкете
               </button>
             </div>
+            <p aria-live="polite" className="text-[11px] text-foreground/58">
+              {documentsAddedByUser
+                ? 'Файл выбран локально. Проверка документов появится после подтверждения в системе.'
+                : 'Документы ещё не подтверждены системой.'}
+            </p>
 
-            <section className="fixed inset-x-5 bottom-[calc(8px+env(safe-area-inset-bottom))] z-20 border-t border-white/10 bg-[linear-gradient(180deg,rgba(7,8,6,0),#070806_35%,#070806)] pt-4 md:static md:inset-auto md:z-auto md:mt-auto md:border-t-0 md:bg-none md:pt-2">
+            <AiExplanationDrawer
+              open={drawerOpen}
+              onToggle={() => setDrawerOpen((current) => !current)}
+              verdict={verdict}
+              documentsUploaded={documentsAddedByUser}
+            />
+
+            <section className="fixed inset-x-5 bottom-[calc(8px+env(safe-area-inset-bottom))] z-20 border-t border-white/10 bg-[#070806]/95 pt-2 md:static md:inset-auto md:z-auto md:mt-auto md:border-t-0 md:bg-transparent md:pt-0">
               <div className="md:max-w-[760px]">
                 <AmberCTA onClick={() => router.push(humanReviewUrl)}>{mainCtaLabel}</AmberCTA>
-                <p className="mt-3 text-center text-[11px] leading-snug text-foreground/52">
-                  Без гарантий: карта помогает понять риски и следующий шаг перед подачей.
-                </p>
               </div>
             </section>
           </section>
