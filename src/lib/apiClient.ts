@@ -175,6 +175,129 @@ export function createInternalCasesApiClient(internalApiToken: string) {
   const internalHeaders = withInternalToken(internalApiToken);
 
   return {
+    async getCase(id: string): Promise<Case> {
+      return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema, {
+        headers: internalHeaders
+      });
+    },
+    async getResult(id: string): Promise<ResultPayload> {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/result`,
+        strictResultPayloadSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+    },
+    async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/recommendations/shortlist`,
+        recommendationShortlistSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+    },
+    async recommendationDetail(
+      id: string,
+      offerId: string
+    ): Promise<RecommendationDetail> {
+      const body = recommendationDetailRequestSchema.parse({ offerId });
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/recommendations/detail`,
+        recommendationDetailSchema,
+        {
+          method: "POST",
+          headers: internalHeaders,
+          body: JSON.stringify(body)
+        }
+      );
+    },
+    async patchSignals(id: string, signals: CaseSignals) {
+      return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {
+        method: "POST",
+        headers: internalHeaders,
+        body: JSON.stringify({ signals })
+      });
+    },
+    async recompute(id: string, preferences?: PathPreferences) {
+      return request(`/api/cases/${encodeURIComponent(id)}/recompute`, caseResultResponseSchema, {
+        method: "POST",
+        headers: internalHeaders,
+        body: JSON.stringify({ preferences })
+      });
+    },
+    async overrideSignal(id: string, override: CaseOverride) {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/override-signal`,
+        caseResultResponseSchema,
+        {
+          method: "POST",
+          headers: internalHeaders,
+          body: JSON.stringify(override)
+        }
+      );
+    },
+    async audit(id: string) {
+      return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema, {
+        headers: internalHeaders
+      });
+    },
+    async documents(id: string) {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/documents`,
+        documentsReadinessSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+    },
+    async fork(id: string, title?: string) {
+      return request(`/api/cases/${encodeURIComponent(id)}/fork`, caseResultResponseSchema, {
+        method: "POST",
+        headers: internalHeaders,
+        body: JSON.stringify({ title })
+      });
+    },
+    async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/scenarios`,
+        scenarioLabFamilySchema,
+        {
+          headers: internalHeaders
+        }
+      );
+    },
+    async compareScenario(
+      id: string,
+      payload: ScenarioLabCompareRequest
+    ): Promise<ScenarioLabCompareResponse> {
+      const body = scenarioLabCompareRequestSchema.parse(payload);
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/scenarios/compare`,
+        strictScenarioLabCompareResponseSchema,
+        {
+          method: "POST",
+          headers: internalHeaders,
+          body: JSON.stringify(body)
+        }
+      );
+    },
+    async decisionScenarioLab(id: string): Promise<ScenarioLabPayload> {
+      return request(
+        `/api/cases/${encodeURIComponent(id)}/scenario-lab`,
+        strictScenarioLabPayloadSchema,
+        {
+          headers: internalHeaders
+        }
+      );
+    },
+    async decisions(): Promise<DecisionLogEntry[]> {
+      const response = await request("/api/decisions", decisionsResponseSchema, {
+        headers: internalHeaders
+      });
+      return response.decisions;
+    },
     async humanReview(id: string): Promise<HumanReviewRequest | null> {
       const response = await request(
         `/api/cases/${encodeURIComponent(id)}/human-review`,
@@ -222,95 +345,6 @@ export const apiClient = {
       })
     );
   },
-  async getCase(id: string): Promise<Case> {
-    return request(`/api/cases/${encodeURIComponent(id)}`, strictCaseSchema);
-  },
-  async getResult(id: string): Promise<ResultPayload> {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/result`,
-      strictResultPayloadSchema
-    );
-  },
-  async recommendationShortlist(id: string): Promise<RecommendationShortlist> {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/recommendations/shortlist`,
-      recommendationShortlistSchema
-    );
-  },
-  async recommendationDetail(
-    id: string,
-    offerId: string
-  ): Promise<RecommendationDetail> {
-    const body = recommendationDetailRequestSchema.parse({ offerId });
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/recommendations/detail`,
-      recommendationDetailSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(body)
-      }
-    );
-  },
-  async patchSignals(id: string, signals: CaseSignals) {
-    return request(`/api/cases/${encodeURIComponent(id)}/signals`, caseResultResponseSchema, {
-      method: "POST",
-      body: JSON.stringify({ signals })
-    });
-  },
-  async recompute(id: string, preferences?: PathPreferences) {
-    return request(`/api/cases/${encodeURIComponent(id)}/recompute`, caseResultResponseSchema, {
-      method: "POST",
-      body: JSON.stringify({ preferences })
-    });
-  },
-  async overrideSignal(id: string, override: CaseOverride) {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/override-signal`,
-      caseResultResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(override)
-      }
-    );
-  },
-  async audit(id: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/audit`, auditResponseSchema);
-  },
-  async documents(id: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/documents`, documentsReadinessSchema);
-  },
-  async fork(id: string, title?: string) {
-    return request(`/api/cases/${encodeURIComponent(id)}/fork`, caseResultResponseSchema, {
-      method: "POST",
-      body: JSON.stringify({ title })
-    });
-  },
-  async scenarioFamily(id: string): Promise<ScenarioLabFamily> {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/scenarios`,
-      scenarioLabFamilySchema
-    );
-  },
-  async compareScenario(
-    id: string,
-    payload: ScenarioLabCompareRequest
-  ): Promise<ScenarioLabCompareResponse> {
-    const body = scenarioLabCompareRequestSchema.parse(payload);
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/scenarios/compare`,
-      strictScenarioLabCompareResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(body)
-      }
-    );
-  },
-  async decisionScenarioLab(id: string): Promise<ScenarioLabPayload> {
-    return request(
-      `/api/cases/${encodeURIComponent(id)}/scenario-lab`,
-      strictScenarioLabPayloadSchema
-    );
-  },
   async paths(caseId: string): Promise<Offer[]> {
     const response = await request(
       `/api/paths/${encodeURIComponent(caseId)}`,
@@ -343,10 +377,6 @@ export const apiClient = {
       `/api/intake/preview/${encodeURIComponent(caseId)}`,
       intakePreviewSchema
     );
-  },
-  async decisions(): Promise<DecisionLogEntry[]> {
-    const response = await request("/api/decisions", decisionsResponseSchema);
-    return response.decisions;
   },
   async scenarios(): Promise<ScenarioCard[]> {
     const response = await request("/api/scenarios", scenariosResponseSchema);

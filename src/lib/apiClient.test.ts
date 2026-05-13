@@ -148,9 +148,12 @@ function okJson(body: unknown): Response {
 }
 
 describe("apiClient strict productType parsing", () => {
+  let internalClient: ReturnType<typeof createInternalCasesApiClient>;
+
   beforeEach(() => {
     configureApiBase("http://api.test");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    internalClient = createInternalCasesApiClient("internal-test-token");
   });
 
   afterEach(() => {
@@ -162,7 +165,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = caseResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(apiClient.getCase(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.getCase(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -172,7 +175,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = resultResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -190,7 +193,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -209,7 +212,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.recompute(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.recompute(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -239,7 +242,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(apiClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
+    await expect(internalClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -278,7 +281,7 @@ describe("apiClient strict productType parsing", () => {
     );
 
     await expect(
-      apiClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
+      internalClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
     ).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
@@ -303,7 +306,7 @@ describe("apiClient strict productType parsing", () => {
   });
 });
 
-describe("apiClient internal/public human-review boundary", () => {
+describe("apiClient internal/public boundary", () => {
   beforeEach(() => {
     configureApiBase("http://api.test");
   });
@@ -313,10 +316,42 @@ describe("apiClient internal/public human-review boundary", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not expose internal human-review methods on public client", () => {
+  it("does not expose internal-only case-bound methods on public client", () => {
+    expect("getCase" in apiClient).toBe(false);
+    expect("getResult" in apiClient).toBe(false);
+    expect("recommendationShortlist" in apiClient).toBe(false);
+    expect("recommendationDetail" in apiClient).toBe(false);
+    expect("patchSignals" in apiClient).toBe(false);
+    expect("recompute" in apiClient).toBe(false);
+    expect("overrideSignal" in apiClient).toBe(false);
+    expect("audit" in apiClient).toBe(false);
+    expect("documents" in apiClient).toBe(false);
+    expect("fork" in apiClient).toBe(false);
+    expect("scenarioFamily" in apiClient).toBe(false);
+    expect("compareScenario" in apiClient).toBe(false);
+    expect("decisionScenarioLab" in apiClient).toBe(false);
+    expect("decisions" in apiClient).toBe(false);
     expect("humanReview" in apiClient).toBe(false);
     expect("humanReviewCasePacket" in apiClient).toBe(false);
     expect("submitHumanReview" in apiClient).toBe(false);
+  });
+
+  it("sends internal token header for internal case reads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson(caseResponse));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-test-token");
+    await expect(internalClient.getCase("case-123")).resolves.toMatchObject({
+      id: caseResponse.id
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/case-123");
+    expect(init.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "x-active-holidays-internal-token": "internal-test-token"
+    });
   });
 
   it("sends internal token header for internal human-review GET", async () => {
