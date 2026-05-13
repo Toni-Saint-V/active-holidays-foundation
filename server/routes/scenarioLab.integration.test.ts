@@ -5,6 +5,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Duplex } from "node:stream";
+import { CASE_ACCESS_HEADER } from "@shared/contracts";
 import { createApp } from "../index";
 import { getCatalogsOrThrow, loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
 import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
@@ -103,19 +104,23 @@ afterAll(async () => {
 async function requestJson(
   method: "GET" | "POST",
   path: string,
-  body?: unknown
+  body?: unknown,
+  headers?: Record<string, string>
 ) {
   const payload = body === undefined ? null : JSON.stringify(body);
   const socket = new MockSocket();
   const req = new IncomingMessage(socket as never);
   req.method = method;
   req.url = path;
-  req.headers = payload
-    ? {
-        "content-type": "application/json",
-        "content-length": String(Buffer.byteLength(payload))
-      }
-    : {};
+  req.headers = {
+    ...(payload
+      ? {
+          "content-type": "application/json",
+          "content-length": String(Buffer.byteLength(payload))
+        }
+      : {}),
+    ...(headers ?? {})
+  };
   if (payload) req.push(payload);
   req.push(null);
 
@@ -155,8 +160,8 @@ async function requestJson(
   return { status: res.statusCode, json } as const;
 }
 
-async function getJson(path: string) {
-  return requestJson("GET", path);
+async function getJson(path: string, headers?: Record<string, string>) {
+  return requestJson("GET", path, undefined, headers);
 }
 
 async function postJson(path: string, body?: unknown) {
@@ -332,8 +337,11 @@ describe("scenario lab HTTP surface", () => {
       ]
     });
     const candidateId = compare.json.candidateCase.id as string;
+    const accessToken = compare.json.access.accessToken as string;
 
-    const family = await getJson(`/api/cases/${candidateId}/scenarios`);
+    const family = await getJson(`/api/cases/${candidateId}/scenarios`, {
+      [CASE_ACCESS_HEADER]: accessToken
+    });
     expect(family.status).toBe(200);
     expect(family.json.rootCaseId).toBe("s4-rf-residency-dnv");
     expect(family.json.focusCaseId).toBe(candidateId);

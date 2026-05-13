@@ -746,7 +746,8 @@ export function casesRouter(): Router {
 
   router.get("/:id/scenarios", validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
-    requireCase(id);
+    const caseData = requireCase(id);
+    requireCaseAccess(req, caseData);
     const family = buildScenarioFamily(getCaseStore(), id, computeResult);
     res.json(family);
   });
