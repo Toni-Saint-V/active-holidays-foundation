@@ -4,10 +4,14 @@ import { ChevronLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AmberCTA } from '@/components/AmberCTA'
 import {
   AiExplanationDrawer,
+  type CockpitMapType,
+  type CockpitSource,
+  documentTruthDetail,
+  type DocumentTruthState,
   type CockpitStatus,
   EvidenceChips,
   PremiumStatusCard,
@@ -15,31 +19,125 @@ import {
   ResultRecoveryCard,
   SecondaryActionButton,
 } from '@/components/ResultCockpit'
+import { apiClient, ApiError } from '@/lib/apiClient'
 import { COUNTRIES } from '@/lib/countryData'
 import { ENGINE_CLASS, type CountryCode, type VerdictKind } from '@/lib/constants'
 import { IMAGE_BLURS } from '@/lib/imageBlurs'
-import { deriveVerdict } from '@/lib/verdict'
+import type { Case, ResultPayload, SignalId } from '@shared/contracts'
 
-const VALID_COUNTRIES: CountryCode[] = ['IT', 'ES', 'FR', 'GR']
-function parseCountry(value: string | null): CountryCode {
-  if (!value) return 'IT'
+const DESTINATION_SIGNAL_ID: SignalId = 'destination'
+const TIMELINE_WEEKS_SIGNAL_ID: SignalId = 'timeline_weeks'
+
+function parseCountry(value: string | null): CountryCode | null {
+  if (!value) return null
   const upper = value.toUpperCase() as CountryCode
-  return VALID_COUNTRIES.includes(upper) ? upper : 'IT'
+  return upper in COUNTRIES ? upper : null
 }
 
-function parseDays(value: string | null): number {
-  if (!value) return 24
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 24
-  return Math.max(0, Math.round(parsed))
+function parseTimelineWeeks(value: unknown): number | null {
+  if (typeof value !== 'number') return null
+  if (!Number.isFinite(value)) return null
+  const weeks = Math.round(value)
+  if (weeks < 0) return null
+  return weeks
 }
 
-function daysFromDeparture(value: string | null): number {
-  if (!value) return 24
-  const departure = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(departure.getTime())) return 24
-  const diff = departure.getTime() - Date.now()
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+function daysFromWeeks(weeks: number | null): number | null {
+  if (weeks == null) return null
+  if (!Number.isFinite(weeks)) return null
+  return Math.max(0, Math.round(weeks * 7))
+}
+
+function countryFromCase(caseData: Case | null): CountryCode | null {
+  if (!caseData) return null
+  const destinationSignal = caseData.signals.find((signal) => signal.id === DESTINATION_SIGNAL_ID)
+  if (!destinationSignal || typeof destinationSignal.value !== 'string') return null
+  return parseCountry(destinationSignal.value)
+}
+
+function timelineWeeksFromCase(caseData: Case | null): number | null {
+  if (!caseData) return null
+  const timelineSignal = caseData.signals.find((signal) => signal.id === TIMELINE_WEEKS_SIGNAL_ID)
+  return parseTimelineWeeks(timelineSignal?.value)
+}
+
+function getDocumentTruthState(documentsConfirmedBySystem: boolean, documentsSelectedLocally: boolean): DocumentTruthState {
+  if (documentsConfirmedBySystem) {
+    return 'SYSTEM_CONFIRMED'
+  }
+  if (documentsSelectedLocally) {
+    return 'LOCAL_PENDING'
+  }
+  return 'UNCONFIRMED'
+}
+
+function useResultCaseBinding(caseId: string) {
+  const [resultPayload, setResultPayload] = useState<ResultPayload | null>(null)
+  const [caseData, setCaseData] = useState<Case | null>(null)
+  const [resultLoading, setResultLoading] = useState(Boolean(caseId))
+  const [hasFetched, setHasFetched] = useState(false)
+  const [resultError, setResultError] = useState<string | null>(null)
+  const [caseDataWarning, setCaseDataWarning] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!caseId) {
+      setResultPayload(null)
+      setCaseData(null)
+      setResultError(null)
+      setCaseDataWarning(null)
+      setResultLoading(false)
+      setHasFetched(false)
+      return
+    }
+
+    setResultLoading(true)
+    setHasFetched(false)
+    setResultError(null)
+    setCaseDataWarning(null)
+
+    void Promise.allSettled([apiClient.getResult(caseId), apiClient.getCase(caseId)])
+      .then(([resultResponse, caseResponse]) => {
+        if (cancelled) return
+        if (resultResponse.status === 'fulfilled') {
+          setResultPayload(resultResponse.value)
+        } else {
+          setResultPayload(null)
+          const reason = resultResponse.reason
+          if (reason instanceof ApiError) {
+            setResultError(reason.message)
+          } else {
+            setResultError('Не удалось получить данные кейса.')
+          }
+        }
+
+        if (caseResponse.status === 'fulfilled') {
+          setCaseData(caseResponse.value)
+        } else {
+          setCaseData(null)
+          setCaseDataWarning('Часть фактов по кейсу недоступна. Карта показывает только подтверждённый результат.')
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setResultPayload(null)
+        setCaseData(null)
+        setCaseDataWarning(null)
+        setResultError(error instanceof ApiError ? error.message : 'Не удалось получить данные кейса.')
+      })
+      .finally(() => {
+        if (cancelled) return
+        setResultLoading(false)
+        setHasFetched(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [caseId])
+
+  return { resultPayload, caseData, resultLoading, hasFetched, resultError, caseDataWarning }
 }
 
 function statusFromState(verdict: VerdictKind, documentsUploaded: boolean): CockpitStatus {
@@ -48,14 +146,24 @@ function statusFromState(verdict: VerdictKind, documentsUploaded: boolean): Cock
   return 'PRELIMINARY'
 }
 
-function statusSubtitle(status: CockpitStatus): string {
-  if (status === 'EXPERT_REQUIRED') {
-    return 'Кейс нестандартный или сжат по срокам. Нужен экспертный разбор перед следующим действием.'
+function assertNever(value: never): never {
+  throw new Error(`Unhandled cockpit status: ${String(value)}`)
+}
+
+function statusSubtitle(status: CockpitStatus, source: CockpitSource): string {
+  switch (status) {
+    case 'EXPERT_REQUIRED':
+      return 'Кейс нестандартный или сжат по срокам. Нужен экспертный разбор перед следующим действием.'
+    case 'DOCS_REVIEW_REQUIRED':
+      return 'Пока это предварительная карта: документы не загружены, поэтому часть рисков не подтверждена.'
+    case 'PRELIMINARY':
+      if (source === 'CASE_DATA') {
+        return 'Карта собрана по данным кейса, но не заменяет решение консульства.'
+      }
+      return 'Карта собрана по текущим ответам пользователя и не заменяет решение консульства.'
+    default:
+      return assertNever(status)
   }
-  if (status === 'DOCS_REVIEW_REQUIRED') {
-    return 'Пока это предварительная карта: документы не загружены, поэтому часть рисков не подтверждена.'
-  }
-  return 'Карта собрана по текущим ответам пользователя и не заменяет решение консульства.'
 }
 
 export function ResultPageClient() {
@@ -66,60 +174,56 @@ export function ResultPageClient() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [documentSelectedLocally, setDocumentSelectedLocally] = useState(false)
 
-  const country = parseCountry(params.get('country'))
-  const departureDate = params.get('departure')
-  const returnDate = params.get('return')
-  const purpose = params.get('purpose')
-  const explicitDays = parseDays(params.get('days'))
-  const daysToTrip = departureDate ? daysFromDeparture(departureDate) : explicitDays
-  const countryEntry = COUNTRIES[country]
-  const hasBlur = Boolean(IMAGE_BLURS[country])
-  // Until Stream 1 case-bound upload contracts are wired, docs verification truth stays server-owned.
-  const documentsUploaded = false
-  const documentsAddedByUser = documentSelectedLocally
+  const caseId = params.get('caseId')?.trim() ?? ''
+  const { resultPayload, caseData, resultLoading, hasFetched, resultError, caseDataWarning } = useResultCaseBinding(caseId)
 
-  const missingCriticalFields = useMemo(() => {
-    return !departureDate || !returnDate || !purpose
-  }, [departureDate, purpose, returnDate])
+  useEffect(() => {
+    setDocumentSelectedLocally(false)
+    if (resultUploadRef.current) {
+      resultUploadRef.current.value = ''
+    }
+  }, [caseId])
 
-  const derivedVerdict = deriveVerdict(daysToTrip, missingCriticalFields)
-  const verdict = derivedVerdict
-  // Until Stream 1 case payload binding is wired, /result stays explicitly preliminary.
-  const sourceLabel = 'ответы пользователя'
-  const mapType = 'Предварительная карта'
-
-  const hasContext = useMemo(() => {
-    return [
-      params.get('country'),
-      params.get('departure'),
-      params.get('return'),
-      params.get('purpose'),
-      params.get('days'),
-    ].some((value) => Boolean(value))
-  }, [params])
-
-  const hasBaseTravelContext = Boolean(
-    params.get('country') && params.get('departure') && params.get('return')
+  const resolvedVerdict: VerdictKind = resultPayload?.verdict ?? 'HUMAN_REVIEW'
+  const country = useMemo(() => {
+    return countryFromCase(caseData)
+  }, [caseData])
+  const daysToTrip = useMemo(() => {
+    const weeks = timelineWeeksFromCase(caseData)
+    return daysFromWeeks(weeks)
+  }, [caseData])
+  const hasBlur = Boolean(country && IMAGE_BLURS[country])
+  const countryEntry = country ? COUNTRIES[country] : null
+  const documentsBackedBySystem = Boolean(
+    resultPayload &&
+      resultPayload.documents.readyCount >= resultPayload.documents.requiredCount
   )
-  const hasMinimalTravelContext = hasBaseTravelContext
-  const needsRecovery = !hasContext || !hasMinimalTravelContext
+  const documentsAddedByUser = documentSelectedLocally
+  const documentTruthState = getDocumentTruthState(documentsBackedBySystem, documentsAddedByUser)
+  const sourceLabel: CockpitSource = 'CASE_DATA'
+  const mapType: CockpitMapType = 'CASE_BOUND'
+  const mainRiskLabel =
+    resultPayload?.criticalRisk?.label ?? (resolvedVerdict === 'HUMAN_REVIEW' ? 'нужна экспертная проверка' : 'часть данных не подтверждена')
 
-  const status = statusFromState(verdict, documentsUploaded)
-  const mainCtaLabel = verdict === 'HUMAN_REVIEW' ? 'Передать эксперту' : 'Разобрать с экспертом'
+  const hasCaseBoundTruth = Boolean(resultPayload)
+  const needsRecovery = !caseId || (hasFetched && !resultLoading && !hasCaseBoundTruth)
+  const status = hasCaseBoundTruth ? statusFromState(resolvedVerdict, documentsBackedBySystem) : 'DOCS_REVIEW_REQUIRED'
+  const mainCtaLabel = resolvedVerdict === 'HUMAN_REVIEW' ? 'Передать эксперту' : 'Разобрать с экспертом'
 
   const humanReviewUrl = useMemo(() => {
+    if (!hasCaseBoundTruth) return '/human-review'
     const qp = new URLSearchParams()
-    qp.set('country', country)
-    qp.set('verdict', verdict)
-    qp.set('resultType', 'preliminary')
-    if (departureDate) qp.set('departure', departureDate)
-    if (returnDate) qp.set('return', returnDate)
+    qp.set('verdict', resolvedVerdict)
+    qp.set('resultType', 'case')
+    if (caseId) qp.set('caseId', caseId)
     return `/human-review?${qp.toString()}`
-  }, [country, departureDate, returnDate, verdict])
+  }, [caseId, hasCaseBoundTruth, resolvedVerdict])
 
-  function handleResultDocumentPicked(file: File | undefined) {
+  function handleResultDocumentPicked(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
     if (!file) return
     setDocumentSelectedLocally(true)
+    event.target.value = ''
   }
 
   return (
@@ -130,13 +234,13 @@ export function ResultPageClient() {
       >
         {!heroImageBroken && (
           <Image
-            src={countryEntry.heroImage}
+            src={countryEntry?.heroImage ?? COUNTRIES.IT.heroImage}
             alt=""
             aria-hidden
             fill
             sizes="100vw"
             placeholder={hasBlur ? 'blur' : 'empty'}
-            blurDataURL={hasBlur ? IMAGE_BLURS[country] : undefined}
+            blurDataURL={hasBlur && country ? IMAGE_BLURS[country] : undefined}
             onError={() => setHeroImageBroken(true)}
             className="pointer-events-none absolute inset-0 -z-10 object-cover opacity-[0.16] saturate-[0.86]"
           />
@@ -158,26 +262,47 @@ export function ResultPageClient() {
           type="file"
           className="sr-only"
           accept=".pdf,.png,.jpg,.jpeg,.heic,.webp"
-          onChange={(event) => handleResultDocumentPicked(event.target.files?.[0])}
+          onChange={handleResultDocumentPicked}
         />
 
-        {needsRecovery ? (
+        {resultLoading ? (
           <section className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
-            <ResultRecoveryCard />
+            <ResultRecoveryCard
+              badgeLabel="Загрузка карты"
+              title="Открываем карту кейса"
+              description="Получаем подтверждённые данные. Если загрузка затянулась, вернитесь к анкете и проверьте caseId."
+            />
+            <div className="mt-auto pt-6">
+              <AmberCTA onClick={() => router.push('/intake')}>Вернуться к анкете</AmberCTA>
+            </div>
+          </section>
+        ) : needsRecovery ? (
+          <section className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
+            <ResultRecoveryCard
+              title="Не удалось открыть карту поездки"
+              description={
+                resultError ??
+                'Данных недостаточно для честного вывода. Вернитесь к анкете и заполните ключевые поля поездки.'
+              }
+            />
             <div className="mt-auto pt-6">
               <AmberCTA onClick={() => router.push('/intake')}>Вернуться к анкете</AmberCTA>
             </div>
           </section>
         ) : (
-          <section className="mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-4 pb-28 md:pb-0">
+          <section
+            className={`mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-4 ${
+              drawerOpen ? 'pb-[calc(236px+env(safe-area-inset-bottom))]' : 'pb-[calc(128px+env(safe-area-inset-bottom))]'
+            } md:pb-0`}
+          >
             <ResultCockpitHeader country={country} daysToTrip={daysToTrip} mapType={mapType} />
 
-            <PremiumStatusCard status={status} subtitle={statusSubtitle(status)} />
+            <PremiumStatusCard status={status} mainRiskLabel={mainRiskLabel} subtitle={statusSubtitle(status, sourceLabel)} />
 
             <EvidenceChips
               country={country}
               daysToTrip={daysToTrip}
-              documentsUploaded={documentsAddedByUser}
+              documentTruthState={documentTruthState}
               source={sourceLabel}
             />
 
@@ -194,19 +319,25 @@ export function ResultPageClient() {
               </button>
             </div>
             <p aria-live="polite" className="text-[11px] text-foreground/58">
-              {documentsAddedByUser
-                ? 'Файл выбран локально. Проверка документов появится после подтверждения в системе.'
-                : 'Документы ещё не подтверждены системой.'}
+              {documentTruthDetail(documentTruthState)}
             </p>
+            {caseDataWarning ? <p className="text-[11px] text-foreground/58">{caseDataWarning}</p> : null}
 
             <AiExplanationDrawer
               open={drawerOpen}
               onToggle={() => setDrawerOpen((current) => !current)}
-              verdict={verdict}
-              documentsUploaded={documentsAddedByUser}
+              verdict={resolvedVerdict}
+              mainRiskLabel={mainRiskLabel}
+              documentTruthState={documentTruthState}
             />
 
-            <section className="fixed inset-x-5 bottom-[calc(8px+env(safe-area-inset-bottom))] z-20 border-t border-white/10 bg-[#070806]/95 pt-2 md:static md:inset-auto md:z-auto md:mt-auto md:border-t-0 md:bg-transparent md:pt-0">
+            <section
+              className={`${
+                drawerOpen
+                  ? 'mt-2 border-t border-white/10 bg-[#070806]/95 pt-2'
+                  : 'fixed inset-x-5 bottom-[calc(8px+env(safe-area-inset-bottom))] z-20 border-t border-white/10 bg-[#070806]/95 pt-2'
+              } md:static md:inset-auto md:z-auto md:mt-auto md:border-t-0 md:bg-transparent md:pt-0`}
+            >
               <div className="md:max-w-[760px]">
                 <AmberCTA onClick={() => router.push(humanReviewUrl)}>{mainCtaLabel}</AmberCTA>
               </div>
