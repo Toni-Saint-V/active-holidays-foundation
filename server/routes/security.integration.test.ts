@@ -94,6 +94,12 @@ type DenyCaseBoundRoute = {
   body?: unknown;
 };
 
+type DenyInternalRoute = {
+  method: "GET" | "POST";
+  path: string;
+  body?: unknown;
+};
+
 const SENSITIVE_CASE_BOUND_ROUTES: readonly DenyCaseBoundRoute[] = [
   { method: "GET", path: "/api/cases/s1-rf-italy" },
   { method: "GET", path: "/api/cases/s1-rf-italy/result" },
@@ -174,6 +180,26 @@ const SENSITIVE_CASE_BOUND_ROUTES: readonly DenyCaseBoundRoute[] = [
   {
     method: "POST",
     path: "/api/cases/s1-rf-italy/fork",
+    body: {}
+  }
+];
+
+const SENSITIVE_WORKBENCH_ROUTES: readonly DenyInternalRoute[] = [
+  { method: "GET", path: "/api/human-review/ops/queue" },
+  { method: "GET", path: "/api/human-review/ops/requests/hr_missing-case_1" },
+  {
+    method: "POST",
+    path: "/api/human-review/ops/requests/hr_missing-case_1/actions",
+    body: {}
+  },
+  { method: "GET", path: "/api/human-review/learning/summary" },
+  { method: "GET", path: "/api/human-review/learning/events" },
+  { method: "GET", path: "/api/human-review/learning/top-blockers" },
+  { method: "GET", path: "/api/human-review/learning/trust-calibration" },
+  { method: "GET", path: "/api/human-review/learning/trust-calibration/cockpit" },
+  {
+    method: "POST",
+    path: "/api/human-review/learning/ingest",
     body: {}
   }
 ];
@@ -319,6 +345,17 @@ describe("Express API security hardening", () => {
       headers: INTERNAL_HEADERS
     });
     expect(auditWithToken.response.status).toBe(200);
+  });
+
+  it("denies workbench routes with an invalid internal token (table-driven)", async () => {
+    for (const route of SENSITIVE_WORKBENCH_ROUTES) {
+      const request = await requestJson(route.method, route.path, {
+        body: route.body,
+        headers: INVALID_INTERNAL_HEADERS
+      });
+      expect(request.response.status, `${route.method} ${route.path}`).toBe(403);
+      expect(request.json.error, `${route.method} ${route.path}`).toBe("internal_api_forbidden");
+    }
   });
 
   it("fails closed for human-review packet and manager brief routes without token", async () => {
