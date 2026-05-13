@@ -96,6 +96,20 @@ const EXECUTABLE_SEGMENTS = new Set([
   "sh"
 ]);
 
+const CONFUSABLE_ASCII_CODEPOINT_MAP = new Map<number, string>([
+  [0x03b5, "e"], // Greek epsilon
+  [0x0430, "a"], // Cyrillic a
+  [0x0435, "e"], // Cyrillic e
+  [0x043e, "o"], // Cyrillic o
+  [0x0440, "p"], // Cyrillic er
+  [0x0441, "c"], // Cyrillic es
+  [0x0445, "x"], // Cyrillic ha
+  [0x0443, "y"], // Cyrillic u
+  [0x0456, "i"], // Cyrillic i
+  [0x0458, "j"], // Cyrillic je
+  [0x0455, "s"] // Cyrillic dze
+]);
+
 function normalizeMimeType(raw: string): string {
   return raw.trim().toLowerCase().split(";", 1)[0] ?? "";
 }
@@ -131,10 +145,19 @@ function hasControlCharacters(value: string): boolean {
 }
 
 function normalizeExecutableSegment(segment: string): string {
-  return segment
+  const normalized = segment
     .normalize("NFKC")
     .replace(/[\p{White_Space}\p{Cf}]+/gu, "")
     .toLowerCase();
+
+  let skeleton = "";
+  for (const char of normalized) {
+    const codePoint = char.codePointAt(0);
+    skeleton +=
+      (codePoint === undefined ? undefined : CONFUSABLE_ASCII_CODEPOINT_MAP.get(codePoint)) ??
+      char;
+  }
+  return skeleton;
 }
 
 function validateFileName(input: string):

@@ -189,6 +189,34 @@ describe("document upload security and trust boundary", () => {
     }
   });
 
+  it("invoice.cyrillic-еxе.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u0435x\u0435.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
+  it("invoice.greek-εxε.pdf rejected", () => {
+    const result = validateDocumentUpload(
+      buildInput({
+        filename: "invoice.\u03B5x\u03B5.pdf",
+        mimeType: "application/pdf",
+        content: bytes([0x25, 0x50, 0x44, 0x46, 0x2d])
+      })
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status === "rejected") {
+      expect(result.reason).toBe("unsafe_filename");
+    }
+  });
+
   it("executable tail extension rejected", () => {
     const result = validateDocumentUpload(
       buildInput({
