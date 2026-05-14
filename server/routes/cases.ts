@@ -170,10 +170,6 @@ function requireCandidateCaseAccess(
   requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
 }
 
-function assertCaseDocumentAccess(_req: Request, _caseId: string): void {
-  // Document intake routes stay internal-token scoped in this merged stream.
-}
-
 function orchestratorCatalogs(
   caseId?: string,
   options: { excludeCalibrationRequestIds?: string[] } = {}
@@ -578,7 +574,6 @@ export function casesRouter(): Router {
     validateBody(documentUploadRequestSchema),
     (req, res) => {
       const caseData = requireCase(getId(req));
-      assertCaseDocumentAccess(req, caseData.id);
       const payload = documentUploadRequestSchema.parse(req.body);
       try {
         const built = buildDocumentIntakeEntry({
@@ -603,7 +598,6 @@ export function casesRouter(): Router {
     validateParams(caseIdParams),
     (req, res) => {
       const caseData = requireCase(getId(req));
-      assertCaseDocumentAccess(req, caseData.id);
       const entries = getCaseStore().documentEntriesFor(caseData.id);
       const summary = buildPublicDocumentSummary({
         caseId: caseData.id,

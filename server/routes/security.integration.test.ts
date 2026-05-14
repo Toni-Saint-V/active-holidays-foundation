@@ -11,7 +11,10 @@ import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
 
 const INTERNAL_API_TOKEN = "test-internal-security-token";
 const INVALID_INTERNAL_API_TOKEN = "test-internal-security-token-invalid";
-const INTERNAL_HEADERS = { "x-active-holidays-internal-token": INTERNAL_API_TOKEN };
+const INTERNAL_HEADERS = { "x-active-holidays-internal-token": INTERNAL_API_TOKEN } as const;
+const INVALID_INTERNAL_HEADERS = {
+  "x-active-holidays-internal-token": INVALID_INTERNAL_API_TOKEN
+} as const;
 
 const SENSITIVE_INTERNAL_ROUTES: Array<{
   method: "GET" | "POST";
@@ -190,11 +193,23 @@ describe("Express API security hardening", () => {
     expect(decisionsWithoutToken.response.status).toBe(403);
     expect(decisionsWithoutToken.json.error).toBe("internal_api_forbidden");
 
+    const decisionsWithInvalidToken = await requestJson("GET", "/api/decisions", {
+      headers: INVALID_INTERNAL_HEADERS
+    });
+    expect(decisionsWithInvalidToken.response.status).toBe(403);
+    expect(decisionsWithInvalidToken.json.error).toBe("internal_api_forbidden");
+
     const decisionsWithToken = await requestJson("GET", "/api/decisions", {
       headers: INTERNAL_HEADERS
     });
     expect(decisionsWithToken.response.status).toBe(200);
     expect(Array.isArray(decisionsWithToken.json.decisions)).toBe(true);
+
+    const operatorQueueWithInvalidToken = await requestJson("GET", "/api/human-review/ops/queue", {
+      headers: INVALID_INTERNAL_HEADERS
+    });
+    expect(operatorQueueWithInvalidToken.response.status).toBe(403);
+    expect(operatorQueueWithInvalidToken.json.error).toBe("internal_api_forbidden");
 
     const auditWithoutToken = await requestJson("GET", "/api/cases/s1-rf-italy/audit");
     expect(auditWithoutToken.response.status).toBe(403);
