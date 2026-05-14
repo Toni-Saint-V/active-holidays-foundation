@@ -18,6 +18,16 @@ const caseResponse = {
   forkedFrom: null
 };
 
+const caseSummaryResponse = {
+  id: caseResponse.id,
+  title: caseResponse.title,
+  productType: caseResponse.productType,
+  createdAt: caseResponse.createdAt,
+  updatedAt: caseResponse.updatedAt,
+  signalCount: caseResponse.signals.length,
+  forkedFrom: caseResponse.forkedFrom
+};
+
 const resultResponse = {
   version: "rdc.v1",
   productType: "residency_es",
@@ -53,6 +63,10 @@ const resultResponse = {
       capsApplied: [],
       factors: []
     },
+    evidenceStatus: "valid",
+    freshnessStatus: "fresh",
+    blockingReason: null,
+    humanReviewReason: null,
     volatilityScore: 0.1,
     sources: [],
     lastCheckedAt: "2026-04-17T10:00:00.000Z"
@@ -148,12 +162,9 @@ function okJson(body: unknown): Response {
 }
 
 describe("apiClient strict productType parsing", () => {
-  let internalClient: ReturnType<typeof createInternalCasesApiClient>;
-
   beforeEach(() => {
     configureApiBase("http://api.test");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    internalClient = createInternalCasesApiClient("internal-test-token");
   });
 
   afterEach(() => {
@@ -165,7 +176,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = caseResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(internalClient.getCase(caseResponse.id)).rejects.toMatchObject({
+    await expect(apiClient.getCase(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -175,7 +186,7 @@ describe("apiClient strict productType parsing", () => {
     const { productType: _productType, ...withoutProductType } = resultResponse;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okJson(withoutProductType)));
 
-    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -193,7 +204,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(internalClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
+    await expect(apiClient.getResult(resultResponse.caseId)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -212,7 +223,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(internalClient.recompute(caseResponse.id)).rejects.toMatchObject({
+    await expect(apiClient.recompute(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -242,7 +253,7 @@ describe("apiClient strict productType parsing", () => {
       )
     );
 
-    await expect(internalClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
+    await expect(apiClient.decisionScenarioLab(caseResponse.id)).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
@@ -281,7 +292,7 @@ describe("apiClient strict productType parsing", () => {
     );
 
     await expect(
-      internalClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
+      apiClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] })
     ).rejects.toMatchObject({
       status: 200,
       code: "schema_mismatch"
@@ -304,152 +315,369 @@ describe("apiClient strict productType parsing", () => {
       code: "schema_mismatch"
     } satisfies Partial<ApiError>);
   });
-});
 
-describe("apiClient internal/public boundary", () => {
-  beforeEach(() => {
-    configureApiBase("http://api.test");
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
-
-  it("does not expose internal-only case-bound methods on public client", () => {
-    expect("getCase" in apiClient).toBe(false);
-    expect("getResult" in apiClient).toBe(false);
-    expect("recommendationShortlist" in apiClient).toBe(false);
-    expect("recommendationDetail" in apiClient).toBe(false);
-    expect("patchSignals" in apiClient).toBe(false);
-    expect("recompute" in apiClient).toBe(false);
-    expect("overrideSignal" in apiClient).toBe(false);
-    expect("audit" in apiClient).toBe(false);
-    expect("documents" in apiClient).toBe(false);
-    expect("fork" in apiClient).toBe(false);
-    expect("scenarioFamily" in apiClient).toBe(false);
-    expect("compareScenario" in apiClient).toBe(false);
-    expect("decisionScenarioLab" in apiClient).toBe(false);
-    expect("decisions" in apiClient).toBe(false);
-    expect("humanReview" in apiClient).toBe(false);
-    expect("humanReviewCasePacket" in apiClient).toBe(false);
-    expect("submitHumanReview" in apiClient).toBe(false);
-  });
-
-  it("sends internal token header for internal case reads", async () => {
+  it("sends case access token via header and never puts it into URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(okJson(caseResponse));
     vi.stubGlobal("fetch", fetchMock);
 
-    const internalClient = createInternalCasesApiClient("internal-test-token");
-    await expect(internalClient.getCase("case-123")).resolves.toMatchObject({
-      id: caseResponse.id
-    });
+    await apiClient.getCase(caseResponse.id, "t".repeat(32));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.test/api/cases/case-123");
-    expect(init.headers).toMatchObject({
-      "Content-Type": "application/json",
-      "x-active-holidays-internal-token": "internal-test-token"
-    });
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv");
+    expect(url).not.toContain("accessToken=");
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe("t".repeat(32));
   });
 
-  it("sends internal token header for internal human-review GET", async () => {
+  it("sends candidate access token in compareScenario body and keeps tokens out of URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       okJson({
-        request: null
-      })
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    const internalClient = createInternalCasesApiClient("internal-test-token");
-    await expect(internalClient.humanReview("case-123")).resolves.toBeNull();
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
-    expect(init.headers).toMatchObject({
-      "Content-Type": "application/json",
-      "x-active-holidays-internal-token": "internal-test-token"
-    });
-  });
-
-  it("validates payload and posts to the same internal human-review route", async () => {
-    const now = "2026-04-17T10:00:00.000Z";
-    const fetchMock = vi.fn().mockResolvedValue(
-      okJson({
-        request: {
-          id: "hr-1",
-          caseId: "case-123",
-          status: "submitted",
-          channel: "email",
-          contact: "user@example.com",
-          message: "Нужна помощь по кейсу и документам.",
-          createdAt: now,
-          updatedAt: now,
-          closedAt: null,
-          durability: "persisted",
-          snapshot: {
-            decisionId: null,
-            verdict: "GO",
-            confidence: 0.91,
-            computedAt: now,
-            lastCheckedAt: now,
-            nextActionLabel: "Подготовить документы",
-            summary: "Проверка завершена."
-          },
-          handoff: null,
-          resolution: null,
-          events: [
-            {
-              id: "event-1",
-              at: now,
-              type: "submitted",
-              status: "submitted",
-              changedBy: "traveler",
-              note: null
-            }
-          ]
+        rootCaseId: caseResponse.id,
+        baseline: scenarioSummary,
+        candidateCase: caseResponse,
+        comparison: {
+          baseline: scenarioSummary,
+          candidate: scenarioSummary,
+          delta: {
+            verdictChanged: false,
+            confidenceDelta: 0,
+            primaryPathChanged: false,
+            documentsScoreDelta: 0,
+            documentsReadyDelta: 0,
+            nextActionChanged: false,
+            humanReviewChanged: false,
+            addedAlternativePathIds: [],
+            removedAlternativePathIds: [],
+            changedSignalIds: [],
+            changedPreferenceIds: [],
+            changedSignals: []
+          }
         },
-        reused: false
+        candidateDecisionRecordId: null
       })
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const internalClient = createInternalCasesApiClient("internal-test-token");
-
-    await expect(
-      internalClient.submitHumanReview("case-123", {
-        channel: "email",
-        contact: "user@example.com",
-        message: "Нужна помощь по кейсу и документам."
-      })
-    ).resolves.toMatchObject({ reused: false });
+    const baselineToken = "b".repeat(32);
+    const candidateToken = "c".repeat(32);
+    await apiClient.compareScenario(
+      caseResponse.id,
+      {
+        compareToCaseId: "s4-rf-residency-dnv-fork-2",
+        signals: [],
+        candidateAccessToken: candidateToken
+      },
+      baselineToken
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://api.test/api/cases/case-123/human-review");
-    expect(init.method).toBe("POST");
-    expect(init.headers).toMatchObject({
-      "Content-Type": "application/json",
-      "x-active-holidays-internal-token": "internal-test-token"
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/scenarios/compare");
+    expect(url).not.toContain("accessToken=");
+    expect(url).not.toContain(baselineToken);
+    expect(url).not.toContain(candidateToken);
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe(baselineToken);
+    const payload = JSON.parse(String(init.body)) as {
+      compareToCaseId: string;
+      candidateAccessToken?: string;
+    };
+    expect(payload.compareToCaseId).toBe("s4-rf-residency-dnv-fork-2");
+    expect(payload.candidateAccessToken).toBe(candidateToken);
+  });
+
+  it("uses header transport for case-scoped API calls without leaking token to URL", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/result")) return okJson(resultResponse);
+      if (url.endsWith("/human-review")) {
+        if ((init?.method ?? "GET").toUpperCase() === "POST") {
+          return okJson({
+            request: {
+              id: "hr_case_1",
+              caseId: caseResponse.id,
+              status: "submitted",
+              channel: "telegram",
+              contact: "@qa_case",
+              message: "Нужна ручная проверка по безопасному каналу.",
+              createdAt: "2026-04-17T10:00:00.000Z",
+              updatedAt: "2026-04-17T10:00:00.000Z",
+              closedAt: null,
+              durability: "volatile",
+              snapshot: {
+                decisionId: null,
+                verdict: "GO",
+                confidence: 0.91,
+                computedAt: "2026-04-17T10:00:00.000Z",
+                lastCheckedAt: "2026-04-17T10:00:00.000Z",
+                nextActionLabel: "Подготовить документы",
+                summary: "Тестовый snapshot"
+              },
+              handoff: null,
+              resolution: null,
+              events: [
+                {
+                  id: "ev_1",
+                  at: "2026-04-17T10:00:00.000Z",
+                  type: "submitted",
+                  status: "submitted",
+                  changedBy: "traveler",
+                  note: null
+                }
+              ]
+            },
+            reused: false
+          });
+        }
+        return okJson({ request: null });
+      }
+      if (url.endsWith("/documents")) {
+        return okJson({
+          score: 1,
+          readyCount: 1,
+          requiredCount: 1,
+          items: []
+        });
+      }
+      if (url.endsWith("/scenarios")) {
+        return okJson({
+          rootCaseId: caseResponse.id,
+          focusCaseId: caseResponse.id,
+          baseline: scenarioSummary,
+          scenarios: [scenarioSummary],
+          comparisons: []
+        });
+      }
+      if (url.endsWith("/scenarios/compare")) {
+        return okJson({
+          rootCaseId: caseResponse.id,
+          baseline: scenarioSummary,
+          candidateCase: caseResponse,
+          comparison: {
+            baseline: scenarioSummary,
+            candidate: scenarioSummary,
+            delta: {
+              verdictChanged: false,
+              confidenceDelta: 0,
+              primaryPathChanged: false,
+              documentsScoreDelta: 0,
+              documentsReadyDelta: 0,
+              nextActionChanged: false,
+              humanReviewChanged: false,
+              addedAlternativePathIds: [],
+              removedAlternativePathIds: [],
+              changedSignalIds: [],
+              changedPreferenceIds: [],
+              changedSignals: []
+            }
+          },
+          candidateDecisionRecordId: null
+        });
+      }
+      if (url.endsWith("/scenario-lab")) {
+        return okJson({
+          version: "scenario-lab.v2",
+          caseId: caseResponse.id,
+          generatedAt: "2026-04-17T10:00:00.000Z",
+          baseResult: resultResponse,
+          issues: [],
+          scenarios: [],
+          recommendedScenarioId: null,
+          noHelpfulScenarios: false,
+          humanReviewEscalation: {
+            required: false,
+            title: "Ручная проверка не нужна",
+            detail: "Автоматический сценарий остаётся рабочим.",
+            triggeredBy: []
+          }
+        });
+      }
+      if (url.endsWith("/fork")) {
+        return okJson({
+          case: caseResponse,
+          result: resultResponse,
+          access: {
+            caseId: caseResponse.id,
+            accessToken: "u".repeat(32),
+            issuedAt: "2026-04-17T10:00:00.000Z",
+            transport: "x-active-holidays-case-access"
+          }
+        });
+      }
+      if (url.endsWith("/recompute") || url.endsWith("/override-signal")) {
+        return okJson({
+          case: caseResponse,
+          result: resultResponse
+        });
+      }
+      return okJson(caseResponse);
     });
-    expect(init.body).toBe(
-      JSON.stringify({
-        channel: "email",
-        contact: "user@example.com",
-        message: "Нужна помощь по кейсу и документам."
-      })
+    vi.stubGlobal("fetch", fetchMock);
+    const token = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
+
+    await apiClient.getResult(caseResponse.id, token);
+    await apiClient.recompute(caseResponse.id, undefined, token);
+    await internalClient.overrideSignal(
+      caseResponse.id,
+      {
+        signalId: "timeline_weeks",
+        value: 3,
+        reason: "Тест",
+        appliedAt: "2026-05-13T12:00:00.000Z"
+      },
+      token
+    );
+    await apiClient.humanReview(caseResponse.id, token);
+    await apiClient.submitHumanReview(
+      caseResponse.id,
+      {
+        channel: "telegram",
+        contact: "@qa_case",
+        message: "Нужна ручная проверка по безопасному каналу."
+      },
+      token
+    );
+    await apiClient.documents(caseResponse.id, token);
+    await apiClient.fork(caseResponse.id, "Fork test", token);
+    await apiClient.scenarioFamily(caseResponse.id, token);
+    await apiClient.compareScenario(caseResponse.id, { title: "Сценарий", signals: [] }, token);
+    await apiClient.decisionScenarioLab(caseResponse.id, token);
+
+    expect(fetchMock).toHaveBeenCalled();
+    for (const [url, init] of fetchMock.mock.calls as [string, RequestInit][]) {
+      expect(url).not.toContain("accessToken=");
+      const headers = (init.headers ?? {}) as Record<string, string>;
+      expect(headers["x-active-holidays-case-access"]).toBe(token);
+    }
+  });
+
+  it("keeps case access error code on rejected getResult", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: vi.fn().mockResolvedValue({
+          error: "case_access_forbidden",
+          message: "Недостаточно прав для доступа к кейсу."
+        })
+      } as unknown as Response)
     );
 
-    fetchMock.mockClear();
-    await expect(
-      internalClient.submitHumanReview("case-123", {
-        channel: "email",
-        contact: "user@example.com",
-        message: "short"
+    await expect(apiClient.getResult(resultResponse.caseId, "t".repeat(32))).rejects.toMatchObject(
+      {
+        status: 403,
+        code: "case_access_forbidden"
+      } satisfies Partial<ApiError>
+    );
+  });
+
+  it("does not expose internal-only endpoints on public client", () => {
+    expect("listCases" in apiClient).toBe(false);
+    expect("decisions" in apiClient).toBe(false);
+    expect("audit" in apiClient).toBe(false);
+    expect("overrideSignal" in apiClient).toBe(false);
+    expect("humanReviewCasePacket" in apiClient).toBe(false);
+  });
+
+  it("uses explicit internal client for packet route and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: vi.fn().mockResolvedValue({
+        error: "internal_api_forbidden",
+        message: "Internal token required."
       })
-    ).rejects.toBeDefined();
-    expect(fetchMock).not.toHaveBeenCalled();
+    } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalToken = "internal-token";
+    const internalClient = createInternalCasesApiClient(internalToken);
+
+    await expect(
+      internalClient.humanReviewCasePacket(caseResponse.id, caseToken)
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "internal_api_forbidden"
+    } satisfies Partial<ApiError>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/human-review/packet");
+    expect(url).not.toContain("accessToken=");
+    expect(url).not.toContain(caseToken);
+    expect(url).not.toContain(internalToken);
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
+    expect(headers["x-active-holidays-internal-token"]).toBe(internalToken);
+  });
+
+  it("uses explicit internal client for listCases and decisions", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson({ cases: [caseSummaryResponse] }))
+      .mockResolvedValueOnce(okJson({ decisions: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(internalClient.listCases()).resolves.toHaveLength(1);
+    await expect(internalClient.decisions()).resolves.toEqual([]);
+
+    const [listUrl, listInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(listUrl).toBe("http://api.test/api/cases");
+    expect((listInit.headers as Record<string, string>)["x-active-holidays-internal-token"]).toBe(
+      "internal-token"
+    );
+
+    const [decisionsUrl, decisionsInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(decisionsUrl).toBe("http://api.test/api/decisions");
+    expect(
+      (decisionsInit.headers as Record<string, string>)["x-active-holidays-internal-token"]
+    ).toBe("internal-token");
+  });
+
+  it("uses explicit internal client for audit and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ trail: resultResponse.auditTrail, decisions: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(internalClient.audit(caseResponse.id, caseToken)).resolves.toBeTruthy();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/audit");
+    expect(url).not.toContain("accessToken=");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-active-holidays-internal-token"]).toBe("internal-token");
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
+  });
+
+  it("uses explicit internal client for override-signal and keeps tokens out of URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ case: caseResponse, result: resultResponse }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const caseToken = "u".repeat(32);
+    const internalClient = createInternalCasesApiClient("internal-token");
+    await expect(
+      internalClient.overrideSignal(
+        caseResponse.id,
+        {
+          signalId: "timeline_weeks",
+          value: 3,
+          reason: "Тестовый override",
+          appliedAt: "2026-05-13T12:00:00.000Z"
+        },
+        caseToken
+      )
+    ).resolves.toBeTruthy();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api.test/api/cases/s4-rf-residency-dnv/override-signal");
+    expect(url).not.toContain("accessToken=");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-active-holidays-internal-token"]).toBe("internal-token");
+    expect(headers["x-active-holidays-case-access"]).toBe(caseToken);
   });
 });

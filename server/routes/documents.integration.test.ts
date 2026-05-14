@@ -358,6 +358,30 @@ describe("document intake HTTP surface", () => {
     expect(response.json?.error).toBe("internal_api_forbidden");
   });
 
+  it("rejects GET documents list without case access token", async () => {
+    const caseId = await createIsolatedCase();
+    const response = await requestJson(
+      "GET",
+      `/api/cases/${caseId}/documents`,
+      undefined,
+      { token: null }
+    );
+    expect(response.status).toBe(403);
+    expect(response.json?.error).toBe("case_access_forbidden");
+  });
+
+  it("rejects GET documents list with invalid internal token but no case access", async () => {
+    const caseId = await createIsolatedCase();
+    const response = await requestJson(
+      "GET",
+      `/api/cases/${caseId}/documents`,
+      undefined,
+      { token: "invalid-test-token" }
+    );
+    expect(response.status).toBe(403);
+    expect(response.json?.error).toBe("case_access_forbidden");
+  });
+
   it("returns 503 when internal token is not configured", async () => {
     const caseId = await createIsolatedCase();
     const previous = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;

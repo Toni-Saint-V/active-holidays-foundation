@@ -4,6 +4,10 @@ import { nextActionSchema, actionTargetScreenSchema } from "./action";
 import { productTypeSchema } from "./product";
 import { signalIdSchema } from "./signals";
 import { verdictSchema } from "./verdict";
+import {
+  caseAccessCredentialSchema,
+  candidateAccessTokenInputSchema
+} from "./caseAccess";
 
 export const scenarioLabPlanStatusSchema = z.enum(["normal", "human_review"]);
 export type ScenarioLabPlanStatus = z.infer<typeof scenarioLabPlanStatusSchema>;
@@ -112,6 +116,7 @@ export type ScenarioLabFamily = z.infer<typeof scenarioLabFamilySchema>;
 export const scenarioLabCompareRequestSchema = z
   .object({
     compareToCaseId: z.string().min(1).optional(),
+    candidateAccessToken: candidateAccessTokenInputSchema,
     title: z.string().min(1).optional(),
     signals: caseSchema.shape.signals.default([]),
     preferences: caseSchema.shape.preferences.optional()
@@ -119,7 +124,9 @@ export const scenarioLabCompareRequestSchema = z
   .refine(
     (value) =>
       !value.compareToCaseId ||
-      (!value.title && value.signals.length === 0 && value.preferences === undefined),
+      (!value.title &&
+        value.signals.length === 0 &&
+        ((value.preferences?.length ?? 0) === 0)),
     {
       message: "Нельзя одновременно сравнивать существующий кейс и создавать новый fork.",
       path: ["compareToCaseId"]
@@ -143,6 +150,7 @@ export const scenarioLabCompareResponseSchema = z.object({
   baseline: scenarioLabSummarySchema,
   candidateCase: caseSchema,
   comparison: scenarioLabComparisonSchema,
-  candidateDecisionRecordId: z.string().min(1).nullable()
+  candidateDecisionRecordId: z.string().min(1).nullable(),
+  access: caseAccessCredentialSchema.optional()
 });
 export type ScenarioLabCompareResponse = z.infer<typeof scenarioLabCompareResponseSchema>;
