@@ -60,9 +60,19 @@ Block any change that introduces:
 - Always inspect `package.json` scripts before claiming checks passed.
 - If a script is missing, mark it `ABSENT`; never report it as passed.
 - Never hide failing checks.
+- CI degraded mode is allowed only for proven external CI billing/startup outage with a documented proof pack and expiry.
+- Expired degraded mode is invalid and must be reported as `BLOCKED` until normal mode is restored.
 - Docs-only tasks must not touch runtime/UI/backend code or dependencies.
 - Do not change public API unless task scope requires it.
 - For UI code tasks, PNG approval is required before UI implementation.
+
+## Temporary CI Degraded Mode (Billing Outage Only)
+
+- Use only for external CI outage signals (for example `startup_failure`, empty CI jobs, suspended billing account), not for code/test failures.
+- Open an incident note: `reports/incidents/ci-degraded-mode-YYYY-MM-DD.md` with `owner`, `opened_at`, `expires_at`, and affected PRs.
+- Maximum validity is `24h` per activation. Renewal requires fresh outage proof and an updated expiry.
+- Mandatory proof pack in PR report: outage evidence, local verification evidence, risk boundaries, rollback, return-to-normal plan.
+- Hard limits during degraded mode: no schema migrations, auth/payments/security/PII sensitive changes, public API contract changes, release tagging, or force-merge.
 
 ## Premium UI Gate
 
