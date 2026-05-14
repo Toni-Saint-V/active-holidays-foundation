@@ -86,10 +86,6 @@ function requireCase(id: string): Case {
   return existing;
 }
 
-function assertCaseDocumentAccess(_req: Request, _caseId: string): void {
-  // TODO: replace internal token guard with case-scoped access guard when it lands in this branch.
-}
-
 function orchestratorCatalogs(
   caseId?: string,
   options: { excludeCalibrationRequestIds?: string[] } = {}
@@ -469,7 +465,6 @@ export function casesRouter(): Router {
     validateBody(documentUploadRequestSchema),
     (req, res) => {
       const caseData = requireCase(getId(req));
-      assertCaseDocumentAccess(req, caseData.id);
       const payload = documentUploadRequestSchema.parse(req.body);
       try {
         const built = buildDocumentIntakeEntry({
@@ -494,7 +489,6 @@ export function casesRouter(): Router {
     validateParams(caseIdParams),
     (req, res) => {
       const caseData = requireCase(getId(req));
-      assertCaseDocumentAccess(req, caseData.id);
       const entries = getCaseStore().documentEntriesFor(caseData.id);
       const summary = buildPublicDocumentSummary({
         caseId: caseData.id,
