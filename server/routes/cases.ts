@@ -19,6 +19,10 @@ import {
   documentUploadResponseSchema,
   publicDocumentCheckSummarySchema,
   caseSummarySchema,
+  CASE_ACCESS_HEADER,
+  DEV_SEED_ACCESS_HEADER,
+  hasCandidateAccessToken,
+  requiresCandidateAccessTokenForCrossCase,
   type Case,
   type CaseSignals,
   type DecisionKind,
@@ -72,6 +76,7 @@ import {
 } from "@shared/domain/engine";
 
 const caseIdParams = z.object({ id: z.string().min(1) });
+const DEV_SEED_ACCESS_ENABLED = process.env.ACTIVE_HOLIDAYS_DEV_SEED_ACCESS === "1";
 
 function getId(req: Request): string {
   const raw = req.params.id;
@@ -86,8 +91,87 @@ function requireCase(id: string): Case {
   return existing;
 }
 
+function caseAccessTokenFromHeader(req: Request): string | null {
+  const raw = req.header(CASE_ACCESS_HEADER);
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function allowDevSeedAccessBypass(req: Request, caseData: Case): boolean {
+  if (caseData.forkedFrom !== null) return false;
+  if (process.env.NODE_ENV === "test") return true;
+  if (!DEV_SEED_ACCESS_ENABLED) return false;
+  return req.header(DEV_SEED_ACCESS_HEADER) === "1";
+}
+
+function isPublicSeedTemplateCase(caseData: Case): boolean {
+  return caseData.forkedFrom === null;
+}
+
+function canBypassCaseAccess(
+  req: Request,
+  caseData: Case,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): boolean {
+  if (options.allowPublicSeedTemplateBypass && isPublicSeedTemplateCase(caseData)) {
+    return true;
+  }
+  return allowDevSeedAccessBypass(req, caseData);
+}
+
+function throwCaseAccessForbidden(): never {
+  throw new HttpError(
+    403,
+    "Недостаточно прав для доступа к кейсу.",
+    "case_access_forbidden"
+  );
+}
+
+function assertCaseToken(caseId: string, token: string | null | undefined): void {
+  const normalized = token?.trim();
+  if (!normalized || !getCaseStore().validateCaseAccess(caseId, normalized)) {
+    throwCaseAccessForbidden();
+  }
+}
+
+function requireCaseAccess(
+  req: Request,
+  caseData: Case,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): void {
+  if (canBypassCaseAccess(req, caseData, options)) return;
+  assertCaseToken(caseData.id, caseAccessTokenFromHeader(req));
+}
+
+function requireCaseAccessByToken(
+  req: Request,
+  caseData: Case,
+  token: string | undefined,
+  options: { allowPublicSeedTemplateBypass?: boolean } = {}
+): void {
+  if (canBypassCaseAccess(req, caseData, options)) return;
+  assertCaseToken(caseData.id, token);
+}
+
+function requireCandidateCaseAccess(
+  req: Request,
+  baselineCase: Case,
+  candidateCase: Case,
+  candidateAccessToken: string | undefined
+): void {
+  if (!requiresCandidateAccessTokenForCrossCase(baselineCase.id, candidateCase.id)) {
+    requireCaseAccess(req, candidateCase);
+    return;
+  }
+  if (!hasCandidateAccessToken(candidateAccessToken)) {
+    throwCaseAccessForbidden();
+  }
+  requireCaseAccessByToken(req, candidateCase, candidateAccessToken);
+}
+
 function assertCaseDocumentAccess(_req: Request, _caseId: string): void {
-  // TODO: replace internal token guard with case-scoped access guard when it lands in this branch.
+  // Document intake routes stay internal-token scoped in this merged stream.
 }
 
 function orchestratorCatalogs(
@@ -265,19 +349,36 @@ export function casesRouter(): Router {
     res.json({ cases: caseSummarySchema.array().parse(summaries) });
   });
 
-  router.get("/:id", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     res.json(caseData);
   });
 
-  router.get("/:id/result", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/result", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(result);
   });
 
-  router.get("/:id/recommendations/shortlist", requireInternalApiToken, recommendationRateLimit, validateParams(caseIdParams), async (req, res) => {
+  router.post(
+    "/:id/access/grant",
+    requireInternalApiToken,
+    validateParams(caseIdParams),
+    (req, res) => {
+      const caseData = requireCase(getId(req));
+      const access = getCaseStore().issueCaseAccess(caseData.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для кейса.");
+      }
+      res.json({ access });
+    }
+  );
+
+  router.get("/:id/recommendations/shortlist", recommendationRateLimit, validateParams(caseIdParams), async (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     const shortlist = await buildRecommendationShortlist(caseData, result);
     if (!shortlist) {
@@ -292,12 +393,12 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/detail",
-    requireInternalApiToken,
     recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationDetailRequestSchema),
     async (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const result = computeResult(caseData);
       const { offerId } = recommendationDetailRequestSchema.parse(req.body);
 
@@ -319,15 +420,21 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recommendations/what-if-brief",
-    requireInternalApiToken,
     recommendationRateLimit,
     validateParams(caseIdParams),
     validateBody(recommendationWhatIfBriefRequestSchema),
     async (req, res) => {
       const id = getId(req);
       const baselineCase = requireCase(id);
+      requireCaseAccess(req, baselineCase);
       const payload = recommendationWhatIfBriefRequestSchema.parse(req.body);
       const candidateCase = requireCase(payload.candidateCaseId);
+      requireCandidateCaseAccess(
+        req,
+        baselineCase,
+        candidateCase,
+        payload.candidateAccessToken
+      );
 
       if (!ensureSameScenarioFamily(getCaseStore(), baselineCase.id, candidateCase.id)) {
         throw new HttpError(
@@ -358,13 +465,13 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/signals",
-    requireInternalApiToken,
     validateParams(caseIdParams),
     validateBody(z.object({ signals: caseSignalsSchema })),
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const caseData = requireCase(id);
+      requireCaseAccess(req, caseData);
       const signals = (req.body as { signals: CaseSignals }).signals;
       for (const signal of signals) {
         const parsed = signalValueSchema.safeParse({
@@ -393,7 +500,6 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/recompute",
-    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(
@@ -407,6 +513,7 @@ export function casesRouter(): Router {
       const id = getId(req);
       const store = getCaseStore();
       const existing = requireCase(id);
+      requireCaseAccess(req, existing);
       const preferences = (req.body as { preferences?: typeof existing.preferences }).preferences;
       const updated = preferences
         ? store.setPreferences(existing.id, preferences) ?? existing
@@ -433,7 +540,8 @@ export function casesRouter(): Router {
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const caseData = requireCase(id);
+      requireCaseAccess(req, caseData);
       const override = req.body as z.infer<typeof caseOverrideSchema>;
       const updated = store.overrideSignal(id, override);
       if (!updated) {
@@ -455,6 +563,7 @@ export function casesRouter(): Router {
 
   router.get("/:id/audit", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json({
       trail: result.auditTrail,
@@ -504,20 +613,23 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/documents", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/documents", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(result.documents);
   });
 
-  router.get("/:id/human-review", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/human-review", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const request = getCaseStore().latestHumanReviewFor(caseData.id);
     res.json(humanReviewResponseSchema.parse({ request }));
   });
 
   router.get("/:id/human-review/packet", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const request = getCaseStore().activeHumanReviewFor(caseData.id);
     if (!request) {
       throw new HttpError(
@@ -539,6 +651,7 @@ export function casesRouter(): Router {
     validateBody(humanReviewManagerBriefRequestSchema.default({})),
     async (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const request = getCaseStore().activeHumanReviewFor(caseData.id);
       if (!request) {
         throw new HttpError(
@@ -562,11 +675,11 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/human-review",
-    requireInternalApiToken,
     validateParams(caseIdParams),
     validateBody(humanReviewCreateRequestSchema),
     (req, res) => {
       const caseData = requireCase(getId(req));
+      requireCaseAccess(req, caseData);
       const payload = humanReviewCreateRequestSchema.parse(req.body);
       const catalogs = orchestratorCatalogs(caseData.id);
       const result = computeResult(caseData, catalogs);
@@ -741,22 +854,23 @@ export function casesRouter(): Router {
     }
   );
 
-  router.get("/:id/scenario-lab", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/scenario-lab", validateParams(caseIdParams), (req, res) => {
     const caseData = requireCase(getId(req));
+    requireCaseAccess(req, caseData);
     const result = computeResult(caseData);
     res.json(buildDecisionScenarioLab(caseData, orchestratorCatalogs(caseData.id), result));
   });
 
-  router.get("/:id/scenarios", requireInternalApiToken, validateParams(caseIdParams), (req, res) => {
+  router.get("/:id/scenarios", validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
-    requireCase(id);
+    const caseData = requireCase(id);
+    requireCaseAccess(req, caseData);
     const family = buildScenarioFamily(getCaseStore(), id, computeResult);
     res.json(family);
   });
 
   router.post(
     "/:id/scenarios/compare",
-    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(scenarioLabCompareRequestSchema),
@@ -764,8 +878,10 @@ export function casesRouter(): Router {
       const id = getId(req);
       const store = getCaseStore();
       const baselineCase = requireCase(id);
+      requireCaseAccess(req, baselineCase);
       const {
         compareToCaseId,
+        candidateAccessToken,
         title,
         signals,
         preferences
@@ -773,6 +889,12 @@ export function casesRouter(): Router {
 
       if (compareToCaseId) {
         const candidateCase = requireCase(compareToCaseId);
+        requireCandidateCaseAccess(
+          req,
+          baselineCase,
+          candidateCase,
+          candidateAccessToken
+        );
         if (!ensureSameScenarioFamily(store, baselineCase.id, candidateCase.id)) {
           throw new HttpError(
             400,
@@ -794,6 +916,10 @@ export function casesRouter(): Router {
       const forked = store.fork(id, { title });
       if (!forked) {
         throw new HttpError(500, "Не удалось создать сценарный fork.");
+      }
+      const access = store.issueCaseAccess(forked.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для сценарного fork.");
       }
 
       let candidateCase = forked;
@@ -822,21 +948,23 @@ export function casesRouter(): Router {
         }
       );
 
-      res.json(
-        buildScenarioCompareResponse({
+      res.json({
+        ...buildScenarioCompareResponse({
           store,
           baselineCase,
           candidateCase,
           candidateDecisionRecordId: record.decisionId,
           computeResult
-        })
-      );
+        }),
+        access
+      });
     }
   );
 
   router.get("/:id/drift", requireInternalApiToken, internalExpensiveRateLimit, validateParams(caseIdParams), (req, res) => {
     const id = getId(req);
     const currentCase = requireCase(id);
+    requireCaseAccess(req, currentCase);
     const latest = getCaseStore().latestRecordFor(id);
     if (!latest) {
       throw new HttpError(
@@ -886,24 +1014,28 @@ export function casesRouter(): Router {
 
   router.post(
     "/:id/fork",
-    requireInternalApiToken,
     expensiveApiRateLimit,
     validateParams(caseIdParams),
     validateBody(z.object({ title: z.string().min(1).optional() }).default({})),
     (req, res) => {
       const id = getId(req);
       const store = getCaseStore();
-      requireCase(id);
+      const baseCase = requireCase(id);
+      requireCaseAccess(req, baseCase, { allowPublicSeedTemplateBypass: true });
       const title = (req.body as { title?: string }).title;
       const forked = store.fork(id, { title });
       if (!forked) throw new HttpError(500, "Не удалось форкнуть кейс.");
+      const access = store.issueCaseAccess(forked.id);
+      if (!access) {
+        throw new HttpError(500, "Не удалось выдать access credential для кейса.");
+      }
       const { result, record } = recordDecision(
         forked,
         `Форк кейса ${id}.`,
         "fork",
         { changedSignalIds: [] }
       );
-      res.json({ case: forked, result, decisionRecordId: record.decisionId });
+      res.json({ case: forked, result, decisionRecordId: record.decisionId, access });
     }
   );
 

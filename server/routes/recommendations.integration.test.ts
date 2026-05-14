@@ -3,7 +3,9 @@ import type { Express } from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import {
+  CASE_ACCESS_HEADER,
   resultPayloadSchema,
+  recommendationWhatIfBriefSchema,
   recommendationDetailSchema,
   recommendationShortlistSchema
 } from "@shared/contracts";
@@ -31,13 +33,10 @@ let app: Express;
 let server: Server;
 let baseUrl = "";
 const previousApiKey = process.env.OPENAI_API_KEY;
-const previousInternalApiToken = process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
-const INTERNAL_API_TOKEN = "test-internal-recommendations-token";
 let restoreFreshCatalogs: (() => void) | null = null;
 
 beforeAll(async () => {
   delete process.env.OPENAI_API_KEY;
-  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = INTERNAL_API_TOKEN;
   app = await createApp();
   server = await new Promise<Server>((resolve) => {
     const instance = app.listen(0, () => resolve(instance));
@@ -75,33 +74,28 @@ afterAll(async () => {
   });
   if (previousApiKey === undefined) {
     delete process.env.OPENAI_API_KEY;
-  } else {
-    process.env.OPENAI_API_KEY = previousApiKey;
-  }
-  if (previousInternalApiToken === undefined) {
-    delete process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN;
     return;
   }
-  process.env.ACTIVE_HOLIDAYS_INTERNAL_API_TOKEN = previousInternalApiToken;
+  process.env.OPENAI_API_KEY = previousApiKey;
 });
 
 async function requestJson(
   method: "GET" | "POST",
   path: string,
-  body?: unknown
+  body?: unknown,
+  headers?: Record<string, string>
 ) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: body
-      ? {
-          "content-type": "application/json",
-          connection: "close",
-          "x-active-holidays-internal-token": INTERNAL_API_TOKEN
-        }
-      : {
-          connection: "close",
-          "x-active-holidays-internal-token": INTERNAL_API_TOKEN
-        },
+    headers: {
+      ...(body
+        ? {
+            "content-type": "application/json"
+          }
+        : {}),
+      connection: "close",
+      ...(headers ?? {})
+    },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const text = await response.text();
@@ -273,5 +267,138 @@ describe("recommendation HTTP surface", () => {
     expect(mergedDetailCopy).not.toContain(result.nextAction.label);
     expect(mergedDetailCopy).not.toContain(result.nextAction.detail);
     expect(mergedDetailCopy).not.toMatch(/confidence|score|quality|\/100|\d{1,3}%/i);
+  });
+
+  it("builds what-if brief only when candidate credential matches candidate case", async () => {
+    const baselineFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.case.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const candidateFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
+    expect(candidateFork.status).toBe(200);
+    const candidateId = candidateFork.json.case.id as string;
+    const candidateToken = candidateFork.json.access.accessToken as string;
+
+    const shortlist = await requestJson(
+      "GET",
+      `/api/cases/${baselineId}/recommendations/shortlist`,
+      undefined,
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(shortlist.status).toBe(200);
+    const offerId = shortlist.json.items[0].offerId as string;
+
+    const success = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        candidateAccessToken: candidateToken,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(success.status).toBe(200);
+    const parsed = recommendationWhatIfBriefSchema.parse(success.json);
+    expect(parsed.caseId).toBe(baselineId);
+    expect(parsed.candidateCaseId).toBe(candidateId);
+
+    const missing = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(missing.status).toBe(403);
+    expect(missing.json.error).toBe("case_access_forbidden");
+
+    const queryInjected = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief?candidateAccessToken=${candidateToken}`,
+      {
+        candidateCaseId: candidateId,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(queryInjected.status).toBe(403);
+    expect(queryInjected.json.error).toBe("case_access_forbidden");
+
+    const invalid = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        candidateAccessToken: `${candidateToken}-tampered`,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(invalid.status).toBe(403);
+    expect(invalid.json.error).toBe("case_access_forbidden");
+
+    const malformed = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        candidateAccessToken: "short",
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(malformed.status).toBe(403);
+    expect(malformed.json.error).toBe("case_access_forbidden");
+
+    const thirdFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
+    expect(thirdFork.status).toBe(200);
+    const thirdToken = thirdFork.json.access.accessToken as string;
+    const wrongCaseToken = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: candidateId,
+        candidateAccessToken: thirdToken,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(wrongCaseToken.status).toBe(403);
+    expect(wrongCaseToken.json.error).toBe("case_access_forbidden");
+  });
+
+  it("allows same-case what-if brief without candidate credential when baseline token is valid", async () => {
+    const baselineFork = await requestJson("POST", "/api/cases/s1-rf-italy/fork", {});
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.case.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const shortlist = await requestJson(
+      "GET",
+      `/api/cases/${baselineId}/recommendations/shortlist`,
+      undefined,
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(shortlist.status).toBe(200);
+    const offerId = shortlist.json.items[0].offerId as string;
+
+    const response = await requestJson(
+      "POST",
+      `/api/cases/${baselineId}/recommendations/what-if-brief`,
+      {
+        candidateCaseId: baselineId,
+        offerId
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+
+    expect(response.status).toBe(200);
+    const parsed = recommendationWhatIfBriefSchema.parse(response.json);
+    expect(parsed.caseId).toBe(baselineId);
+    expect(parsed.candidateCaseId).toBe(baselineId);
   });
 });
