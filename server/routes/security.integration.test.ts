@@ -33,6 +33,19 @@ const SENSITIVE_INTERNAL_ROUTES: Array<{
       appliedAt: "2026-05-13T12:00:00.000Z"
     }
   },
+  {
+    method: "POST",
+    path: "/api/cases/s1-rf-italy/documents",
+    body: {
+      kind: "passport",
+      fileName: "passport.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1,
+      contentBase64: "QQ==",
+      source: "user_file"
+    }
+  },
+  { method: "GET", path: "/api/cases/s1-rf-italy/documents/summary" },
   { method: "GET", path: "/api/cases/s2-tr-spb/human-review/packet" },
   {
     method: "POST",
