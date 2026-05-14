@@ -5,6 +5,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Duplex } from "node:stream";
+import { CASE_ACCESS_HEADER } from "@shared/contracts";
 import { createApp } from "../index";
 import { getCatalogsOrThrow, loadCatalogs, replaceCatalogsForTest } from "../lib/catalogs";
 import { freshCatalogsForRouteTest } from "./testFreshCatalogs";
@@ -111,7 +112,8 @@ afterAll(async () => {
 async function requestJson(
   method: "GET" | "POST",
   path: string,
-  body?: unknown
+  body?: unknown,
+  headers?: Record<string, string>
 ) {
   const payload = body === undefined ? null : JSON.stringify(body);
   const socket = new MockSocket();
@@ -125,7 +127,8 @@ async function requestJson(
           "content-length": String(Buffer.byteLength(payload))
         }
       : {}),
-    "x-active-holidays-internal-token": INTERNAL_API_TOKEN
+    "x-active-holidays-internal-token": INTERNAL_API_TOKEN,
+    ...(headers ?? {})
   };
   if (payload) req.push(payload);
   req.push(null);
@@ -166,12 +169,12 @@ async function requestJson(
   return { status: res.statusCode, json } as const;
 }
 
-async function getJson(path: string) {
-  return requestJson("GET", path);
+async function getJson(path: string, headers?: Record<string, string>) {
+  return requestJson("GET", path, undefined, headers);
 }
 
-async function postJson(path: string, body?: unknown) {
-  return requestJson("POST", path, body);
+async function postJson(path: string, body?: unknown, headers?: Record<string, string>) {
+  return requestJson("POST", path, body, headers);
 }
 
 async function withFreshEvidence<T>(run: () => Promise<T>): Promise<T> {
@@ -324,6 +327,116 @@ describe("scenario lab HTTP surface", () => {
     ]);
   });
 
+  it("compares two existing forked scenarios only with candidate credential", async () => {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/fork", {
+      title: "S1 — baseline fork для dual-token compare"
+    });
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.case.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const candidateFork = await postJson("/api/cases/s1-rf-italy/fork", {
+      title: "S1 — candidate fork для dual-token compare"
+    });
+    expect(candidateFork.status).toBe(200);
+    const candidateId = candidateFork.json.case.id as string;
+    const candidateToken = candidateFork.json.access.accessToken as string;
+
+    const success = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: candidateToken
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(success.status).toBe(200);
+    expect(success.json.rootCaseId).toBe("s1-rf-italy");
+    expect(success.json.candidateCase.id).toBe(candidateId);
+
+    const missing = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      { compareToCaseId: candidateId, signals: [] },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(missing.status).toBe(403);
+    expect(missing.json.error).toBe("case_access_forbidden");
+
+    const queryInjected = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare?candidateAccessToken=${candidateToken}`,
+      { compareToCaseId: candidateId, signals: [] },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(queryInjected.status).toBe(403);
+    expect(queryInjected.json.error).toBe("case_access_forbidden");
+
+    const invalid = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: `${candidateToken}-tampered`
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(invalid.status).toBe(403);
+    expect(invalid.json.error).toBe("case_access_forbidden");
+
+    const malformed = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: "short"
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(malformed.status).toBe(403);
+    expect(malformed.json.error).toBe("case_access_forbidden");
+
+    const thirdFork = await postJson("/api/cases/s1-rf-italy/fork", {
+      title: "S1 — third fork token isolation"
+    });
+    expect(thirdFork.status).toBe(200);
+    const thirdToken = thirdFork.json.access.accessToken as string;
+
+    const wrongCaseToken = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: candidateId,
+        signals: [],
+        candidateAccessToken: thirdToken
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+    expect(wrongCaseToken.status).toBe(403);
+    expect(wrongCaseToken.json.error).toBe("case_access_forbidden");
+  });
+
+  it("allows same-case compare without candidate credential when baseline token is valid", async () => {
+    const baselineFork = await postJson("/api/cases/s1-rf-italy/fork", {
+      title: "S1 — baseline fork для same-case compare"
+    });
+    expect(baselineFork.status).toBe(200);
+    const baselineId = baselineFork.json.case.id as string;
+    const baselineToken = baselineFork.json.access.accessToken as string;
+
+    const sameCase = await postJson(
+      `/api/cases/${baselineId}/scenarios/compare`,
+      {
+        compareToCaseId: baselineId,
+        signals: []
+      },
+      { [CASE_ACCESS_HEADER]: baselineToken }
+    );
+
+    expect(sameCase.status).toBe(200);
+    expect(sameCase.json.rootCaseId).toBe("s1-rf-italy");
+    expect(sameCase.json.baseline.caseId).toBe(baselineId);
+    expect(sameCase.json.candidateCase.id).toBe(baselineId);
+  });
+
   it("returns the whole fork family with comparisons relative to the root scenario", async () => {
     const compare = await postJson("/api/cases/s4-rf-residency-dnv/scenarios/compare", {
       title: "S4 — доход выше и документов больше",
@@ -343,8 +456,11 @@ describe("scenario lab HTTP surface", () => {
       ]
     });
     const candidateId = compare.json.candidateCase.id as string;
+    const accessToken = compare.json.access.accessToken as string;
 
-    const family = await getJson(`/api/cases/${candidateId}/scenarios`);
+    const family = await getJson(`/api/cases/${candidateId}/scenarios`, {
+      [CASE_ACCESS_HEADER]: accessToken
+    });
     expect(family.status).toBe(200);
     expect(family.json.rootCaseId).toBe("s4-rf-residency-dnv");
     expect(family.json.focusCaseId).toBe(candidateId);
